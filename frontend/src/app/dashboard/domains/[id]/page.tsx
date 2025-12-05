@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe,
@@ -21,51 +21,33 @@ import {
   Eye,
   Download,
   RefreshCw,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime } from '@/lib/utils';
+import { domainsApi } from '@/lib/api';
 
-// Mock domain data
-const domainData = {
-  id: '1',
-  domain: 'example.com',
-  program: { id: '1', name: 'Example Corp Bug Bounty' },
-  status: 'active',
-  lastScan: '2024-01-15T10:30:00Z',
-  stats: {
-    subdomains: 156,
-    aliveSubdomains: 142,
-    ports: 423,
-    vulnerabilities: 12,
-    endpoints: 89,
-    technologies: 15,
-  },
-  recentScans: [
-    { id: '1', type: 'full', status: 'completed', date: '2024-01-15T10:30:00Z', vulns: 3 },
-    { id: '2', type: 'quick', status: 'completed', date: '2024-01-14T08:00:00Z', vulns: 1 },
-    { id: '3', type: 'vulnerability', status: 'completed', date: '2024-01-13T15:00:00Z', vulns: 0 },
-  ],
-  topSubdomains: [
-    { subdomain: 'api.example.com', ip: '192.168.1.100', status: 200, vulns: 5 },
-    { subdomain: 'app.example.com', ip: '192.168.1.101', status: 200, vulns: 3 },
-    { subdomain: 'staging.example.com', ip: '192.168.1.102', status: 401, vulns: 2 },
-    { subdomain: 'dev.example.com', ip: '192.168.1.103', status: 403, vulns: 1 },
-    { subdomain: 'mail.example.com', ip: '192.168.1.104', status: 200, vulns: 1 },
-  ],
-  vulnerabilities: [
-    { id: 1, title: 'SQL Injection', severity: 'critical', target: 'api.example.com/users' },
-    { id: 2, title: 'XSS Reflected', severity: 'high', target: 'app.example.com/search' },
-    { id: 3, title: 'Information Disclosure', severity: 'medium', target: 'dev.example.com' },
-    { id: 4, title: 'Missing Security Headers', severity: 'low', target: 'example.com' },
-  ],
-  technologies: [
-    { name: 'nginx', category: 'Web Server', count: 89 },
-    { name: 'React', category: 'JavaScript Framework', count: 45 },
-    { name: 'Node.js', category: 'Runtime', count: 34 },
-    { name: 'AWS', category: 'Cloud', count: 23 },
-    { name: 'Cloudflare', category: 'CDN/WAF', count: 12 },
-  ],
-};
+interface Domain {
+  _id: string;
+  domain: string;
+  programId?: { _id: string; name: string };
+  status: string;
+  subdomainCount: number;
+  vulnerabilityCount: number;
+  endpointCount: number;
+  lastScan?: string;
+  technologies: string[];
+  createdAt: string;
+}
+
+interface DomainStats {
+  domain: Domain;
+  subdomainCount: number;
+  aliveCount: number;
+  deadCount: number;
+  technologies: { _id: string; count: number }[];
+  recentScans: any[];
+}
 
 const severityColors: Record<string, string> = {
   critical: 'bg-red-500/20 text-red-400',
@@ -83,7 +65,73 @@ const getStatusColor = (status: number) => {
 
 export default function DomainDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('overview');
-  const domain = domainData;
+  const [domain, setDomain] = useState<Domain | null>(null);
+  const [stats, setStats] = useState<DomainStats | null>(null);
+  const [subdomains, setSubdomains] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchDomainData = async () => {
+      try {
+        const [domainRes, statsRes, subdomainsRes] = await Promise.all([
+          domainsApi.getById(params.id),
+          domainsApi.getStats(params.id),
+          domainsApi.getSubdomains(params.id),
+        ]);
+        setDomain(domainRes.data);
+        setStats(statsRes.data);
+        setSubdomains(subdomainsRes.data);
+      } catch (err: any) {
+        console.error('Failed to fetch domain:', err);
+        setError(err.response?.data?.message || 'Failed to load domain');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDomainData();
+  }, [params.id]);
+
+  const handleStartScan = async () => {
+    try {
+      setScanning(true);
+      await domainsApi.startScan(params.id);
+      // Refresh domain data
+      const domainRes = await domainsApi.getById(params.id);
+      setDomain(domainRes.data);
+    } catch (err: any) {
+      console.error('Failed to start scan:', err);
+      setError(err.response?.data?.message || 'Failed to start scan');
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !domain) {
+    return (
+      <div className="text-center py-24">
+        <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-white mb-2">Error loading domain</h3>
+        <p className="text-slate-400 mb-4">{error || 'Domain not found'}</p>
+        <Link
+          href="/dashboard/domains"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Domains
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -101,17 +149,26 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
               <h1 className="text-2xl font-bold text-white">{domain.domain}</h1>
               <span className={cn(
                 'px-2 py-1 rounded text-xs',
-                domain.status === 'active' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+                domain.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                domain.status === 'scanning' ? 'bg-blue-500/20 text-blue-400' :
+                domain.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                'bg-yellow-500/20 text-yellow-400'
               )}>
                 {domain.status}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-1">
-              <Link href={`/dashboard/programs/${domain.program.id}`} className="text-sm text-primary-400 hover:text-primary-300">
-                {domain.program.name}
-              </Link>
-              <span className="text-slate-500">•</span>
-              <span className="text-sm text-slate-400">Last scan: {formatDateTime(domain.lastScan)}</span>
+              {domain.programId && (
+                <>
+                  <Link href={`/dashboard/programs/${domain.programId._id}`} className="text-sm text-primary-400 hover:text-primary-300">
+                    {domain.programId.name}
+                  </Link>
+                  <span className="text-slate-500">•</span>
+                </>
+              )}
+              <span className="text-sm text-slate-400">
+                {domain.lastScan ? `Last scan: ${formatDateTime(domain.lastScan)}` : 'Not scanned yet'}
+              </span>
             </div>
           </div>
         </div>
@@ -125,25 +182,40 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
             <ExternalLink className="w-4 h-4" />
             Visit Site
           </a>
-          <Link
-            href="/dashboard/scans/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
+          <button
+            onClick={handleStartScan}
+            disabled={scanning || domain.status === 'scanning'}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
+              scanning || domain.status === 'scanning'
+                ? 'bg-dark-700 text-slate-500 cursor-not-allowed'
+                : 'bg-primary-600 hover:bg-primary-500 text-white'
+            )}
           >
-            <Play className="w-4 h-4" />
-            Start Scan
-          </Link>
+            {scanning || domain.status === 'scanning' ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Scanning...
+              </>
+            ) : (
+              <>
+                <Play className="w-4 h-4" />
+                Start Scan
+              </>
+            )}
+          </button>
         </div>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-6 gap-4">
         {[
-          { label: 'Subdomains', value: domain.stats.subdomains, icon: Layers, color: 'text-blue-400' },
-          { label: 'Alive', value: domain.stats.aliveSubdomains, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'Open Ports', value: domain.stats.ports, icon: Server, color: 'text-purple-400' },
-          { label: 'Vulnerabilities', value: domain.stats.vulnerabilities, icon: Shield, color: 'text-red-400' },
-          { label: 'Endpoints', value: domain.stats.endpoints, icon: Globe, color: 'text-cyan-400' },
-          { label: 'Technologies', value: domain.stats.technologies, icon: Settings, color: 'text-yellow-400' },
+          { label: 'Subdomains', value: stats?.subdomainCount || domain.subdomainCount || 0, icon: Layers, color: 'text-blue-400' },
+          { label: 'Alive', value: stats?.aliveCount || 0, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Dead', value: stats?.deadCount || 0, icon: XCircle, color: 'text-red-400' },
+          { label: 'Vulnerabilities', value: domain.vulnerabilityCount || 0, icon: Shield, color: 'text-red-400' },
+          { label: 'Endpoints', value: domain.endpointCount || 0, icon: Globe, color: 'text-cyan-400' },
+          { label: 'Technologies', value: stats?.technologies?.length || domain.technologies?.length || 0, icon: Settings, color: 'text-yellow-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -165,7 +237,7 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-dark-800">
-        {['overview', 'subdomains', 'vulnerabilities', 'technologies'].map((tab) => (
+        {['overview', 'subdomains', 'technologies'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -190,29 +262,48 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
             className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
           >
             <h3 className="text-lg font-semibold text-white mb-4">Recent Scans</h3>
-            <div className="space-y-3">
-              {domain.recentScans.map((scan) => (
-                <Link
-                  key={scan.id}
-                  href={`/dashboard/scans/${scan.id}`}
-                  className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <CheckCircle className="w-4 h-4 text-green-400" />
-                    <div>
-                      <p className="text-white text-sm font-medium capitalize">{scan.type} Scan</p>
-                      <p className="text-xs text-slate-500">{formatDateTime(scan.date)}</p>
+            {stats?.recentScans && stats.recentScans.length > 0 ? (
+              <div className="space-y-3">
+                {stats.recentScans.map((scan: any) => (
+                  <Link
+                    key={scan._id}
+                    href={`/dashboard/scans/${scan._id}`}
+                    className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {scan.status === 'completed' ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : scan.status === 'running' ? (
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                      ) : scan.status === 'failed' ? (
+                        <XCircle className="w-4 h-4 text-red-400" />
+                      ) : (
+                        <Clock className="w-4 h-4 text-yellow-400" />
+                      )}
+                      <div>
+                        <p className="text-white text-sm font-medium capitalize">{scan.type} Scan</p>
+                        <p className="text-xs text-slate-500">{formatDateTime(scan.createdAt)}</p>
+                      </div>
                     </div>
-                  </div>
-                  <span className={cn(
-                    'text-sm',
-                    scan.vulns > 0 ? 'text-red-400' : 'text-slate-400'
-                  )}>
-                    {scan.vulns} vulns
-                  </span>
-                </Link>
-              ))}
-            </div>
+                    <span className="text-sm text-slate-400 capitalize">
+                      {scan.status}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">No scans yet</p>
+                <button
+                  onClick={handleStartScan}
+                  disabled={scanning}
+                  className="mt-3 text-sm text-primary-400 hover:text-primary-300"
+                >
+                  Start your first scan →
+                </button>
+              </div>
+            )}
           </motion.div>
 
           <motion.div
@@ -221,28 +312,38 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
             transition={{ delay: 0.1 }}
             className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
           >
-            <h3 className="text-lg font-semibold text-white mb-4">Top Vulnerabilities</h3>
-            <div className="space-y-3">
-              {domain.vulnerabilities.slice(0, 4).map((vuln) => (
-                <div key={vuln.id} className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <AlertTriangle className={cn(
-                      'w-4 h-4',
-                      vuln.severity === 'critical' ? 'text-red-400' :
-                      vuln.severity === 'high' ? 'text-orange-400' :
-                      vuln.severity === 'medium' ? 'text-yellow-400' :
-                      'text-green-400'
-                    )} />
-                    <div>
-                      <p className="text-white text-sm font-medium">{vuln.title}</p>
-                      <p className="text-xs text-slate-500">{vuln.target}</p>
-                    </div>
-                  </div>
-                  <span className={cn('px-2 py-0.5 rounded text-xs uppercase', severityColors[vuln.severity])}>
-                    {vuln.severity}
-                  </span>
+            <h3 className="text-lg font-semibold text-white mb-4">Domain Information</h3>
+            <div className="space-y-4">
+              <div className="flex justify-between py-2 border-b border-dark-800">
+                <span className="text-slate-400">Domain</span>
+                <span className="text-white font-mono">{domain.domain}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-dark-800">
+                <span className="text-slate-400">Status</span>
+                <span className={cn(
+                  'px-2 py-0.5 rounded text-xs',
+                  domain.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                  domain.status === 'scanning' ? 'bg-blue-500/20 text-blue-400' :
+                  domain.status === 'failed' ? 'bg-red-500/20 text-red-400' :
+                  'bg-yellow-500/20 text-yellow-400'
+                )}>
+                  {domain.status}
+                </span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-dark-800">
+                <span className="text-slate-400">Program</span>
+                <span className="text-primary-400">{domain.programId?.name || 'Unknown'}</span>
+              </div>
+              <div className="flex justify-between py-2 border-b border-dark-800">
+                <span className="text-slate-400">Created</span>
+                <span className="text-white">{formatDateTime(domain.createdAt)}</span>
+              </div>
+              {domain.lastScan && (
+                <div className="flex justify-between py-2">
+                  <span className="text-slate-400">Last Scan</span>
+                  <span className="text-white">{formatDateTime(domain.lastScan)}</span>
                 </div>
-              ))}
+              )}
             </div>
           </motion.div>
         </div>
@@ -256,7 +357,7 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
           className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 overflow-hidden"
         >
           <div className="flex items-center justify-between p-4 border-b border-dark-800">
-            <h3 className="font-semibold text-white">Subdomains ({domain.stats.subdomains})</h3>
+            <h3 className="font-semibold text-white">Subdomains ({subdomains.length})</h3>
             <Link
               href="/dashboard/subdomains"
               className="text-sm text-primary-400 hover:text-primary-300"
@@ -264,84 +365,48 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
               View All →
             </Link>
           </div>
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Subdomain</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">IP</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Status</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Vulnerabilities</th>
-              </tr>
-            </thead>
-            <tbody>
-              {domain.topSubdomains.map((sub, index) => (
-                <tr key={index} className="border-b border-dark-800/50 hover:bg-dark-800/30">
-                  <td className="px-4 py-3">
-                    <span className="text-white font-mono text-sm">{sub.subdomain}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-slate-400 font-mono text-sm">{sub.ip}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('font-mono text-sm', getStatusColor(sub.status))}>
-                      {sub.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      'text-sm font-medium',
-                      sub.vulns > 0 ? 'text-red-400' : 'text-slate-400'
-                    )}>
-                      {sub.vulns}
-                    </span>
-                  </td>
+          {subdomains.length > 0 ? (
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-800">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Subdomain</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">IP</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Status</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Alive</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </motion.div>
-      )}
-
-      {/* Vulnerabilities Tab */}
-      {activeTab === 'vulnerabilities' && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 overflow-hidden"
-        >
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Vulnerability</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Severity</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {domain.vulnerabilities.map((vuln) => (
-                <tr key={vuln.id} className="border-b border-dark-800/50 hover:bg-dark-800/30">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className={cn(
-                        'w-4 h-4',
-                        vuln.severity === 'critical' ? 'text-red-400' :
-                        vuln.severity === 'high' ? 'text-orange-400' :
-                        vuln.severity === 'medium' ? 'text-yellow-400' :
-                        'text-green-400'
-                      )} />
-                      <span className="text-white font-medium">{vuln.title}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn('px-2 py-0.5 rounded text-xs uppercase', severityColors[vuln.severity])}>
-                      {vuln.severity}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-slate-300 font-mono text-sm">{vuln.target}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {subdomains.slice(0, 10).map((sub: any, index: number) => (
+                  <tr key={sub._id || index} className="border-b border-dark-800/50 hover:bg-dark-800/30">
+                    <td className="px-4 py-3">
+                      <span className="text-white font-mono text-sm">{sub.subdomain}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-slate-400 font-mono text-sm">{sub.ip || '-'}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={cn('font-mono text-sm', sub.httpStatus ? getStatusColor(sub.httpStatus) : 'text-slate-400')}>
+                        {sub.httpStatus || '-'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {sub.isAlive ? (
+                        <CheckCircle className="w-4 h-4 text-green-400" />
+                      ) : (
+                        <XCircle className="w-4 h-4 text-red-400" />
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="text-center py-12">
+              <Layers className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">No subdomains found yet</p>
+              <p className="text-slate-500 text-xs mt-1">Run a scan to discover subdomains</p>
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -352,20 +417,35 @@ export default function DomainDetailPage({ params }: { params: { id: string } })
           animate={{ opacity: 1 }}
           className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
         >
-          <div className="grid grid-cols-3 gap-4">
-            {domain.technologies.map((tech, index) => (
-              <div key={index} className="p-4 bg-dark-800/50 rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-medium">{tech.name}</span>
-                  <span className="text-primary-400 font-bold">{tech.count}</span>
+          {stats?.technologies && stats.technologies.length > 0 ? (
+            <div className="grid grid-cols-3 gap-4">
+              {stats.technologies.map((tech: any, index: number) => (
+                <div key={index} className="p-4 bg-dark-800/50 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-white font-medium">{tech._id}</span>
+                    <span className="text-primary-400 font-bold">{tech.count}</span>
+                  </div>
+                  <span className="text-xs text-slate-500">instances</span>
                 </div>
-                <span className="text-xs text-slate-500">{tech.category}</span>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : domain.technologies && domain.technologies.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {domain.technologies.map((tech: string, index: number) => (
+                <span key={index} className="px-3 py-1.5 bg-dark-800 text-slate-300 rounded-lg text-sm">
+                  {tech}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Settings className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">No technologies detected yet</p>
+              <p className="text-slate-500 text-xs mt-1">Run a scan to detect technologies</p>
+            </div>
+          )}
         </motion.div>
       )}
     </div>
   );
 }
-

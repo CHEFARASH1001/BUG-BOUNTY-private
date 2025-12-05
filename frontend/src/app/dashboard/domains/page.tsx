@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe,
@@ -19,50 +19,18 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime, getSeverityColor } from '@/lib/utils';
+import { domainsApi } from '@/lib/api';
 
-// Mock data
-const domains = [
-  {
-    id: '1',
-    domain: 'example.com',
-    program: { name: 'Example Corp' },
-    status: 'completed',
-    subdomainCount: 156,
-    vulnerabilityCount: 12,
-    lastScan: '2024-01-15T10:30:00Z',
-    technologies: ['React', 'nginx', 'Node.js'],
-  },
-  {
-    id: '2',
-    domain: 'test.io',
-    program: { name: 'Test Inc' },
-    status: 'scanning',
-    subdomainCount: 89,
-    vulnerabilityCount: 5,
-    lastScan: '2024-01-15T09:00:00Z',
-    technologies: ['Vue.js', 'Apache', 'PHP'],
-  },
-  {
-    id: '3',
-    domain: 'demo.org',
-    program: { name: 'Demo Labs' },
-    status: 'pending',
-    subdomainCount: 0,
-    vulnerabilityCount: 0,
-    lastScan: null,
-    technologies: [],
-  },
-  {
-    id: '4',
-    domain: 'app.net',
-    program: { name: 'App Network' },
-    status: 'failed',
-    subdomainCount: 234,
-    vulnerabilityCount: 28,
-    lastScan: '2024-01-14T15:45:00Z',
-    technologies: ['Angular', 'AWS', 'Python'],
-  },
-];
+interface Domain {
+  _id: string;
+  domain: string;
+  programId?: { name: string };
+  status: string;
+  subdomainCount: number;
+  vulnerabilityCount: number;
+  lastScan?: string;
+  technologies: string[];
+}
 
 const statusConfig: Record<string, { icon: any; color: string; label: string }> = {
   completed: { icon: CheckCircle, color: 'text-green-500', label: 'Completed' },
@@ -74,12 +42,29 @@ const statusConfig: Record<string, { icon: any; color: string; label: string }> 
 export default function DomainsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
+  const [domains, setDomains] = useState<Domain[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [mounted, setMounted] = useState(false);
 
-  const filteredDomains = domains.filter((domain) => {
-    const matchesSearch = domain.domain.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = !selectedStatus || domain.status === selectedStatus;
-    return matchesSearch && matchesStatus;
-  });
+  useEffect(() => {
+    setMounted(true);
+    const fetchDomains = async () => {
+      try {
+        const response = await domainsApi.getAll({
+          status: selectedStatus || undefined,
+          search: searchQuery || undefined,
+        });
+        setDomains(response.data);
+      } catch (err) {
+        console.error('Failed to fetch domains:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchDomains();
+  }, [selectedStatus, searchQuery]);
+
+  const filteredDomains = domains;
 
   return (
     <div className="space-y-6">
@@ -131,13 +116,18 @@ export default function DomainsPage() {
       </div>
 
       {/* Domains Grid */}
+      {!mounted || loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+        </div>
+      ) : (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {filteredDomains.map((domain, index) => {
-          const StatusIcon = statusConfig[domain.status].icon;
+          const StatusIcon = statusConfig[domain.status]?.icon || Clock;
 
           return (
             <motion.div
-              key={domain.id}
+              key={domain._id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
@@ -153,12 +143,12 @@ export default function DomainsPage() {
                     </div>
                     <div>
                       <Link
-                        href={`/dashboard/domains/${domain.id}`}
+                        href={`/dashboard/domains/${domain._id}`}
                         className="text-white font-medium hover:text-primary-400 transition-colors"
                       >
                         {domain.domain}
                       </Link>
-                      <p className="text-xs text-slate-500">{domain.program.name}</p>
+                      <p className="text-xs text-slate-500">{domain.programId?.name || 'Unknown Program'}</p>
                     </div>
                   </div>
                   <button className="p-1 text-slate-400 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
@@ -170,11 +160,11 @@ export default function DomainsPage() {
                 <div className="flex items-center gap-2 mb-4">
                   <StatusIcon className={cn(
                     'w-4 h-4',
-                    statusConfig[domain.status].color,
+                    statusConfig[domain.status]?.color || 'text-slate-400',
                     domain.status === 'scanning' && 'animate-spin'
                   )} />
-                  <span className={cn('text-sm', statusConfig[domain.status].color)}>
-                    {statusConfig[domain.status].label}
+                  <span className={cn('text-sm', statusConfig[domain.status]?.color || 'text-slate-400')}>
+                    {statusConfig[domain.status]?.label || domain.status}
                   </span>
                 </div>
 
@@ -242,8 +232,9 @@ export default function DomainsPage() {
           );
         })}
       </div>
+      )}
 
-      {filteredDomains.length === 0 && (
+      {mounted && !loading && filteredDomains.length === 0 && (
         <div className="text-center py-12">
           <Globe className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No domains found</h3>

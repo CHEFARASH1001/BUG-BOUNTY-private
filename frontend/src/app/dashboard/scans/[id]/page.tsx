@@ -24,53 +24,43 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime, formatDuration } from '@/lib/utils';
+import { scansApi } from '@/lib/api';
 
-// Mock scan data
-const scanData = {
-  id: '1',
-  domain: 'example.com',
-  type: 'full',
-  status: 'running',
-  progress: 68,
-  startedAt: '2024-01-15T08:00:00Z',
-  completedAt: null,
-  results: {
-    subdomains: 156,
-    ports: 423,
-    vulnerabilities: 12,
-    endpoints: 89,
-  },
-  stages: [
-    { name: 'Subdomain Enumeration', status: 'completed', progress: 100, found: 156 },
-    { name: 'DNS Resolution', status: 'completed', progress: 100, found: 142 },
-    { name: 'Port Scanning', status: 'running', progress: 75, found: 423 },
-    { name: 'HTTP Probing', status: 'pending', progress: 0, found: 0 },
-    { name: 'Technology Detection', status: 'pending', progress: 0, found: 0 },
-    { name: 'Vulnerability Scanning', status: 'pending', progress: 0, found: 0 },
-  ],
-  logs: [
-    { time: '08:00:00', level: 'info', message: 'Scan started for example.com' },
-    { time: '08:00:05', level: 'info', message: 'Starting subdomain enumeration...' },
-    { time: '08:05:23', level: 'success', message: 'Found 156 subdomains' },
-    { time: '08:05:30', level: 'info', message: 'Starting DNS resolution...' },
-    { time: '08:10:45', level: 'success', message: 'Resolved 142 hosts' },
-    { time: '08:10:50', level: 'info', message: 'Starting port scanning...' },
-    { time: '08:15:00', level: 'info', message: 'Scanning ports on 142 hosts...' },
-    { time: '08:20:00', level: 'warning', message: 'Rate limited by target, slowing down...' },
-  ],
-  vulnerabilities: [
-    { id: 1, title: 'SQL Injection', severity: 'critical', target: 'api.example.com/users' },
-    { id: 2, title: 'XSS Reflected', severity: 'high', target: 'app.example.com/search' },
-    { id: 3, title: 'Information Disclosure', severity: 'medium', target: 'dev.example.com' },
-    { id: 4, title: 'Missing Security Headers', severity: 'low', target: 'example.com' },
-  ],
-};
+interface ScanData {
+  _id: string;
+  target: string;
+  targetId?: string;
+  targetType: string;
+  type: string;
+  status: string;
+  progress: number;
+  createdAt: string;
+  startedAt?: string;
+  completedAt?: string;
+  currentStep?: string;
+  logs?: string[];
+  results?: {
+    subdomainsFound?: number;
+    aliveHosts?: number;
+    portsFound?: number;
+    vulnerabilitiesFound?: number;
+    technologiesFound?: string[];
+  };
+  config?: {
+    includeSubdomains?: boolean;
+    includePorts?: boolean;
+    includeNuclei?: boolean;
+    includeScreenshots?: boolean;
+    includeTechnologies?: boolean;
+  };
+}
 
-const statusConfig: Record<string, { icon: any; color: string; bg: string }> = {
-  completed: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500' },
-  running: { icon: Loader2, color: 'text-blue-400', bg: 'bg-blue-500' },
-  pending: { icon: Clock, color: 'text-slate-400', bg: 'bg-slate-600' },
-  failed: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500' },
+const statusConfig: Record<string, { icon: any; color: string; bg: string; label: string }> = {
+  completed: { icon: CheckCircle, color: 'text-green-400', bg: 'bg-green-500', label: 'Completed' },
+  running: { icon: Loader2, color: 'text-blue-400', bg: 'bg-blue-500', label: 'Running' },
+  pending: { icon: Clock, color: 'text-slate-400', bg: 'bg-slate-600', label: 'Pending' },
+  queued: { icon: Clock, color: 'text-yellow-400', bg: 'bg-yellow-500', label: 'Queued' },
+  failed: { icon: XCircle, color: 'text-red-400', bg: 'bg-red-500', label: 'Failed' },
 };
 
 const severityColors: Record<string, string> = {
@@ -82,23 +72,97 @@ const severityColors: Record<string, string> = {
 
 export default function ScanDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState('overview');
-  const [scan, setScan] = useState(scanData);
+  const [scan, setScan] = useState<ScanData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Simulate real-time progress
   useEffect(() => {
-    if (scan.status !== 'running') return;
+    const fetchScan = async () => {
+      try {
+        const response = await scansApi.getById(params.id);
+        setScan(response.data);
+      } catch (err: any) {
+        console.error('Failed to fetch scan:', err);
+        setError(err.response?.data?.message || 'Failed to load scan');
+      } finally {
+        setLoading(false);
+      }
+    };
     
+    fetchScan();
+    
+    // Poll for updates if scan is running
     const interval = setInterval(() => {
-      setScan(prev => ({
-        ...prev,
-        progress: Math.min(prev.progress + 1, 100),
-      }));
-    }, 2000);
-
+      if (scan?.status === 'running' || scan?.status === 'queued') {
+        fetchScan();
+      }
+    }, 5000);
+    
     return () => clearInterval(interval);
-  }, [scan.status]);
+  }, [params.id, scan?.status]);
 
-  const StatusIcon = statusConfig[scan.status].icon;
+  const handleRetry = async () => {
+    try {
+      await scansApi.retry(params.id);
+      const response = await scansApi.getById(params.id);
+      setScan(response.data);
+    } catch (err) {
+      console.error('Failed to retry scan:', err);
+    }
+  };
+
+  const handleCancel = async () => {
+    try {
+      await scansApi.cancel(params.id);
+      const response = await scansApi.getById(params.id);
+      setScan(response.data);
+    } catch (err) {
+      console.error('Failed to cancel scan:', err);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+      </div>
+    );
+  }
+
+  if (error || !scan) {
+    return (
+      <div className="text-center py-24">
+        <AlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-white mb-2">Error loading scan</h3>
+        <p className="text-slate-400 mb-4">{error || 'Scan not found'}</p>
+        <Link
+          href="/dashboard/scans"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Scans
+        </Link>
+      </div>
+    );
+  }
+
+  const status = statusConfig[scan.status] || statusConfig.pending;
+  const StatusIcon = status.icon;
+
+  // Parse logs from the scan
+  const parsedLogs = (scan.logs || []).map((log, index) => {
+    const match = log.match(/\[([^\]]+)\]\s*(.*)/);
+    if (match) {
+      const time = new Date(match[1]).toLocaleTimeString();
+      const message = match[2];
+      const level = message.toLowerCase().includes('error') ? 'error' :
+                    message.toLowerCase().includes('found') ? 'success' :
+                    message.toLowerCase().includes('complete') ? 'success' :
+                    'info';
+      return { time, message, level };
+    }
+    return { time: '', message: log, level: 'info' };
+  });
 
   return (
     <div className="space-y-6">
@@ -113,45 +177,50 @@ export default function ScanDetailPage({ params }: { params: { id: string } }) {
           </Link>
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-white">{scan.domain}</h1>
+              <h1 className="text-2xl font-bold text-white">{scan.target}</h1>
               <span className={cn(
                 'flex items-center gap-1 px-2 py-1 rounded text-xs',
-                statusConfig[scan.status].bg + '/20',
-                statusConfig[scan.status].color
+                status.bg + '/20',
+                status.color
               )}>
                 <StatusIcon className={cn('w-3 h-3', scan.status === 'running' && 'animate-spin')} />
-                {scan.status.charAt(0).toUpperCase() + scan.status.slice(1)}
+                {status.label}
               </span>
             </div>
             <p className="text-slate-400 mt-1">
-              Started {formatDateTime(scan.startedAt)}
-              {scan.completedAt && ` • Duration: ${formatDuration(new Date(scan.startedAt), new Date(scan.completedAt))}`}
+              {scan.startedAt ? `Started ${formatDateTime(scan.startedAt)}` : `Created ${formatDateTime(scan.createdAt)}`}
+              {scan.completedAt && scan.startedAt && ` • Duration: ${formatDuration(new Date(scan.startedAt), new Date(scan.completedAt))}`}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           {scan.status === 'running' && (
-            <>
-              <button className="flex items-center gap-2 px-4 py-2 bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 rounded-lg transition-colors">
-                <Pause className="w-4 h-4" />
-                Pause
-              </button>
-              <button className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors">
-                <Square className="w-4 h-4" />
-                Stop
-              </button>
-            </>
+            <button 
+              onClick={handleCancel}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-colors"
+            >
+              <Square className="w-4 h-4" />
+              Stop
+            </button>
           )}
           {(scan.status === 'completed' || scan.status === 'failed') && (
-            <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors">
+            <button 
+              onClick={handleRetry}
+              className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg transition-colors"
+            >
               <RefreshCw className="w-4 h-4" />
               Re-run
             </button>
           )}
-          <button className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 rounded-lg transition-colors">
-            <Download className="w-4 h-4" />
-            Export
-          </button>
+          <a
+            href={`https://${scan.target}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 rounded-lg transition-colors"
+          >
+            <ExternalLink className="w-4 h-4" />
+            Visit Site
+          </a>
         </div>
       </div>
 
@@ -162,15 +231,23 @@ export default function ScanDetailPage({ params }: { params: { id: string } }) {
         className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
       >
         <div className="flex items-center justify-between mb-2">
-          <span className="text-white font-medium">Overall Progress</span>
-          <span className="text-primary-400 font-bold">{scan.progress}%</span>
+          <div>
+            <span className="text-white font-medium">Overall Progress</span>
+            {scan.currentStep && (
+              <span className="text-slate-400 text-sm ml-3">• {scan.currentStep}</span>
+            )}
+          </div>
+          <span className="text-primary-400 font-bold">{scan.progress || 0}%</span>
         </div>
         <div className="h-3 bg-dark-800 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
-            animate={{ width: `${scan.progress}%` }}
+            animate={{ width: `${scan.progress || 0}%` }}
             transition={{ duration: 0.5 }}
-            className="h-full bg-gradient-to-r from-primary-500 to-accent-cyan rounded-full"
+            className={cn(
+              'h-full rounded-full',
+              scan.status === 'failed' ? 'bg-red-500' : 'bg-gradient-to-r from-primary-500 to-accent-cyan'
+            )}
           />
         </div>
       </motion.div>
@@ -178,10 +255,10 @@ export default function ScanDetailPage({ params }: { params: { id: string } }) {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: 'Subdomains', value: scan.results.subdomains, icon: Layers, color: 'text-blue-400' },
-          { label: 'Open Ports', value: scan.results.ports, icon: Server, color: 'text-green-400' },
-          { label: 'Vulnerabilities', value: scan.results.vulnerabilities, icon: Shield, color: 'text-red-400' },
-          { label: 'Endpoints', value: scan.results.endpoints, icon: Globe, color: 'text-purple-400' },
+          { label: 'Subdomains', value: scan.results?.subdomainsFound || 0, icon: Layers, color: 'text-blue-400' },
+          { label: 'Alive Hosts', value: scan.results?.aliveHosts || 0, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Open Ports', value: scan.results?.portsFound || 0, icon: Server, color: 'text-purple-400' },
+          { label: 'Vulnerabilities', value: scan.results?.vulnerabilitiesFound || 0, icon: Shield, color: 'text-red-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -203,158 +280,109 @@ export default function ScanDetailPage({ params }: { params: { id: string } }) {
 
       {/* Tabs */}
       <div className="flex items-center gap-2 border-b border-dark-800">
-        {['overview', 'vulnerabilities', 'logs'].map((tab) => (
+        {['overview', 'logs'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
             className={cn(
-              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px',
+              'px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px capitalize',
               activeTab === tab
                 ? 'text-primary-400 border-primary-400'
                 : 'text-slate-400 border-transparent hover:text-white'
             )}
           >
-            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+            {tab}
           </button>
         ))}
       </div>
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
-        >
-          <h3 className="text-lg font-semibold text-white mb-4">Scan Stages</h3>
-          <div className="space-y-4">
-            {scan.stages.map((stage, index) => {
-              const StageIcon = statusConfig[stage.status].icon;
-              return (
-                <div key={stage.name} className="flex items-center gap-4">
-                  <div className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center',
-                    statusConfig[stage.status].bg + '/20'
-                  )}>
-                    <StageIcon className={cn(
-                      'w-4 h-4',
-                      statusConfig[stage.status].color,
-                      stage.status === 'running' && 'animate-spin'
-                    )} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-white font-medium">{stage.name}</span>
-                      <span className="text-sm text-slate-400">
-                        {stage.found > 0 && `${stage.found} found`}
-                      </span>
-                    </div>
-                    <div className="h-2 bg-dark-800 rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          'h-full rounded-full transition-all duration-500',
-                          stage.status === 'completed' ? 'bg-green-500' :
-                          stage.status === 'running' ? 'bg-blue-500' :
-                          'bg-slate-600'
-                        )}
-                        style={{ width: `${stage.progress}%` }}
-                      />
-                    </div>
-                  </div>
-                  <span className="text-sm text-slate-400 w-12 text-right">{stage.progress}%</span>
+        <div className="grid grid-cols-2 gap-6">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+          >
+            <h3 className="text-lg font-semibold text-white mb-4">Scan Configuration</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Scan Type', value: scan.type?.toUpperCase() || 'Full' },
+                { label: 'Target Type', value: scan.targetType || 'Domain' },
+                { label: 'Subdomain Enumeration', value: scan.config?.includeSubdomains ? 'Yes' : 'No' },
+                { label: 'Port Scanning', value: scan.config?.includePorts ? 'Yes' : 'No' },
+                { label: 'Vulnerability Scan', value: scan.config?.includeNuclei ? 'Yes' : 'No' },
+                { label: 'Technology Detection', value: scan.config?.includeTechnologies ? 'Yes' : 'No' },
+              ].map((item, index) => (
+                <div key={index} className="flex justify-between py-2 border-b border-dark-800 last:border-0">
+                  <span className="text-slate-400">{item.label}</span>
+                  <span className="text-white">{item.value}</span>
                 </div>
-              );
-            })}
-          </div>
-        </motion.div>
-      )}
-
-      {activeTab === 'vulnerabilities' && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 overflow-hidden"
-        >
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Vulnerability</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Severity</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Target</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {scan.vulnerabilities.map((vuln) => (
-                <tr key={vuln.id} className="border-b border-dark-800/50 hover:bg-dark-800/30">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className={cn(
-                        'w-4 h-4',
-                        vuln.severity === 'critical' ? 'text-red-400' :
-                        vuln.severity === 'high' ? 'text-orange-400' :
-                        vuln.severity === 'medium' ? 'text-yellow-400' :
-                        'text-green-400'
-                      )} />
-                      <span className="text-white font-medium">{vuln.title}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={cn(
-                      'px-2 py-1 rounded text-xs border',
-                      severityColors[vuln.severity]
-                    )}>
-                      {vuln.severity.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="text-slate-300 font-mono text-sm">{vuln.target}</span>
-                  </td>
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/dashboard/vulnerabilities`}
-                      className="p-1.5 text-slate-400 hover:text-white transition-colors inline-block"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Link>
-                  </td>
-                </tr>
               ))}
-            </tbody>
-          </table>
-        </motion.div>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.1 }}
+            className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+          >
+            <h3 className="text-lg font-semibold text-white mb-4">Technologies Found</h3>
+            {scan.results?.technologiesFound && scan.results.technologiesFound.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {scan.results.technologiesFound.map((tech, index) => (
+                  <span key={index} className="px-3 py-1.5 bg-dark-800 text-slate-300 rounded-lg text-sm">
+                    {tech}
+                  </span>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <Server className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                <p className="text-slate-400 text-sm">No technologies detected yet</p>
+              </div>
+            )}
+          </motion.div>
+        </div>
       )}
 
       {activeTab === 'logs' && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-4 font-mono text-sm"
+          className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-4 font-mono text-sm max-h-96 overflow-y-auto"
         >
-          <div className="space-y-1">
-            {scan.logs.map((log, index) => (
-              <div key={index} className="flex items-start gap-3 py-1">
-                <span className="text-slate-500">[{log.time}]</span>
-                <span className={cn(
-                  log.level === 'success' ? 'text-green-400' :
-                  log.level === 'warning' ? 'text-yellow-400' :
-                  log.level === 'error' ? 'text-red-400' :
-                  'text-slate-300'
-                )}>
-                  {log.message}
-                </span>
-              </div>
-            ))}
-            {scan.status === 'running' && (
-              <div className="flex items-center gap-2 text-blue-400 mt-2">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                <span>Scanning in progress...</span>
-              </div>
-            )}
-          </div>
+          {parsedLogs.length > 0 ? (
+            <div className="space-y-1">
+              {parsedLogs.map((log, index) => (
+                <div key={index} className="flex items-start gap-3 py-1">
+                  {log.time && <span className="text-slate-500">[{log.time}]</span>}
+                  <span className={cn(
+                    log.level === 'success' ? 'text-green-400' :
+                    log.level === 'warning' ? 'text-yellow-400' :
+                    log.level === 'error' ? 'text-red-400' :
+                    'text-slate-300'
+                  )}>
+                    {log.message}
+                  </span>
+                </div>
+              ))}
+              {scan.status === 'running' && (
+                <div className="flex items-center gap-2 text-blue-400 mt-2">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Scanning in progress...</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Clock className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+              <p className="text-slate-400 text-sm">No logs available yet</p>
+            </div>
+          )}
         </motion.div>
       )}
     </div>
   );
 }
-

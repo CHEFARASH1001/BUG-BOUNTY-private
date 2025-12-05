@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe,
@@ -16,21 +16,41 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { domainsApi, programsApi } from '@/lib/api';
 
-const programs = [
-  { id: '1', name: 'Example Corp Bug Bounty', platform: 'HackerOne' },
-  { id: '2', name: 'Test Inc Security Program', platform: 'Bugcrowd' },
-  { id: '3', name: 'Demo Labs VDP', platform: 'Self-hosted' },
-  { id: '4', name: 'App Network Pentest', platform: 'Synack' },
-];
+interface Program {
+  _id: string;
+  name: string;
+  platform: string;
+}
 
 export default function NewDomainPage() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [domain, setDomain] = useState('');
   const [selectedProgram, setSelectedProgram] = useState<string | null>(null);
   const [autoScan, setAutoScan] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [validationStatus, setValidationStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [loadingPrograms, setLoadingPrograms] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setMounted(true);
+    const fetchPrograms = async () => {
+      try {
+        const response = await programsApi.getAll();
+        setPrograms(response.data);
+      } catch (err) {
+        console.error('Failed to fetch programs:', err);
+        setError('Failed to load programs');
+      } finally {
+        setLoadingPrograms(false);
+      }
+    };
+    fetchPrograms();
+  }, []);
 
   const validateDomain = (value: string) => {
     if (!value) {
@@ -51,8 +71,20 @@ export default function NewDomainPage() {
     if (validationStatus !== 'valid' || !selectedProgram) return;
     
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    router.push('/dashboard/domains');
+    setError(null);
+    
+    try {
+      await domainsApi.create({
+        domain: domain.toLowerCase(),
+        programId: selectedProgram,
+        autoScan,
+      });
+      router.push('/dashboard/domains');
+    } catch (err: any) {
+      console.error('Failed to create domain:', err);
+      setError(err.response?.data?.message || 'Failed to add domain');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -144,34 +176,44 @@ export default function NewDomainPage() {
         </h2>
 
         <div className="space-y-3">
-          {programs.map((program) => (
-            <button
-              key={program.id}
-              onClick={() => setSelectedProgram(program.id)}
-              className={cn(
-                'w-full p-4 rounded-lg border text-left transition-all',
-                selectedProgram === program.id
-                  ? 'bg-primary-500/20 border-primary-500/50'
-                  : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
-              )}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Building2 className={cn(
-                    'w-5 h-5',
-                    selectedProgram === program.id ? 'text-primary-400' : 'text-slate-500'
-                  )} />
-                  <div>
-                    <p className="font-medium text-white">{program.name}</p>
-                    <p className="text-xs text-slate-500">{program.platform}</p>
-                  </div>
-                </div>
-                {selectedProgram === program.id && (
-                  <CheckCircle className="w-5 h-5 text-primary-400" />
+          {!mounted || loadingPrograms ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 text-primary-400 animate-spin" />
+            </div>
+          ) : programs.length === 0 ? (
+            <div className="p-4 bg-dark-800/50 rounded-lg text-center">
+              <p className="text-slate-400">No programs found. Create a program first.</p>
+            </div>
+          ) : (
+            programs.map((program) => (
+              <button
+                key={program._id}
+                onClick={() => setSelectedProgram(program._id)}
+                className={cn(
+                  'w-full p-4 rounded-lg border text-left transition-all',
+                  selectedProgram === program._id
+                    ? 'bg-primary-500/20 border-primary-500/50'
+                    : 'bg-dark-800/50 border-dark-700 hover:border-dark-600'
                 )}
-              </div>
-            </button>
-          ))}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Building2 className={cn(
+                      'w-5 h-5',
+                      selectedProgram === program._id ? 'text-primary-400' : 'text-slate-500'
+                    )} />
+                    <div>
+                      <p className="font-medium text-white">{program.name}</p>
+                      <p className="text-xs text-slate-500">{program.platform}</p>
+                    </div>
+                  </div>
+                  {selectedProgram === program._id && (
+                    <CheckCircle className="w-5 h-5 text-primary-400" />
+                  )}
+                </div>
+              </button>
+            ))
+          )}
         </div>
 
         <Link
@@ -219,6 +261,12 @@ export default function NewDomainPage() {
         transition={{ delay: 0.3 }}
         className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
       >
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-white font-medium">Ready to add</h3>

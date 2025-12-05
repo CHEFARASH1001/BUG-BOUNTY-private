@@ -13,23 +13,26 @@ import {
   CheckCircle,
   Loader2,
   Trash2,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
+import { programsApi } from '@/lib/api';
 
 const platforms = [
   { id: 'hackerone', name: 'HackerOne', color: 'bg-purple-500/20 text-purple-400' },
   { id: 'bugcrowd', name: 'Bugcrowd', color: 'bg-orange-500/20 text-orange-400' },
   { id: 'synack', name: 'Synack', color: 'bg-blue-500/20 text-blue-400' },
   { id: 'intigriti', name: 'Intigriti', color: 'bg-green-500/20 text-green-400' },
-  { id: 'yeswehack', name: 'YesWeHack', color: 'bg-red-500/20 text-red-400' },
-  { id: 'self', name: 'Self-hosted', color: 'bg-slate-500/20 text-slate-400' },
+  { id: 'other', name: 'YesWeHack', color: 'bg-red-500/20 text-red-400' },
+  { id: 'custom', name: 'Self-hosted', color: 'bg-slate-500/20 text-slate-400' },
 ];
 
 export default function NewProgramPage() {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -70,9 +73,35 @@ export default function NewProgramPage() {
   const handleSubmit = async () => {
     if (!formData.name) return;
     
+    // Filter out empty scope items
+    const filteredScope = scope.filter(s => s.trim() !== '');
+    if (filteredScope.length === 0) {
+      setError('Please add at least one scope item');
+      return;
+    }
+    
     setIsSubmitting(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    router.push('/dashboard/programs');
+    setError(null);
+    
+    try {
+      await programsApi.create({
+        name: formData.name,
+        description: formData.description || undefined,
+        platform: formData.platform,
+        platformUrl: formData.programUrl || undefined,
+        scope: filteredScope,
+        outOfScope: outOfScope.filter(s => s.trim() !== ''),
+        rewards: formData.minBounty || formData.maxBounty ? {
+          low: formData.minBounty ? `$${formData.minBounty}` : undefined,
+          critical: formData.maxBounty ? `$${formData.maxBounty}` : undefined,
+        } : undefined,
+      });
+      router.push('/dashboard/programs');
+    } catch (err: any) {
+      console.error('Failed to create program:', err);
+      setError(err.response?.data?.message || 'Failed to create program');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -302,6 +331,12 @@ export default function NewProgramPage() {
         transition={{ delay: 0.3 }}
         className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
       >
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/50 rounded-lg flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-red-500" />
+            <p className="text-sm text-red-400">{error}</p>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-white font-medium">Ready to create</h3>

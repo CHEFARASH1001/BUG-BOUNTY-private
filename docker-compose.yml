@@ -1,0 +1,152 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: bb-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-bugbounty2024}
+      MONGO_INITDB_DATABASE: bugbounty
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - bb-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis for Job Queue
+  redis:
+    image: redis:7.2-alpine
+    container_name: bb-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - bb-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: bb-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 4000
+      MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-bugbounty2024}@mongodb:27017/bugbounty?authSource=admin
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      SHODAN_API_KEY: ${SHODAN_API_KEY:-}
+      SECURITYTRAILS_API_KEY: ${SECURITYTRAILS_API_KEY:-}
+      VIRUSTOTAL_API_KEY: ${VIRUSTOTAL_API_KEY:-}
+      CENSYS_API_ID: ${CENSYS_API_ID:-}
+      CENSYS_API_SECRET: ${CENSYS_API_SECRET:-}
+      HUNTER_API_KEY: ${HUNTER_API_KEY:-}
+      SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+      DISCORD_WEBHOOK_URL: ${DISCORD_WEBHOOK_URL:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+    ports:
+      - "4000:4000"
+    volumes:
+      - scan_results:/app/results
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bb-network
+
+  # Next.js Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: bb-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      NEXT_PUBLIC_API_URL: http://localhost:4000
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-your-nextauth-secret-change-in-production}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - bb-network
+
+  # Nuclei Scanner Container
+  nuclei:
+    image: projectdiscovery/nuclei:latest
+    container_name: bb-nuclei
+    volumes:
+      - nuclei_templates:/root/nuclei-templates
+      - scan_results:/results
+    networks:
+      - bb-network
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  # HTTPx for HTTP probing
+  httpx:
+    image: projectdiscovery/httpx:latest
+    container_name: bb-httpx
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  # Subfinder for subdomain enumeration
+  subfinder:
+    image: projectdiscovery/subfinder:latest
+    container_name: bb-subfinder
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+    entrypoint: ["tail", "-f", "/dev/null"]
+
+  # NAABU for port scanning
+  naabu:
+    image: projectdiscovery/naabu:latest
+    container_name: bb-naabu
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+    entrypoint: ["tail", "-f", "/dev/null"]
+    cap_add:
+      - NET_RAW
+
+volumes:
+  mongodb_data:
+  redis_data:
+  scan_results:
+  nuclei_templates:
+
+networks:
+  bb-network:
+    driver: bridge
+

@@ -19,6 +19,9 @@ import {
   Terminal,
   LogOut,
   Search,
+  Shield,
+  BookOpen,
+  ChevronDown,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -33,13 +36,27 @@ const navigation = [
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];
 
+const documentsSection = {
+  name: 'Documents',
+  icon: BookOpen,
+  items: [
+    { name: 'XSS Encodings', href: '/dashboard/xss-encodings', icon: Shield },
+  ],
+};
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [documentsExpanded, setDocumentsExpanded] = useState(true);
   const pathname = usePathname();
+  
+  // Check if any document item is active
+  const isDocumentsActive = documentsSection.items.some(
+    (item) => pathname === item.href || pathname.startsWith(item.href)
+  );
 
   return (
     <div className="min-h-screen bg-dark-950 flex">
@@ -69,39 +86,140 @@ export default function DashboardLayout({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || 
-              (item.href !== '/dashboard' && pathname.startsWith(item.href));
-            
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={clsx(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
-                  isActive
-                    ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                    : 'text-slate-400 hover:bg-dark-800 hover:text-white'
-                )}
-              >
-                <item.icon className={clsx(
-                  'w-5 h-5 shrink-0',
-                  isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
-                )} />
-                {!sidebarCollapsed && (
-                  <motion.span
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-sm font-medium"
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {navigation.map((item) => {
+              const isActive = pathname === item.href || 
+                (item.href !== '/dashboard' && pathname.startsWith(item.href));
+              
+              return (
+                <Link
+                  key={item.name}
+                  href={item.href}
+                  className={clsx(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
+                    isActive
+                      ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                      : 'text-slate-400 hover:bg-dark-800 hover:text-white'
+                  )}
+                >
+                  <item.icon className={clsx(
+                    'w-5 h-5 shrink-0',
+                    isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                  )} />
+                  {!sidebarCollapsed && (
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="text-sm font-medium"
+                    >
+                      {item.name}
+                    </motion.span>
+                  )}
+                </Link>
+              );
+            })}
+          </nav>
+          
+          {/* Documents Section - Always visible at bottom */}
+          <div className="p-3 border-t border-dark-800 shrink-0">
+            {!sidebarCollapsed ? (
+              <div>
+                <button
+                  onClick={() => setDocumentsExpanded(!documentsExpanded)}
+                  className={clsx(
+                    'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group',
+                    isDocumentsActive
+                      ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                      : 'text-slate-400 hover:bg-dark-800 hover:text-white'
+                  )}
+                >
+                  <documentsSection.icon className={clsx(
+                    'w-5 h-5 shrink-0',
+                    isDocumentsActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                  )} />
+                  <span className="text-sm font-medium flex-1 text-left">{documentsSection.name}</span>
+                  <motion.div
+                    animate={{ rotate: documentsExpanded ? 180 : 0 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    {item.name}
-                  </motion.span>
-                )}
-              </Link>
-            );
-          })}
-        </nav>
+                    <ChevronDown className="w-4 h-4 shrink-0" />
+                  </motion.div>
+                </button>
+                
+                <motion.div
+                  initial={false}
+                  animate={{ 
+                    height: documentsExpanded ? 'auto' : 0,
+                    opacity: documentsExpanded ? 1 : 0
+                  }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden"
+                >
+                  <div className="mt-1 ml-4 space-y-1 pl-4 border-l border-dark-700">
+                    {documentsSection.items.map((item) => {
+                      const isActive = pathname === item.href || pathname.startsWith(item.href);
+                      
+                      return (
+                        <Link
+                          key={item.name}
+                          href={item.href}
+                          className={clsx(
+                            'flex items-center gap-3 px-3 py-2 rounded-lg transition-all group',
+                            isActive
+                              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                              : 'text-slate-400 hover:bg-dark-800 hover:text-white'
+                          )}
+                        >
+                          <item.icon className={clsx(
+                            'w-4 h-4 shrink-0',
+                            isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                          )} />
+                          <span className="text-sm font-medium">{item.name}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                <div className={clsx(
+                  'flex items-center justify-center p-2 rounded-lg',
+                  isDocumentsActive
+                    ? 'bg-primary-500/20 border border-primary-500/30'
+                    : 'text-slate-400'
+                )}>
+                  <documentsSection.icon className={clsx(
+                    'w-5 h-5',
+                    isDocumentsActive ? 'text-primary-400' : 'text-slate-500'
+                  )} />
+                </div>
+                {documentsSection.items.map((item) => {
+                  const isActive = pathname === item.href || pathname.startsWith(item.href);
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={clsx(
+                        'flex items-center justify-center p-2 rounded-lg transition-all',
+                        isActive
+                          ? 'bg-primary-500/20 border border-primary-500/30'
+                          : 'text-slate-400 hover:bg-dark-800 hover:text-white'
+                      )}
+                      title={item.name}
+                    >
+                      <item.icon className={clsx(
+                        'w-4 h-4',
+                        isActive ? 'text-primary-400' : 'text-slate-500'
+                      )} />
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
 
         {/* Collapse button */}
         <div className="p-3 border-t border-dark-800">

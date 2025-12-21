@@ -4,6 +4,7 @@ import { Model, Types } from 'mongoose';
 import { Program, ProgramDocument } from '../../schemas/program.schema';
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
 import { Vulnerability, VulnerabilityDocument } from '../../schemas/vulnerability.schema';
+import { Scope, ScopeDocument } from '../../schemas/scope.schema';
 import { CreateProgramDto, UpdateProgramDto } from './dto/program.dto';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class ProgramsService {
     @InjectModel(Program.name) private programModel: Model<ProgramDocument>,
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     @InjectModel(Vulnerability.name) private vulnModel: Model<VulnerabilityDocument>,
+    @InjectModel(Scope.name) private scopeModel: Model<ScopeDocument>,
   ) {}
 
   async create(createProgramDto: CreateProgramDto, userId: string): Promise<ProgramDocument> {
@@ -115,6 +117,14 @@ export class ProgramsService {
     return this.vulnModel
       .find({ programId: new Types.ObjectId(id) })
       .sort({ severity: 1, createdAt: -1 })
+      .exec();
+  }
+
+  async getScopes(id: string): Promise<ScopeDocument[]> {
+    await this.findById(id); // Verify program exists
+    return this.scopeModel
+      .find({ programId: new Types.ObjectId(id) })
+      .sort({ status: 1, target: 1 })
       .exec();
   }
 

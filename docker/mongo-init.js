@@ -28,10 +28,10 @@ db.createCollection('programs', {
       required: ['name', 'scope', 'createdAt'],
       properties: {
         name: { bsonType: 'string' },
-        platform: { enum: ['hackerone', 'bugcrowd', 'intigriti', 'custom', 'other'] },
+        platform: { enum: ['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'github', 'other'] },
         scope: { bsonType: 'array' },
         outOfScope: { bsonType: 'array' },
-        status: { enum: ['active', 'paused', 'archived'] },
+        status: { enum: ['active', 'paused', 'archived', 'open', 'closed'] },
         createdAt: { bsonType: 'date' }
       }
     }

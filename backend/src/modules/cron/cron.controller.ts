@@ -100,4 +100,38 @@ export class CronController {
   async getExecutionLogs(@Param('executionId') executionId: string) {
     return this.cronService.getExecutionLogs(executionId);
   }
+
+  @Post('cleanup/stale')
+  @Public()
+  @ApiOperation({ summary: 'Mark stale running jobs as failed' })
+  @ApiQuery({ name: 'maxAgeHours', required: false, type: Number, description: 'Maximum age in hours (default: 1)' })
+  @ApiResponse({ status: 200, description: 'Number of jobs marked as failed' })
+  async cleanupStaleJobs(@Query('maxAgeHours') maxAgeHours?: string) {
+    const maxAgeMs = maxAgeHours ? parseFloat(maxAgeHours) * 3600000 : 3600000;
+    const count = await this.cronService.markStaleJobsAsFailed(maxAgeMs);
+    return {
+      message: `Marked ${count} stale job(s) as failed`,
+      count,
+    };
+  }
+
+  @Post('executions/:executionId/cancel')
+  @Public()
+  @ApiOperation({ summary: 'Cancel a running job' })
+  @ApiResponse({ status: 200, description: 'Job cancelled' })
+  @ApiResponse({ status: 404, description: 'Job not found or not running' })
+  async cancelJob(@Param('executionId') executionId: string) {
+    const execution = await this.cronService.cancelJob(executionId);
+    if (!execution) {
+      return {
+        message: 'Job not found or not running',
+        success: false,
+      };
+    }
+    return {
+      message: 'Job cancelled successfully',
+      success: true,
+      execution,
+    };
+  }
 }

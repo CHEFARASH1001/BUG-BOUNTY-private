@@ -11,8 +11,8 @@ export class CreateProgramDto {
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ enum: ['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'other'] })
-  @IsEnum(['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'other'])
+  @ApiPropertyOptional({ enum: ['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'github', 'other'] })
+  @IsEnum(['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'github', 'other'])
   @IsOptional()
   platform?: string;
 

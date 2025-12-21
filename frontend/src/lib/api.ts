@@ -53,6 +53,7 @@ export const programsApi = {
   getStats: (id: string) => api.get(`/programs/${id}/stats`),
   getDomains: (id: string) => api.get(`/programs/${id}/domains`),
   getVulnerabilities: (id: string) => api.get(`/programs/${id}/vulnerabilities`),
+  getScopes: (id: string) => api.get(`/programs/${id}/scopes`),
 };
 
 // Domains API
@@ -145,6 +146,8 @@ export const cronApi = {
     api.get('/cron/executions', { params: filters }),
   getRunningJobs: () => api.get('/cron/running'),
   getExecutionLogs: (executionId: string) => api.get(`/cron/executions/${executionId}/logs`),
+  cleanupStaleJobs: (maxAgeHours?: number) => api.post('/cron/cleanup/stale', null, { params: maxAgeHours ? { maxAgeHours } : {} }),
+  cancelJob: (executionId: string) => api.post(`/cron/executions/${executionId}/cancel`),
 };
 
 // Platform Sync API
@@ -188,18 +191,43 @@ export const technologiesApi = {
     api.get('/technologies/list', { params: filters }),
 };
 
-// Scores API
+// Scores API - Enhanced scoring system
 export const scoresApi = {
+  // Calculate scores
   calculateAll: () => api.post('/scores/calculate/all'),
   calculateProgram: (id: string) => api.post(`/scores/calculate/program/${id}`),
   calculateDomain: (id: string) => api.post(`/scores/calculate/domain/${id}`),
+  
+  // Get individual scores
   getProgramScore: (id: string) => api.get(`/scores/program/${id}`),
   getDomainScore: (id: string) => api.get(`/scores/domain/${id}`),
-  getTopPrograms: (filters?: { limit?: number; sortBy?: string }) =>
-    api.get('/scores/top/programs', { params: filters }),
-  getTopDomains: (filters?: { limit?: number; sortBy?: string }) =>
-    api.get('/scores/top/domains', { params: filters }),
+  
+  // Get top scores with sorting options
+  getTopPrograms: (filters?: { 
+    limit?: number; 
+    sortBy?: 'totalScore' | 'exploitabilityScore' | 'historicalScore' | 
+             'programQualityScore' | 'competitionScore' | 'attackSurfaceScore' | 'pentestScore';
+  }) => api.get('/scores/top/programs', { params: filters }),
+  
+  getTopDomains: (filters?: { 
+    limit?: number; 
+    sortBy?: 'totalScore' | 'exploitabilityScore' | 'historicalScore' | 
+             'programQualityScore' | 'competitionScore' | 'attackSurfaceScore' | 'pentestScore';
+  }) => api.get('/scores/top/domains', { params: filters }),
+  
+  // Get by tier (S/A/B/C/D/F)
+  getByTier: (tier: 'S' | 'A' | 'B' | 'C' | 'D' | 'F') => 
+    api.get(`/scores/tier/${tier}`),
+  
+  // Get overall statistics
+  getStats: () => api.get('/scores/stats'),
+  
+  // Compare multiple targets
   compare: (ids: string[], type: 'program' | 'domain') =>
     api.get('/scores/compare', { params: { ids: ids.join(','), type } }),
+  
+  // Get score history
+  getHistory: (id: string, type: 'program' | 'domain', days?: number) =>
+    api.get(`/scores/history/${id}`, { params: { type, days } }),
 };
 

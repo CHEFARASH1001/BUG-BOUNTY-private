@@ -115,3 +115,11 @@ status:
 # Full reset - removes everything and rebuilds
 reset: dev-clean dev-build dev-up
 
+# Update MongoDB validator for programs collection
+update-mongo-validator:
+	@echo "Updating MongoDB validator..."
+	docker compose -f docker-compose.dev.yml exec -T mongodb mongosh -u admin -p bugbounty2024 --authenticationDatabase admin bugbounty < docker/update-validator.js || \
+	docker compose exec -T mongodb mongosh -u admin -p bugbounty2024 --authenticationDatabase admin bugbounty < docker/update-validator.js
+	@echo "✅ MongoDB validator updated successfully!"
+
+

@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { usePathname, useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   FolderKanban,
@@ -24,12 +24,18 @@ import {
   ChevronDown,
   Clock,
   Activity,
+  CheckCircle,
+  Info,
+  X,
+  Target,
 } from 'lucide-react';
 import { clsx } from 'clsx';
+import { cronApi } from '@/lib/api';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Programs', href: '/dashboard/programs', icon: FolderKanban },
+  { name: 'Scores', href: '/dashboard/scores', icon: Target },
   { name: 'Domains', href: '/dashboard/domains', icon: Globe },
   { name: 'Subdomains', href: '/dashboard/subdomains', icon: Server },
   { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: AlertTriangle },
@@ -47,6 +53,14 @@ const documentsSection = {
   ],
 };
 
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  type: 'success' | 'info' | 'warning' | 'error';
+  time: string;
+}
+
 export default function DashboardLayout({
   children,
 }: {
@@ -54,12 +68,67 @@ export default function DashboardLayout({
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [documentsExpanded, setDocumentsExpanded] = useState(true);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const notificationRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
+  const router = useRouter();
+  
+  // Fetch recent job executions as notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await cronApi.getExecutions({ limit: 5 });
+        const executions = response.data || [];
+        const notifs: Notification[] = executions.map((exec: any) => ({
+          id: exec._id,
+          title: exec.jobName.replace('watch_', '').replace(/_/g, ' '),
+          message: `Status: ${exec.status}${exec.duration ? ` (${(exec.duration / 1000).toFixed(1)}s)` : ''}`,
+          type: exec.status === 'completed' ? 'success' : exec.status === 'failed' ? 'error' : 'info',
+          time: new Date(exec.startedAt).toLocaleString(),
+        }));
+        setNotifications(notifs);
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      }
+    };
+    fetchNotifications();
+  }, []);
+
+  // Close notifications when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target as Node)) {
+        setNotificationsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = () => {
+    // Clear any stored tokens
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('token');
+      sessionStorage.clear();
+    }
+    // Redirect to login
+    router.push('/login');
+  };
   
   // Check if any document item is active
   const isDocumentsActive = documentsSection.items.some(
     (item) => pathname === item.href || pathname.startsWith(item.href)
   );
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case 'success': return <CheckCircle className="w-4 h-4 text-green-400" />;
+      case 'error': return <AlertTriangle className="w-4 h-4 text-red-400" />;
+      case 'warning': return <AlertTriangle className="w-4 h-4 text-yellow-400" />;
+      default: return <Info className="w-4 h-4 text-blue-400" />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-dark-950 flex">
@@ -262,10 +331,77 @@ export default function DashboardLayout({
 
             {/* Actions */}
             <div className="flex items-center gap-4">
-              <button className="relative p-2 text-slate-400 hover:text-white transition-colors">
-                <Bell className="w-5 h-5" />
-                <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
-              </button>
+              {/* Notifications */}
+              <div className="relative" ref={notificationRef}>
+                <button 
+                  onClick={() => setNotificationsOpen(!notificationsOpen)}
+                  className="relative p-2 text-slate-400 hover:text-white transition-colors"
+                >
+                  <Bell className="w-5 h-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                  )}
+                </button>
+                
+                <AnimatePresence>
+                  {notificationsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 top-full mt-2 w-80 bg-dark-900 border border-dark-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                    >
+                      <div className="p-3 border-b border-dark-700 flex items-center justify-between">
+                        <h3 className="text-sm font-medium text-white">Recent Activity</h3>
+                        <button
+                          onClick={() => setNotificationsOpen(false)}
+                          className="p-1 text-slate-400 hover:text-white"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                      <div className="max-h-80 overflow-y-auto">
+                        {notifications.length === 0 ? (
+                          <div className="p-4 text-center text-slate-500">
+                            No recent activity
+                          </div>
+                        ) : (
+                          notifications.map((notif) => (
+                            <div
+                              key={notif.id}
+                              className="p-3 border-b border-dark-800 last:border-b-0 hover:bg-dark-800/50 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                {getNotificationIcon(notif.type)}
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white capitalize">
+                                    {notif.title}
+                                  </p>
+                                  <p className="text-xs text-slate-400 mt-0.5">
+                                    {notif.message}
+                                  </p>
+                                  <p className="text-xs text-slate-500 mt-1">
+                                    {notif.time}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                      <div className="p-2 border-t border-dark-700">
+                        <Link
+                          href="/dashboard/cron"
+                          onClick={() => setNotificationsOpen(false)}
+                          className="block w-full text-center py-2 text-sm text-primary-400 hover:text-primary-300"
+                        >
+                          View all activity
+                        </Link>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
               
               <div className="h-8 w-px bg-dark-700" />
               
@@ -273,7 +409,11 @@ export default function DashboardLayout({
                 <div className="w-8 h-8 bg-primary-500/20 rounded-lg flex items-center justify-center">
                   <span className="text-sm font-medium text-primary-400">U</span>
                 </div>
-                <button className="p-2 text-slate-400 hover:text-white transition-colors">
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                  title="Logout"
+                >
                   <LogOut className="w-5 h-5" />
                 </button>
               </div>

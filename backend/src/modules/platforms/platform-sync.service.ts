@@ -7,7 +7,6 @@ import { Scope, ScopeDocument, ScopeType, ScopeStatus } from '../../schemas/scop
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
 import { HackerOneService, HackerOneProgram } from './services/hackerone.service';
 import { BugcrowdService, BugcrowdProgram } from './services/bugcrowd.service';
-import { GitHubProgramsService } from './services/github-programs.service';
 import { QueueService } from '../queue/queue.service';
 import { NotificationsService } from '../notifications/notifications.service';
 
@@ -32,7 +31,6 @@ export class PlatformSyncService {
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     private hackerOneService: HackerOneService,
     private bugcrowdService: BugcrowdService,
-    private githubProgramsService: GitHubProgramsService,
     private queueService: QueueService,
     private notificationsService: NotificationsService,
   ) {}
@@ -60,12 +58,6 @@ export class PlatformSyncService {
       const bcResult = await this.syncBugcrowd(logMsg);
       results.push(bcResult);
       await logMsg(`Bugcrowd: ${bcResult.newPrograms} new, ${bcResult.updatedPrograms} updated, ${bcResult.newScopes} scopes`);
-
-      // Sync GitHub programs
-      await logMsg('Starting GitHub programs sync...');
-      const ghResult = await this.syncGitHubPrograms(logMsg);
-      results.push(ghResult);
-      await logMsg(`GitHub: ${ghResult.newScopes} new domains`);
 
       // Send notification about sync results
       await this.notifySync(results);
@@ -181,66 +173,6 @@ export class PlatformSyncService {
     return result;
   }
 
-  async syncGitHubPrograms(log?: LogFn): Promise<SyncResult> {
-    const startTime = Date.now();
-    const logMsg = log || (async (msg: string) => this.logger.log(msg));
-    const result: SyncResult = {
-      platform: 'github',
-      newPrograms: 0,
-      updatedPrograms: 0,
-      newScopes: 0,
-      errors: [],
-      duration: 0,
-    };
-
-    try {
-      await logMsg('Fetching GitHub domain lists...');
-      
-      // Fetch domains from Arkadiyt
-      const domains = await this.githubProgramsService.fetchAllDomains();
-      await logMsg(`Found ${domains.length} domains from GitHub`);
-      
-      for (const domain of domains) {
-        try {
-          // Check if domain already exists in any scope
-          const existingDomain = await this.domainModel.findOne({ domain: domain.toLowerCase() });
-          
-          if (!existingDomain) {
-            // Create domain without program association
-            await this.domainModel.create({
-              domain: domain.toLowerCase(),
-              source: 'github-bounty-list',
-              isActive: true,
-              firstSeen: new Date(),
-            });
-            result.newScopes++;
-          }
-        } catch (error: any) {
-          // Skip duplicate key errors
-          if (error.code !== 11000) {
-            result.errors.push(`${domain}: ${error.message}`);
-          }
-        }
-      }
-
-      await logMsg(`Added ${result.newScopes} new domains`);
-
-      // Fetch wildcards
-      await logMsg('Fetching wildcard domains...');
-      const wildcards = await this.githubProgramsService.fetchWildcards();
-      result.newPrograms = wildcards.length;
-      await logMsg(`Found ${wildcards.length} wildcard entries`);
-
-    } catch (error: any) {
-      result.errors.push(error.message);
-      await logMsg(`ERROR: GitHub sync failed: ${error.message}`);
-    }
-
-    result.duration = Date.now() - startTime;
-    await logMsg(`GitHub sync completed in ${result.duration}ms`);
-    return result;
-  }
-
   private async upsertProgram(
     h1Program: HackerOneProgram,
     platform: string,
@@ -272,6 +204,8 @@ export class PlatformSyncService {
       state: h1Program.state,
       offersBounties: h1Program.offersBounties,
       isActive: true,
+      scope: [],
+      outOfScope: [],
       firstSyncedAt: new Date(),
       lastSyncedAt: new Date(),
     });
@@ -316,6 +250,8 @@ export class PlatformSyncService {
         max: bcProgram.maxRewards,
       },
       isActive: true,
+      scope: [],
+      outOfScope: [],
       firstSyncedAt: new Date(),
       lastSyncedAt: new Date(),
     });
@@ -332,17 +268,24 @@ export class PlatformSyncService {
     for (const scope of program.scopes) {
       const scopeType = this.mapAssetType(scope.assetType);
       
+      // Determine if in-scope based on eligibleForSubmission
+      // eligibleForSubmission: false means OUT OF SCOPE
+      // eligibleForSubmission: true (or undefined) means IN SCOPE
+      const isInScope = scope.eligibleForSubmission === true;
+      const scopeStatus = isInScope ? ScopeStatus.IN_SCOPE : ScopeStatus.OUT_OF_SCOPE;
+      
       const existing = await this.scopeModel.findOne({
         programId,
         target: scope.assetIdentifier,
       });
 
       if (!existing) {
+        // Create new scope
         await this.scopeModel.create({
           programId,
           target: scope.assetIdentifier,
           type: scopeType,
-          status: ScopeStatus.IN_SCOPE,
+          status: scopeStatus,
           description: scope.instruction,
           isActive: true,
           eligibility: {
@@ -352,8 +295,23 @@ export class PlatformSyncService {
         });
         newScopes++;
 
-        // Extract domain from scope and create domain entry
-        await this.extractAndCreateDomain(programId, scope.assetIdentifier, scopeType);
+        // Only extract domain from in-scope items
+        if (isInScope) {
+          await this.extractAndCreateDomain(programId, scope.assetIdentifier, scopeType);
+        }
+      } else {
+        // Update existing scope if status has changed
+        if (existing.status !== scopeStatus) {
+          await this.scopeModel.updateOne(
+            { _id: existing._id },
+            {
+              status: scopeStatus,
+              description: scope.instruction,
+              'eligibility.isEligible': scope.eligibleForBounty,
+            },
+          );
+          this.logger.log(`Updated scope ${scope.assetIdentifier}: ${existing.status} -> ${scopeStatus}`);
+        }
       }
     }
 
@@ -384,8 +342,10 @@ export class PlatformSyncService {
         });
         newScopes++;
 
-        // Extract domain from scope
-        await this.extractAndCreateDomain(programId, scope.uri, ScopeType.DOMAIN);
+        // Only extract domain from in-scope items
+        if (scope.inScope) {
+          await this.extractAndCreateDomain(programId, scope.uri, ScopeType.DOMAIN);
+        }
       }
     }
 

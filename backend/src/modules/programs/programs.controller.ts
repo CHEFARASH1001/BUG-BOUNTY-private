@@ -71,7 +71,15 @@ export class ProgramsController {
     return this.programsService.getVulnerabilities(id);
   }
 
+  @Get(':id/scopes')
+  @Public() // Allow public access for dev mode
+  @ApiOperation({ summary: 'Get scopes for a program' })
+  getScopes(@Param('id') id: string) {
+    return this.programsService.getScopes(id);
+  }
+
   @Put(':id')
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Update program' })
   update(@Param('id') id: string, @Body() updateProgramDto: UpdateProgramDto) {
     return this.programsService.update(id, updateProgramDto);

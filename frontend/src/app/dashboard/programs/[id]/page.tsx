@@ -85,6 +85,17 @@ interface Vulnerability {
   createdAt: string;
 }
 
+interface Scope {
+  _id: string;
+  target: string;
+  type: string;
+  status: 'in_scope' | 'out_of_scope';
+  description?: string;
+  eligibility?: {
+    isEligible?: boolean;
+  };
+}
+
 interface Stats {
   program: Program;
   domainCount: number;
@@ -123,6 +134,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
   const [stats, setStats] = useState<Stats | null>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [vulnerabilities, setVulnerabilities] = useState<Vulnerability[]>([]);
+  const [scopes, setScopes] = useState<Scope[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -133,17 +145,19 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         setError(null);
         
         // Fetch all data in parallel
-        const [programRes, statsRes, domainsRes, vulnsRes] = await Promise.all([
+        const [programRes, statsRes, domainsRes, vulnsRes, scopesRes] = await Promise.all([
           programsApi.getById(params.id),
           programsApi.getStats(params.id),
           programsApi.getDomains(params.id),
           programsApi.getVulnerabilities(params.id),
+          programsApi.getScopes(params.id),
         ]);
 
         setProgram(programRes.data);
         setStats(statsRes.data);
         setDomains(domainsRes.data || []);
         setVulnerabilities(vulnsRes.data || []);
+        setScopes(scopesRes.data || []);
       } catch (err: any) {
         console.error('Error fetching program data:', err);
         setError(err.response?.data?.message || 'Failed to load program data');
@@ -180,6 +194,32 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
       </div>
     );
   }
+
+  // Separate in-scope and out-of-scope (after null check)
+  const inScopeItems = scopes.filter(s => s.status === 'in_scope');
+  const outOfScopeItems = scopes.filter(s => s.status === 'out_of_scope');
+  
+  // Also include program.scope array (string array) if scopes collection is empty
+  const allInScope = inScopeItems.length > 0 
+    ? inScopeItems 
+    : (program?.scope || []).map((item, index) => ({
+        _id: `in-scope-${index}`,
+        target: item,
+        type: 'domain',
+        status: 'in_scope' as const,
+        description: undefined,
+      }));
+  
+  // Also include program.outOfScope array (string array) if scopes collection is empty
+  const allOutOfScope = outOfScopeItems.length > 0 
+    ? outOfScopeItems 
+    : (program?.outOfScope || []).map((item, index) => ({
+        _id: `out-of-scope-${index}`,
+        target: item,
+        type: 'domain',
+        status: 'out_of_scope' as const,
+        description: undefined,
+      }));
 
   // Format bounty range
   const bountyRange = program.bountyRange
@@ -298,74 +338,209 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
 
       {/* Overview Tab */}
       {activeTab === 'overview' && (
-        <div className="grid grid-cols-2 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
-          >
-            <h3 className="text-lg font-semibold text-white mb-4">Description</h3>
-            <p className="text-slate-400">
-              {program.description || 'No description available.'}
-            </p>
-            {program.notes && (
-              <div className="mt-4 pt-4 border-t border-dark-700">
-                <h4 className="text-sm font-medium text-slate-300 mb-2">Notes</h4>
-                <p className="text-slate-400 text-sm">{program.notes}</p>
-              </div>
-            )}
-            {program.tags && program.tags.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-dark-700">
-                <h4 className="text-sm font-medium text-slate-300 mb-2">Tags</h4>
-                <div className="flex flex-wrap gap-2">
-                  {program.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="px-2 py-1 bg-dark-700 text-slate-300 text-xs rounded"
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Program Information */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">Program Information</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Platform</label>
+                  <p className="text-white mt-1 capitalize">{program.platform || 'N/A'}</p>
+                </div>
+                {program.handle && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">Handle</label>
+                    <p className="text-white mt-1 font-mono">{program.handle}</p>
+                  </div>
+                )}
+                {program.state && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">State</label>
+                    <p className="text-white mt-1 capitalize">{program.state}</p>
+                  </div>
+                )}
+                {program.url && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">URL</label>
+                    <a
+                      href={program.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-400 hover:text-primary-300 mt-1 block truncate"
                     >
-                      {tag}
-                    </span>
-                  ))}
+                      {program.url}
+                    </a>
+                  </div>
+                )}
+                {program.platformUrl && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">Platform URL</label>
+                    <a
+                      href={program.platformUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary-400 hover:text-primary-300 mt-1 block truncate"
+                    >
+                      {program.platformUrl}
+                    </a>
+                  </div>
+                )}
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Bounty Status</label>
+                  <p className="text-white mt-1">{program.offersBounties ? 'Bounties Available' : 'No Bounties'}</p>
                 </div>
               </div>
-            )}
-          </motion.div>
+            </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
-          >
-            <h3 className="text-lg font-semibold text-white mb-4">Recent Vulnerabilities</h3>
-            {vulnerabilities.length === 0 ? (
-              <p className="text-slate-500 text-sm">No vulnerabilities found.</p>
-            ) : (
-              <div className="space-y-3">
-                {vulnerabilities.slice(0, 5).map((vuln) => (
-                  <div key={vuln._id} className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className={cn(
-                        'w-4 h-4',
-                        vuln.severity === 'critical' ? 'text-red-400' :
-                        vuln.severity === 'high' ? 'text-orange-400' :
-                        vuln.severity === 'medium' ? 'text-yellow-400' :
-                        vuln.severity === 'low' ? 'text-green-400' :
-                        'text-blue-400'
-                      )} />
-                      <div>
-                        <p className="text-white text-sm font-medium">{vuln.title}</p>
-                        <p className="text-xs text-slate-500">{vuln.target || vuln.url || 'N/A'}</p>
-                      </div>
+            {/* Bounty Information */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">Bounty Information</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-slate-500 uppercase tracking-wide">Bounty Range</label>
+                  <p className="text-white mt-1">{bountyRange}</p>
+                </div>
+                {program.rewards && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide mb-2 block">Rewards</label>
+                    <div className="space-y-2">
+                      {program.rewards.critical && (
+                        <div className="flex items-center justify-between p-2 bg-red-500/10 rounded">
+                          <span className="text-sm text-slate-300">Critical</span>
+                          <span className="text-sm font-medium text-red-400">{program.rewards.critical}</span>
+                        </div>
+                      )}
+                      {program.rewards.high && (
+                        <div className="flex items-center justify-between p-2 bg-orange-500/10 rounded">
+                          <span className="text-sm text-slate-300">High</span>
+                          <span className="text-sm font-medium text-orange-400">{program.rewards.high}</span>
+                        </div>
+                      )}
+                      {program.rewards.medium && (
+                        <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded">
+                          <span className="text-sm text-slate-300">Medium</span>
+                          <span className="text-sm font-medium text-yellow-400">{program.rewards.medium}</span>
+                        </div>
+                      )}
+                      {program.rewards.low && (
+                        <div className="flex items-center justify-between p-2 bg-green-500/10 rounded">
+                          <span className="text-sm text-slate-300">Low</span>
+                          <span className="text-sm font-medium text-green-400">{program.rewards.low}</span>
+                        </div>
+                      )}
                     </div>
-                    <span className={cn('px-2 py-0.5 rounded text-xs', statusColors[vuln.status] || 'bg-slate-500/20 text-slate-400')}>
-                      {vuln.status}
-                    </span>
                   </div>
-                ))}
+                )}
               </div>
-            )}
-          </motion.div>
+            </motion.div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Description & Notes */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">Description</h3>
+              <p className="text-slate-400 whitespace-pre-wrap">
+                {program.description || 'No description available.'}
+              </p>
+              {program.notes && (
+                <div className="mt-4 pt-4 border-t border-dark-700">
+                  <h4 className="text-sm font-medium text-slate-300 mb-2">Notes</h4>
+                  <p className="text-slate-400 text-sm whitespace-pre-wrap">{program.notes}</p>
+                </div>
+              )}
+              {program.tags && program.tags.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-dark-700">
+                  <h4 className="text-sm font-medium text-slate-300 mb-2">Tags</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {program.tags.map((tag, index) => (
+                      <span
+                        key={index}
+                        className="px-2 py-1 bg-dark-700 text-slate-300 text-xs rounded"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+
+            {/* Sync Information & Recent Vulnerabilities */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 p-6"
+            >
+              <h3 className="text-lg font-semibold text-white mb-4">Sync Information</h3>
+              <div className="space-y-3 mb-6">
+                {program.firstSyncedAt && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">First Synced</label>
+                    <p className="text-white mt-1">{formatDateTime(program.firstSyncedAt)}</p>
+                  </div>
+                )}
+                {program.lastSyncedAt && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">Last Synced</label>
+                    <p className="text-white mt-1">{formatDateTime(program.lastSyncedAt)}</p>
+                  </div>
+                )}
+                {program.lastScannedAt && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">Last Scanned</label>
+                    <p className="text-white mt-1">{formatDateTime(program.lastScannedAt)}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="pt-4 border-t border-dark-700">
+                <h4 className="text-sm font-medium text-slate-300 mb-3">Recent Vulnerabilities</h4>
+                {vulnerabilities.length === 0 ? (
+                  <p className="text-slate-500 text-sm">No vulnerabilities found.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {vulnerabilities.slice(0, 5).map((vuln) => (
+                      <div key={vuln._id} className="flex items-center justify-between p-2 bg-dark-800/50 rounded-lg">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <AlertTriangle className={cn(
+                            'w-3.5 h-3.5 shrink-0',
+                            vuln.severity === 'critical' ? 'text-red-400' :
+                            vuln.severity === 'high' ? 'text-orange-400' :
+                            vuln.severity === 'medium' ? 'text-yellow-400' :
+                            vuln.severity === 'low' ? 'text-green-400' :
+                            'text-blue-400'
+                          )} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-white text-xs font-medium truncate">{vuln.title}</p>
+                            <p className="text-xs text-slate-500 truncate">{vuln.target || vuln.url || 'N/A'}</p>
+                          </div>
+                        </div>
+                        <span className={cn('px-2 py-0.5 rounded text-xs shrink-0', statusColors[vuln.status] || 'bg-slate-500/20 text-slate-400')}>
+                          {vuln.status}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
         </div>
       )}
 
@@ -506,7 +681,8 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
 
       {/* Scope Tab */}
       {activeTab === 'scope' && (
-        <div className="grid grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* In Scope */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -514,22 +690,53 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
           >
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <CheckCircle className="w-5 h-5 text-green-400" />
-              In Scope ({program.scope?.length || 0})
+              In Scope ({allInScope.length > 0 ? allInScope.length : domains.length})
             </h3>
-            {(!program.scope || program.scope.length === 0) ? (
-              <p className="text-slate-500 text-sm">No scope defined.</p>
-            ) : (
-              <div className="space-y-2">
-                {program.scope.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                    <Globe className="w-4 h-4 text-green-400" />
-                    <span className="text-slate-300 font-mono text-sm">{item}</span>
+            
+            {/* Show scopes if available, otherwise show domains */}
+            {allInScope.length > 0 ? (
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {allInScope.map((scope) => (
+                  <div
+                    key={scope._id}
+                    className="flex items-start gap-3 p-3 bg-green-500/10 border border-green-500/20 rounded-lg"
+                  >
+                    <Globe className="w-4 h-4 text-green-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-slate-300 font-mono text-sm break-all">{scope.target}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-500 capitalize">{scope.type?.replace('_', ' ') || 'domain'}</span>
+                        {scope.eligibility?.isEligible && (
+                          <span className="px-1.5 py-0.5 text-xs bg-yellow-500/20 text-yellow-400 rounded">Bounty</span>
+                        )}
+                      </div>
+                      {scope.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{scope.description}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
+            ) : domains.length > 0 ? (
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                <p className="text-slate-400 text-xs mb-2">Showing domains as scope targets:</p>
+                {domains.map((domain) => (
+                  <Link
+                    key={domain._id}
+                    href={`/dashboard/domains/${domain._id}`}
+                    className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg hover:bg-green-500/20 transition-colors"
+                  >
+                    <Globe className="w-4 h-4 text-green-400 shrink-0" />
+                    <span className="text-slate-300 font-mono text-sm truncate">{domain.domain}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-slate-500 text-sm">No in-scope targets found.</p>
             )}
           </motion.div>
 
+          {/* Out of Scope */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -538,19 +745,31 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
           >
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <XCircle className="w-5 h-5 text-red-400" />
-              Out of Scope ({program.outOfScope?.length || 0})
+              Out of Scope ({allOutOfScope.length})
             </h3>
-            {(!program.outOfScope || program.outOfScope.length === 0) ? (
-              <p className="text-slate-500 text-sm">No out-of-scope items defined.</p>
-            ) : (
-              <div className="space-y-2">
-                {program.outOfScope.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                    <Globe className="w-4 h-4 text-red-400" />
-                    <span className="text-slate-300 font-mono text-sm">{item}</span>
+            
+            {allOutOfScope.length > 0 ? (
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {allOutOfScope.map((scope) => (
+                  <div
+                    key={scope._id}
+                    className="flex items-start gap-3 p-3 bg-red-500/10 border border-red-500/20 rounded-lg"
+                  >
+                    <XCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-slate-300 font-mono text-sm break-all">{scope.target}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-slate-500 capitalize">{scope.type?.replace('_', ' ') || 'domain'}</span>
+                      </div>
+                      {scope.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{scope.description}</p>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
+            ) : (
+              <p className="text-slate-500 text-sm">No out-of-scope targets defined. All listed targets are in scope.</p>
             )}
           </motion.div>
         </div>

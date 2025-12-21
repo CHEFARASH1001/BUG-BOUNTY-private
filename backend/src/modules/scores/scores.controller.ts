@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Scores')
-@Controller('api/scores')
+@Controller('scores')
 export class ScoresController {
   constructor(private scoresService: ScoresService) {}
 
@@ -44,7 +44,7 @@ export class ScoresController {
   @Get('program/:id')
   @Public()
   @ApiOperation({ summary: 'Get score for a program' })
-  @ApiResponse({ status: 200, description: 'Program score' })
+  @ApiResponse({ status: 200, description: 'Program score with full breakdown' })
   async getProgramScore(@Param('id') id: string) {
     return this.scoresService.getScore(id, ScoreTargetType.PROGRAM);
   }
@@ -52,7 +52,7 @@ export class ScoresController {
   @Get('domain/:id')
   @Public()
   @ApiOperation({ summary: 'Get score for a domain' })
-  @ApiResponse({ status: 200, description: 'Domain score' })
+  @ApiResponse({ status: 200, description: 'Domain score with full breakdown' })
   async getDomainScore(@Param('id') id: string) {
     return this.scoresService.getScore(id, ScoreTargetType.DOMAIN);
   }
@@ -60,8 +60,21 @@ export class ScoresController {
   @Get('top/programs')
   @Public()
   @ApiOperation({ summary: 'Get top scored programs' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['totalScore', 'pentestScore', 'exposureScore', 'priorityScore'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results (default 20)' })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: [
+      'totalScore',
+      'exploitabilityScore',
+      'historicalScore',
+      'programQualityScore',
+      'competitionScore',
+      'attackSurfaceScore',
+      'pentestScore',
+    ],
+    description: 'Sort by score type',
+  })
   @ApiResponse({ status: 200, description: 'Top programs by score' })
   async getTopPrograms(
     @Query('limit') limit?: string,
@@ -77,8 +90,21 @@ export class ScoresController {
   @Get('top/domains')
   @Public()
   @ApiOperation({ summary: 'Get top scored domains' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'sortBy', required: false, enum: ['totalScore', 'pentestScore', 'exposureScore', 'priorityScore'] })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results (default 20)' })
+  @ApiQuery({
+    name: 'sortBy',
+    required: false,
+    enum: [
+      'totalScore',
+      'exploitabilityScore',
+      'historicalScore',
+      'programQualityScore',
+      'competitionScore',
+      'attackSurfaceScore',
+      'pentestScore',
+    ],
+    description: 'Sort by score type',
+  })
   @ApiResponse({ status: 200, description: 'Top domains by score' })
   async getTopDomains(
     @Query('limit') limit?: string,
@@ -89,6 +115,23 @@ export class ScoresController {
       limit ? parseInt(limit, 10) : 20,
       sortBy || 'totalScore',
     );
+  }
+
+  @Get('tier/:tier')
+  @Public()
+  @ApiOperation({ summary: 'Get all programs/domains in a specific tier' })
+  @ApiQuery({ name: 'tier', enum: ['S', 'A', 'B', 'C', 'D', 'F'], description: 'Tier level' })
+  @ApiResponse({ status: 200, description: 'Scores filtered by tier' })
+  async getByTier(@Param('tier') tier: string) {
+    return this.scoresService.getScoresByTier(tier);
+  }
+
+  @Get('stats')
+  @Public()
+  @ApiOperation({ summary: 'Get scoring statistics' })
+  @ApiResponse({ status: 200, description: 'Overall scoring statistics' })
+  async getStats() {
+    return this.scoresService.getScoreStats();
   }
 
   @Get('compare')
@@ -110,8 +153,8 @@ export class ScoresController {
   @Public()
   @ApiOperation({ summary: 'Get score history for a target' })
   @ApiQuery({ name: 'type', required: true, enum: ['program', 'domain'] })
-  @ApiQuery({ name: 'days', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Score history' })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Number of days (default 30)' })
+  @ApiResponse({ status: 200, description: 'Score history over time' })
   async getHistory(
     @Param('id') id: string,
     @Query('type') type: string,
@@ -125,4 +168,3 @@ export class ScoresController {
     );
   }
 }
-

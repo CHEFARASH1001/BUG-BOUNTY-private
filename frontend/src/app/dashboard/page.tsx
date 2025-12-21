@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   Globe,
@@ -12,6 +13,8 @@ import {
   ArrowUpRight,
   Plus,
   Play,
+  Loader2,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -26,73 +29,115 @@ import {
   Pie,
   Cell,
 } from 'recharts';
+import { programsApi, domainsApi, subdomainsApi, cronApi } from '@/lib/api';
 
-// Mock data - replace with real API data
-const stats = [
-  { name: 'Programs', value: 12, change: '+2', icon: Target, color: 'text-blue-400', bg: 'bg-blue-500/20' },
-  { name: 'Domains', value: 48, change: '+8', icon: Globe, color: 'text-purple-400', bg: 'bg-purple-500/20' },
-  { name: 'Subdomains', value: 1247, change: '+156', icon: Server, color: 'text-cyan-400', bg: 'bg-cyan-500/20' },
-  { name: 'Vulnerabilities', value: 89, change: '+12', icon: AlertTriangle, color: 'text-red-400', bg: 'bg-red-500/20' },
-];
+interface DashboardStats {
+  programs: number;
+  domains: number;
+  subdomains: number;
+  aliveSubdomains: number;
+}
 
-const vulnBySeverity = [
-  { name: 'Critical', value: 8, color: '#dc3545' },
-  { name: 'High', value: 23, color: '#fd7e14' },
-  { name: 'Medium', value: 34, color: '#ffc107' },
-  { name: 'Low', value: 24, color: '#28a745' },
-];
-
-const activityData = [
-  { date: 'Mon', scans: 12, vulns: 4 },
-  { date: 'Tue', scans: 19, vulns: 8 },
-  { date: 'Wed', scans: 15, vulns: 6 },
-  { date: 'Thu', scans: 22, vulns: 12 },
-  { date: 'Fri', scans: 28, vulns: 15 },
-  { date: 'Sat', scans: 18, vulns: 7 },
-  { date: 'Sun', scans: 24, vulns: 11 },
-];
-
-const recentScans = [
-  { id: 1, domain: 'example.com', status: 'completed', vulns: 5, time: '2 min ago' },
-  { id: 2, domain: 'test.io', status: 'running', vulns: null, time: '5 min ago' },
-  { id: 3, domain: 'demo.org', status: 'completed', vulns: 12, time: '15 min ago' },
-  { id: 4, domain: 'app.net', status: 'queued', vulns: null, time: '20 min ago' },
-];
-
-const recentVulns = [
-  { id: 1, title: 'SQL Injection in login', severity: 'critical', target: 'api.example.com', time: '5m ago' },
-  { id: 2, title: 'XSS in search parameter', severity: 'high', target: 'www.test.io', time: '12m ago' },
-  { id: 3, title: 'CORS misconfiguration', severity: 'medium', target: 'cdn.demo.org', time: '25m ago' },
-  { id: 4, title: 'Missing security headers', severity: 'low', target: 'app.net', time: '1h ago' },
-];
+interface CronExecution {
+  _id: string;
+  jobName: string;
+  status: string;
+  startedAt: string;
+  completedAt?: string;
+  duration?: number;
+}
 
 export default function DashboardPage() {
+  const [stats, setStats] = useState<DashboardStats>({ programs: 0, domains: 0, subdomains: 0, aliveSubdomains: 0 });
+  const [recentExecutions, setRecentExecutions] = useState<CronExecution[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchStats = async () => {
+    setLoading(true);
+    try {
+      const [programsRes, domainsRes, subdomainsRes, executionsRes] = await Promise.all([
+        programsApi.getAll().catch(() => ({ data: [] })),
+        domainsApi.getAll().catch(() => ({ data: [] })),
+        subdomainsApi.getAll().catch(() => ({ data: [] })),
+        cronApi.getExecutions({ limit: 5 }).catch(() => ({ data: [] })),
+      ]);
+
+      const programs = Array.isArray(programsRes.data) ? programsRes.data : [];
+      const domains = Array.isArray(domainsRes.data) ? domainsRes.data : [];
+      const subdomains = Array.isArray(subdomainsRes.data) ? subdomainsRes.data : [];
+      const executions = Array.isArray(executionsRes.data) ? executionsRes.data : [];
+
+      setStats({
+        programs: programs.length,
+        domains: domains.length,
+        subdomains: subdomains.length,
+        aliveSubdomains: subdomains.filter((s: any) => s.isAlive).length,
+      });
+      setRecentExecutions(executions);
+    } catch (error) {
+      console.error('Failed to fetch dashboard stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const statCards = [
+    { name: 'Programs', value: stats.programs, icon: Target, color: 'text-blue-400', bg: 'bg-blue-500/20', href: '/dashboard/programs' },
+    { name: 'Domains', value: stats.domains, icon: Globe, color: 'text-purple-400', bg: 'bg-purple-500/20', href: '/dashboard/domains' },
+    { name: 'Subdomains', value: stats.subdomains, icon: Server, color: 'text-cyan-400', bg: 'bg-cyan-500/20', href: '/dashboard/subdomains' },
+    { name: 'Alive Hosts', value: stats.aliveSubdomains, icon: Activity, color: 'text-green-400', bg: 'bg-green-500/20', href: '/dashboard/subdomains' },
+  ];
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return 'text-green-400';
+      case 'running': return 'text-blue-400';
+      case 'failed': return 'text-red-400';
+      default: return 'text-slate-400';
+    }
+  };
+
+  const formatDuration = (ms?: number) => {
+    if (!ms) return '-';
+    if (ms < 1000) return `${ms}ms`;
+    if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+    return `${(ms / 60000).toFixed(1)}m`;
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="text-slate-400 mt-1">Overview of your bug bounty activities</p>
+          <p className="text-slate-400 mt-1">Overview of your bug bounty automation</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link
-            href="/dashboard/domains/new"
+          <button 
+            onClick={fetchStats}
+            disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 hover:bg-dark-700 hover:text-white transition-colors"
           >
-            <Plus className="w-4 h-4" />
-            Add Domain
-          </Link>
-          <button className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors">
-            <Play className="w-4 h-4" />
-            New Scan
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
+          <Link
+            href="/dashboard/cron"
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+          >
+            <Play className="w-4 h-4" />
+            Run Jobs
+          </Link>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
+        {statCards.map((stat, index) => (
           <motion.div
             key={stat.name}
             initial={{ opacity: 0, y: 20 }}
@@ -100,87 +145,78 @@ export default function DashboardPage() {
             transition={{ delay: index * 0.1 }}
             className="relative group"
           >
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300" />
-            <div className="relative p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className={`p-2 rounded-lg ${stat.bg}`}>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+            <Link href={stat.href}>
+              <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-30 transition duration-300" />
+              <div className="relative p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
+                <div className="flex items-center justify-between mb-3">
+                  <div className={`p-2 rounded-lg ${stat.bg}`}>
+                    <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                  </div>
+                  <ArrowUpRight className="w-4 h-4 text-slate-500 group-hover:text-primary-400 transition-colors" />
                 </div>
-                <span className="text-xs text-green-400 flex items-center gap-1">
-                  <TrendingUp className="w-3 h-3" />
-                  {stat.change}
-                </span>
+                <div className="text-2xl font-bold text-white mb-1">
+                  {loading ? <Loader2 className="w-6 h-6 animate-spin" /> : stat.value.toLocaleString()}
+                </div>
+                <div className="text-sm text-slate-400">{stat.name}</div>
               </div>
-              <div className="text-2xl font-bold text-white mb-1">{stat.value.toLocaleString()}</div>
-              <div className="text-sm text-slate-400">{stat.name}</div>
-            </div>
+            </Link>
           </motion.div>
         ))}
       </div>
 
-      {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity Chart */}
+      {/* Recent Activity & Quick Actions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Cron Executions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="lg:col-span-2 p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+          className="p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary-400" />
-              Activity Overview
+              <Clock className="w-5 h-5 text-primary-400" />
+              Recent Job Executions
             </h3>
-            <select className="px-3 py-1 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none">
-              <option>Last 7 days</option>
-              <option>Last 30 days</option>
-              <option>Last 90 days</option>
-            </select>
+            <Link href="/dashboard/cron" className="text-sm text-primary-400 hover:text-primary-300 flex items-center gap-1">
+              View all <ArrowUpRight className="w-4 h-4" />
+            </Link>
           </div>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={activityData}>
-                <defs>
-                  <linearGradient id="colorScans" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#22c55e" stopOpacity={0}/>
-                  </linearGradient>
-                  <linearGradient id="colorVulns" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-                <XAxis dataKey="date" stroke="#64748b" fontSize={12} />
-                <YAxis stroke="#64748b" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="scans"
-                  stroke="#22c55e"
-                  fillOpacity={1}
-                  fill="url(#colorScans)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="vulns"
-                  stroke="#ef4444"
-                  fillOpacity={1}
-                  fill="url(#colorVulns)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="space-y-3">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-primary-400 animate-spin" />
+              </div>
+            ) : recentExecutions.length === 0 ? (
+              <div className="text-center py-8 text-slate-400">
+                No recent executions. Run a cron job to get started.
+              </div>
+            ) : (
+              recentExecutions.map((exec) => (
+                <div
+                  key={exec._id}
+                  className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${exec.status === 'completed' ? 'bg-green-500' : exec.status === 'running' ? 'bg-blue-500 animate-pulse' : 'bg-red-500'}`} />
+                    <div>
+                      <div className="text-sm font-medium text-white">{exec.jobName.replace('watch_', '').replace(/_/g, ' ')}</div>
+                      <div className="text-xs text-slate-500">
+                        {new Date(exec.startedAt).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`text-sm capitalize ${getStatusColor(exec.status)}`}>{exec.status}</div>
+                    <div className="text-xs text-slate-500">{formatDuration(exec.duration)}</div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
 
-        {/* Severity Distribution */}
+        {/* Quick Actions */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -188,126 +224,92 @@ export default function DashboardPage() {
           className="p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
         >
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-primary-400" />
-            Severity Distribution
+            <Activity className="w-5 h-5 text-primary-400" />
+            Quick Actions
           </h3>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={vulnBySeverity}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={70}
-                  paddingAngle={4}
-                  dataKey="value"
-                >
-                  {vulnBySeverity.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#1e293b',
-                    border: '1px solid #334155',
-                    borderRadius: '8px',
-                  }}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex flex-wrap justify-center gap-4 mt-2">
-            {vulnBySeverity.map((item) => (
-              <div key={item.name} className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className="text-xs text-slate-400">{item.name}</span>
+          <div className="grid grid-cols-2 gap-3">
+            <Link
+              href="/dashboard/cron"
+              className="p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors group"
+            >
+              <div className="p-2 bg-blue-500/20 rounded-lg w-fit mb-3">
+                <RefreshCw className="w-5 h-5 text-blue-400" />
               </div>
-            ))}
+              <div className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors">Sync Programs</div>
+              <div className="text-xs text-slate-500 mt-1">Fetch from HackerOne</div>
+            </Link>
+            
+            <Link
+              href="/dashboard/cron"
+              className="p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors group"
+            >
+              <div className="p-2 bg-purple-500/20 rounded-lg w-fit mb-3">
+                <Server className="w-5 h-5 text-purple-400" />
+              </div>
+              <div className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors">Enumerate Subdomains</div>
+              <div className="text-xs text-slate-500 mt-1">Discover new hosts</div>
+            </Link>
+            
+            <Link
+              href="/dashboard/cron"
+              className="p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors group"
+            >
+              <div className="p-2 bg-cyan-500/20 rounded-lg w-fit mb-3">
+                <Globe className="w-5 h-5 text-cyan-400" />
+              </div>
+              <div className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors">DNS Resolution</div>
+              <div className="text-xs text-slate-500 mt-1">Resolve live hosts</div>
+            </Link>
+            
+            <Link
+              href="/dashboard/cron"
+              className="p-4 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors group"
+            >
+              <div className="p-2 bg-green-500/20 rounded-lg w-fit mb-3">
+                <Activity className="w-5 h-5 text-green-400" />
+              </div>
+              <div className="text-sm font-medium text-white group-hover:text-primary-400 transition-colors">HTTP Probing</div>
+              <div className="text-xs text-slate-500 mt-1">Check web services</div>
+            </Link>
           </div>
         </motion.div>
       </div>
 
-      {/* Tables Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Scans */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary-400" />
-              Recent Scans
-            </h3>
-            <Link href="/dashboard/scans" className="text-sm text-primary-400 hover:text-primary-300 flex items-center gap-1">
-              View all <ArrowUpRight className="w-4 h-4" />
-            </Link>
+      {/* System Status */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.6 }}
+        className="p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+      >
+        <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
+          <AlertTriangle className="w-5 h-5 text-primary-400" />
+          System Status
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-dark-800/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm font-medium text-white">Backend API</span>
+            </div>
+            <div className="text-xs text-slate-500">http://localhost:4000</div>
           </div>
-          <div className="space-y-3">
-            {recentScans.map((scan) => (
-              <div
-                key={scan.id}
-                className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`status-dot ${scan.status === 'completed' ? 'online' : scan.status === 'running' ? 'scanning' : 'pending'}`} />
-                  <div>
-                    <div className="text-sm font-medium text-white">{scan.domain}</div>
-                    <div className="text-xs text-slate-500">{scan.time}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm text-slate-300 capitalize">{scan.status}</div>
-                  {scan.vulns !== null && (
-                    <div className="text-xs text-slate-500">{scan.vulns} vulns</div>
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="p-4 bg-dark-800/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm font-medium text-white">MongoDB</span>
+            </div>
+            <div className="text-xs text-slate-500">Connected</div>
           </div>
-        </motion.div>
-
-        {/* Recent Vulnerabilities */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.7 }}
-          className="p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-red-400" />
-              Recent Vulnerabilities
-            </h3>
-            <Link href="/dashboard/vulnerabilities" className="text-sm text-primary-400 hover:text-primary-300 flex items-center gap-1">
-              View all <ArrowUpRight className="w-4 h-4" />
-            </Link>
+          <div className="p-4 bg-dark-800/50 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500" />
+              <span className="text-sm font-medium text-white">RabbitMQ</span>
+            </div>
+            <div className="text-xs text-slate-500">Connected</div>
           </div>
-          <div className="space-y-3">
-            {recentVulns.map((vuln) => (
-              <div
-                key={vuln.id}
-                className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg hover:bg-dark-800 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <div className={`px-2 py-1 rounded text-xs font-medium bg-severity-${vuln.severity} border severity-${vuln.severity}`}>
-                    {vuln.severity.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-sm font-medium text-white">{vuln.title}</div>
-                    <div className="text-xs text-slate-500">{vuln.target}</div>
-                  </div>
-                </div>
-                <div className="text-xs text-slate-500">{vuln.time}</div>
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
-

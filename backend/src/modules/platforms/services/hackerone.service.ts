@@ -171,7 +171,19 @@ export class HackerOneService {
                 submission_state
                 started_accepting_at
                 url
-                structured_scopes(first: 100, archived: false) {
+                in_scope: structured_scopes(first: 100, archived: false, eligible_for_submission: true) {
+                  edges {
+                    node {
+                      asset_type
+                      asset_identifier
+                      eligible_for_bounty
+                      eligible_for_submission
+                      instruction
+                      max_severity
+                    }
+                  }
+                }
+                out_of_scope: structured_scopes(first: 100, archived: false, eligible_for_submission: false) {
                   edges {
                     node {
                       asset_type
@@ -235,17 +247,34 @@ export class HackerOneService {
             const node = edge.node;
             const scopes: HackerOneScope[] = [];
             
-            if (node.structured_scopes?.edges) {
-              for (const scopeEdge of node.structured_scopes.edges) {
+            // Process in-scope items
+            if (node.in_scope?.edges) {
+              for (const scopeEdge of node.in_scope.edges) {
                 const scopeNode = scopeEdge.node;
                 scopes.push({
                   id: `${node.handle}-${scopeNode.asset_identifier}`,
                   assetType: scopeNode.asset_type || 'URL',
                   assetIdentifier: scopeNode.asset_identifier,
                   eligibleForBounty: scopeNode.eligible_for_bounty || false,
-                  eligibleForSubmission: scopeNode.eligible_for_submission || true,
+                  eligibleForSubmission: true, // In-scope
                   instruction: scopeNode.instruction || '',
                   maxSeverity: scopeNode.max_severity || 'critical',
+                });
+              }
+            }
+            
+            // Process out-of-scope items
+            if (node.out_of_scope?.edges) {
+              for (const scopeEdge of node.out_of_scope.edges) {
+                const scopeNode = scopeEdge.node;
+                scopes.push({
+                  id: `${node.handle}-${scopeNode.asset_identifier}-oos`,
+                  assetType: scopeNode.asset_type || 'URL',
+                  assetIdentifier: scopeNode.asset_identifier,
+                  eligibleForBounty: false, // Out-of-scope items are not eligible
+                  eligibleForSubmission: false, // Out of scope
+                  instruction: scopeNode.instruction || '',
+                  maxSeverity: scopeNode.max_severity || 'none',
                 });
               }
             }

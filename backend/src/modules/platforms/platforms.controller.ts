@@ -4,16 +4,14 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { PlatformSyncService, SyncResult } from './platform-sync.service';
 import { HackerOneService } from './services/hackerone.service';
 import { BugcrowdService } from './services/bugcrowd.service';
-import { GitHubProgramsService } from './services/github-programs.service';
 
 @ApiTags('Platforms')
-@Controller('api/platforms')
+@Controller('platforms')
 export class PlatformsController {
   constructor(
     private platformSyncService: PlatformSyncService,
     private hackerOneService: HackerOneService,
     private bugcrowdService: BugcrowdService,
-    private githubProgramsService: GitHubProgramsService,
   ) {}
 
   @Post('sync')
@@ -45,14 +43,6 @@ export class PlatformsController {
     return this.platformSyncService.syncBugcrowd();
   }
 
-  @Post('sync/github')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({ summary: 'Sync GitHub program lists' })
-  async syncGitHub(): Promise<SyncResult> {
-    return this.platformSyncService.syncGitHubPrograms();
-  }
-
   @Get('hackerone/programs')
   @ApiOperation({ summary: 'Get HackerOne programs (live fetch)' })
   async getHackerOnePrograms() {
@@ -75,24 +65,6 @@ export class PlatformsController {
   @ApiOperation({ summary: 'Get Bugcrowd program details' })
   async getBugcrowdProgram(@Param('code') code: string) {
     return this.bugcrowdService.getProgramDetails(code);
-  }
-
-  @Get('github/domains')
-  @ApiOperation({ summary: 'Get all domains from GitHub lists' })
-  async getGitHubDomains() {
-    return this.githubProgramsService.fetchAllDomains();
-  }
-
-  @Get('github/wildcards')
-  @ApiOperation({ summary: 'Get wildcards from GitHub lists' })
-  async getGitHubWildcards() {
-    return this.githubProgramsService.fetchWildcards();
-  }
-
-  @Get('github/chaos')
-  @ApiOperation({ summary: 'Get Chaos program list' })
-  async getChaosPrograms() {
-    return this.githubProgramsService.fetchChaosPrograms();
   }
 }
 

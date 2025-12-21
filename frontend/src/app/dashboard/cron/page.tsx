@@ -124,6 +124,7 @@ export default function CronJobsPage() {
   const [executionLogs, setExecutionLogs] = useState<string[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logsAutoRefresh, setLogsAutoRefresh] = useState(false);
+  const [cleaningUp, setCleaningUp] = useState(false);
 
   const fetchData = async () => {
     try {
@@ -193,6 +194,38 @@ export default function CronJobsPage() {
     setSelectedExecution(null);
     setExecutionLogs([]);
     setLogsAutoRefresh(false);
+  };
+
+  const handleCleanupStaleJobs = async () => {
+    setCleaningUp(true);
+    try {
+      const res = await cronApi.cleanupStaleJobs(1); // 1 hour
+      alert(res.data.message || `Cleaned up ${res.data.count} stale job(s)`);
+      await fetchData();
+    } catch (error: any) {
+      console.error('Failed to cleanup stale jobs:', error);
+      alert(error.response?.data?.message || 'Failed to cleanup stale jobs');
+    } finally {
+      setCleaningUp(false);
+    }
+  };
+
+  const handleCancelJob = async (executionId: string) => {
+    if (!confirm('Are you sure you want to cancel this job?')) {
+      return;
+    }
+    try {
+      const res = await cronApi.cancelJob(executionId);
+      if (res.data.success) {
+        alert('Job cancelled successfully');
+        await fetchData();
+      } else {
+        alert(res.data.message || 'Failed to cancel job');
+      }
+    } catch (error: any) {
+      console.error('Failed to cancel job:', error);
+      alert(error.response?.data?.message || 'Failed to cancel job');
+    }
   };
 
   // Auto-refresh logs for running jobs
@@ -276,18 +309,37 @@ export default function CronJobsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4"
         >
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-500/20 rounded-lg">
-              <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg">
+                <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-medium text-blue-400">
+                  {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} currently running
+                </h3>
+                <p className="text-xs text-blue-300/70 mt-0.5">
+                  {runningJobs.map(j => j.jobName).join(', ')}
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-medium text-blue-400">
-                {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} currently running
-              </h3>
-              <p className="text-xs text-blue-300/70 mt-0.5">
-                {runningJobs.map(j => j.jobName).join(', ')}
-              </p>
-            </div>
+            <button
+              onClick={handleCleanupStaleJobs}
+              disabled={cleaningUp}
+              className={clsx(
+                'flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                cleaningUp
+                  ? 'bg-dark-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30'
+              )}
+            >
+              {cleaningUp ? (
+                <Loader2 className="w-3 h-3 animate-spin" />
+              ) : (
+                <XCircle className="w-3 h-3" />
+              )}
+              Cleanup Stale Jobs
+            </button>
           </div>
         </motion.div>
       )}
@@ -595,13 +647,25 @@ export default function CronJobsPage() {
                         )}
                       </td>
                       <td className="p-4">
-                        <button
-                          onClick={() => handleViewLogs(execution)}
-                          className="flex items-center gap-1.5 px-2 py-1 bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors"
-                        >
-                          <Terminal className="w-3 h-3" />
-                          Logs
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleViewLogs(execution)}
+                            className="flex items-center gap-1.5 px-2 py-1 bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors"
+                          >
+                            <Terminal className="w-3 h-3" />
+                            Logs
+                          </button>
+                          {execution.status === 'running' && (
+                            <button
+                              onClick={() => handleCancelJob(execution._id)}
+                              className="flex items-center gap-1.5 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition-colors border border-red-500/30"
+                              title="Cancel job"
+                            >
+                              <X className="w-3 h-3" />
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

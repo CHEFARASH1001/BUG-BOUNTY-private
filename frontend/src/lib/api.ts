@@ -51,6 +51,8 @@ export const programsApi = {
   update: (id: string, data: any) => api.put(`/programs/${id}`, data),
   delete: (id: string) => api.delete(`/programs/${id}`),
   getStats: (id: string) => api.get(`/programs/${id}/stats`),
+  getDomains: (id: string) => api.get(`/programs/${id}/domains`),
+  getVulnerabilities: (id: string) => api.get(`/programs/${id}/vulnerabilities`),
 };
 
 // Domains API
@@ -130,5 +132,74 @@ export const usersApi = {
     api.put('/users/me/password', { currentPassword, newPassword }),
   updateApiKeys: (keys: any) => api.put('/users/me/api-keys', keys),
   updateNotifications: (settings: any) => api.put('/users/me/notifications', settings),
+};
+
+// Cron Jobs API
+export const cronApi = {
+  getConfigs: () => api.get('/cron/configs'),
+  getConfig: (jobName: string) => api.get(`/cron/configs/${jobName}`),
+  updateConfig: (jobName: string, data: { schedule?: string; enabled?: boolean }) =>
+    api.put(`/cron/configs/${jobName}`, data),
+  triggerJob: (jobName: string) => api.post(`/cron/trigger/${jobName}`),
+  getExecutions: (filters?: { jobName?: string; limit?: number }) =>
+    api.get('/cron/executions', { params: filters }),
+  getRunningJobs: () => api.get('/cron/running'),
+  getExecutionLogs: (executionId: string) => api.get(`/cron/executions/${executionId}/logs`),
+};
+
+// Platform Sync API
+export const platformsApi = {
+  syncAll: () => api.post('/platforms/sync'),
+  syncHackerOne: () => api.post('/platforms/sync/hackerone'),
+  syncBugcrowd: () => api.post('/platforms/sync/bugcrowd'),
+  syncGitHub: () => api.post('/platforms/sync/github'),
+  getHackerOnePrograms: () => api.get('/platforms/hackerone/programs'),
+  getBugcrowdPrograms: () => api.get('/platforms/bugcrowd/programs'),
+};
+
+// Lives API (DNS-resolved hosts)
+export const livesApi = {
+  getAll: (filters?: { domain?: string; isCdn?: boolean; limit?: number }) =>
+    api.get('/lives/all', { params: filters }),
+  getFresh: (filters?: { domain?: string; limit?: number }) =>
+    api.get('/lives/fresh', { params: filters }),
+  getByScope: (scope: string, filters?: { isCdn?: boolean; count?: boolean }) =>
+    api.get(`/lives/scope/${scope}`, { params: filters }),
+  getStats: (filters?: { domain?: string }) =>
+    api.get('/lives/stats', { params: filters }),
+};
+
+// HTTP Services API
+export const httpServicesApi = {
+  getAll: (filters?: { domain?: string; tech?: string; title?: string; limit?: number }) =>
+    api.get('/http/all', { params: filters }),
+  getFresh: (filters?: { domain?: string; limit?: number }) =>
+    api.get('/http/fresh', { params: filters }),
+  getSingle: (domain: string) => api.get(`/http/single/${domain}`),
+  getChanges: (filters?: { domain?: string }) =>
+    api.get('/http/changes', { params: filters }),
+  getStats: (filters?: { domain?: string }) =>
+    api.get('/http/stats', { params: filters }),
+};
+
+// Technologies API
+export const technologiesApi = {
+  getList: (filters?: { domain?: string; limit?: number }) =>
+    api.get('/technologies/list', { params: filters }),
+};
+
+// Scores API
+export const scoresApi = {
+  calculateAll: () => api.post('/scores/calculate/all'),
+  calculateProgram: (id: string) => api.post(`/scores/calculate/program/${id}`),
+  calculateDomain: (id: string) => api.post(`/scores/calculate/domain/${id}`),
+  getProgramScore: (id: string) => api.get(`/scores/program/${id}`),
+  getDomainScore: (id: string) => api.get(`/scores/domain/${id}`),
+  getTopPrograms: (filters?: { limit?: number; sortBy?: string }) =>
+    api.get('/scores/top/programs', { params: filters }),
+  getTopDomains: (filters?: { limit?: number; sortBy?: string }) =>
+    api.get('/scores/top/domains', { params: filters }),
+  compare: (ids: string[], type: 'program' | 'domain') =>
+    api.get('/scores/compare', { params: { ids: ids.join(','), type } }),
 };
 

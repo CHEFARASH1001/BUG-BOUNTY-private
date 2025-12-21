@@ -13,6 +13,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { DomainsService } from './domains.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateDomainDto, UpdateDomainDto } from './dto/domain.dto';
 
 @ApiTags('domains')
@@ -29,6 +30,7 @@ export class DomainsController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get all domains' })
   @ApiQuery({ name: 'programId', required: false })
   @ApiQuery({ name: 'status', required: false })
@@ -42,18 +44,21 @@ export class DomainsController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get domain by ID' })
   findOne(@Param('id') id: string) {
     return this.domainsService.findById(id);
   }
 
   @Get(':id/stats')
+  @Public()
   @ApiOperation({ summary: 'Get domain statistics' })
   getStats(@Param('id') id: string) {
     return this.domainsService.getStats(id);
   }
 
   @Get(':id/subdomains')
+  @Public()
   @ApiOperation({ summary: 'Get subdomains for a domain' })
   getSubdomains(@Param('id') id: string) {
     return this.domainsService.getSubdomains(id);

@@ -23,19 +23,24 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis for Job Queue
-  redis:
-    image: redis:7.2-alpine
-    container_name: bb-redis
+  # RabbitMQ for Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: bb-rabbitmq
     restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-bugbounty}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-bugbounty2024}
+      RABBITMQ_DEFAULT_VHOST: watchtower
     ports:
-      - "6379:6379"
+      - "5672:5672"
+      - "15672:15672"
     volumes:
-      - redis_data:/data
+      - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - bb-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -51,8 +56,7 @@ services:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 4000
       MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-bugbounty2024}@mongodb:27017/bugbounty?authSource=admin
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
+      RABBITMQ_URL: amqp://${RABBITMQ_USER:-bugbounty}:${RABBITMQ_PASS:-bugbounty2024}@rabbitmq:5672/watchtower
       JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
       SHODAN_API_KEY: ${SHODAN_API_KEY:-}
       SECURITYTRAILS_API_KEY: ${SECURITYTRAILS_API_KEY:-}
@@ -73,7 +77,7 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-      redis:
+      rabbitmq:
         condition: service_healthy
     networks:
       - bb-network
@@ -142,7 +146,7 @@ services:
 
 volumes:
   mongodb_data:
-  redis_data:
+  rabbitmq_data:
   scan_results:
   nuclei_templates:
 

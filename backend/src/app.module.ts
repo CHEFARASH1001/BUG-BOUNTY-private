@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule } from '@nestjs/throttler';
 
@@ -22,6 +21,13 @@ import { WebsocketModule } from './modules/websocket/websocket.module';
 import { ReconModule } from './modules/recon/recon.module';
 import { ExternalApisModule } from './modules/external-apis/external-apis.module';
 import { ScannerModule } from './modules/scanner/scanner.module';
+import { RabbitMQWrapperModule } from './modules/queue/rabbitmq.module';
+import { QueueModule } from './modules/queue/queue.module';
+import { PlatformsModule } from './modules/platforms/platforms.module';
+import { LivesModule } from './modules/lives/lives.module';
+import { HttpServicesModule } from './modules/http-services/http-services.module';
+import { ScoresModule } from './modules/scores/scores.module';
+import { CronModule } from './modules/cron/cron.module';
 
 @Module({
   imports: [
@@ -42,26 +48,11 @@ import { ScannerModule } from './modules/scanner/scanner.module';
       inject: [ConfigService],
     }),
 
-    // Redis/Bull Queue
-    BullModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        redis: {
-          host: configService.get<string>('REDIS_HOST', 'localhost'),
-          port: configService.get<number>('REDIS_PORT', 6379),
-        },
-        defaultJobOptions: {
-          removeOnComplete: 100,
-          removeOnFail: 50,
-          attempts: 3,
-          backoff: {
-            type: 'exponential',
-            delay: 2000,
-          },
-        },
-      }),
-      inject: [ConfigService],
-    }),
+    // RabbitMQ Message Queue (Global wrapper)
+    RabbitMQWrapperModule,
+
+    // Queue Module (must be after RabbitMQWrapperModule)
+    QueueModule,
 
     // Scheduler
     ScheduleModule.forRoot(),
@@ -89,7 +80,11 @@ import { ScannerModule } from './modules/scanner/scanner.module';
     ReconModule,
     ExternalApisModule,
     ScannerModule,
+    PlatformsModule,
+    LivesModule,
+    HttpServicesModule,
+    ScoresModule,
+    CronModule,
   ],
 })
 export class AppModule {}
-

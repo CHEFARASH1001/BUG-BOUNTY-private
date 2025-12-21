@@ -1,0 +1,107 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: bb-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: bugbounty2024
+      MONGO_INITDB_DATABASE: bugbounty
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - bb-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RabbitMQ for Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: bb-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: bugbounty
+      RABBITMQ_DEFAULT_PASS: bugbounty2024
+      RABBITMQ_DEFAULT_VHOST: watchtower
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - bb-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # NestJS Backend API - Development Mode
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: bb-backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      MONGODB_URI: mongodb://admin:bugbounty2024@mongodb:27017/bugbounty?authSource=admin
+      RABBITMQ_URL: amqp://bugbounty:bugbounty2024@rabbitmq:5672/watchtower
+      JWT_SECRET: dev-jwt-secret-key
+      HACKERONE_API_TOKEN: ${HACKERONE_API_TOKEN:-}
+      BUGCROWD_API_TOKEN: ${BUGCROWD_API_TOKEN:-}
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/package.json:/app/package.json
+      - scan_results:/app/results
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bb-network
+
+  # Next.js Frontend - Development Mode
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: bb-frontend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: dev-nextauth-secret
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+      - ./frontend/public:/app/public
+      - ./frontend/package.json:/app/package.json
+    depends_on:
+      - backend
+    networks:
+      - bb-network
+
+volumes:
+  mongodb_data:
+  rabbitmq_data:
+  scan_results:
+
+networks:
+  bb-network:
+    driver: bridge

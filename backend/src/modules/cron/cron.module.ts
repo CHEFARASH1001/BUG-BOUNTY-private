@@ -1,0 +1,36 @@
+import { Module, forwardRef } from '@nestjs/common';
+import { MongooseModule } from '@nestjs/mongoose';
+import { CronService } from './cron.service';
+import { CronController } from './cron.controller';
+import { JobExecution, JobExecutionSchema } from './schemas/job-execution.schema';
+import { CronConfig, CronConfigSchema } from './schemas/cron-config.schema';
+import { QueueModule } from '../queue/queue.module';
+import { PlatformsModule } from '../platforms/platforms.module';
+import { LivesModule } from '../lives/lives.module';
+import { HttpServicesModule } from '../http-services/http-services.module';
+import { ScoresModule } from '../scores/scores.module';
+import { DomainsModule } from '../domains/domains.module';
+import { SubdomainsModule } from '../subdomains/subdomains.module';
+import { ReconModule } from '../recon/recon.module';
+
+@Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: JobExecution.name, schema: JobExecutionSchema },
+      { name: CronConfig.name, schema: CronConfigSchema },
+    ]),
+    QueueModule,
+    forwardRef(() => PlatformsModule),
+    forwardRef(() => LivesModule),
+    forwardRef(() => HttpServicesModule),
+    forwardRef(() => ScoresModule),
+    forwardRef(() => DomainsModule),
+    forwardRef(() => SubdomainsModule),
+    forwardRef(() => ReconModule),
+  ],
+  controllers: [CronController],
+  providers: [CronService],
+  exports: [CronService],
+})
+export class CronModule {}
+

@@ -12,6 +12,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { SubdomainsService } from './subdomains.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateSubdomainDto, UpdateSubdomainDto } from './dto/subdomain.dto';
 
 @ApiTags('subdomains')
@@ -28,6 +29,7 @@ export class SubdomainsController {
   }
 
   @Get()
+  @Public()
   @ApiOperation({ summary: 'Get all subdomains' })
   @ApiQuery({ name: 'domainId', required: false })
   @ApiQuery({ name: 'isAlive', required: false, type: Boolean })
@@ -48,18 +50,21 @@ export class SubdomainsController {
   }
 
   @Get(':id')
+  @Public()
   @ApiOperation({ summary: 'Get subdomain by ID' })
   findOne(@Param('id') id: string) {
     return this.subdomainsService.findById(id);
   }
 
   @Get(':id/stats')
+  @Public()
   @ApiOperation({ summary: 'Get subdomain statistics' })
   getStats(@Param('id') id: string) {
     return this.subdomainsService.getStats(id);
   }
 
   @Get(':id/endpoints')
+  @Public()
   @ApiOperation({ summary: 'Get endpoints for a subdomain' })
   getEndpoints(@Param('id') id: string) {
     return this.subdomainsService.getEndpoints(id);

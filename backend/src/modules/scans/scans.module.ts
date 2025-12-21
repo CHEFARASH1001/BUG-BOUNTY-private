@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BullModule } from '@nestjs/bull';
 import { ScansService } from './scans.service';
 import { ScansController } from './scans.controller';
 import { ScanProcessor } from './processors/scan.processor';
@@ -13,6 +12,7 @@ import { ReconModule } from '../recon/recon.module';
 import { ScannerModule } from '../scanner/scanner.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { WebsocketModule } from '../websocket/websocket.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [
@@ -23,9 +23,7 @@ import { WebsocketModule } from '../websocket/websocket.module';
       { name: Vulnerability.name, schema: VulnerabilitySchema },
       { name: Endpoint.name, schema: EndpointSchema },
     ]),
-    BullModule.registerQueue({
-      name: 'scans',
-    }),
+    QueueModule,
     forwardRef(() => ReconModule),
     forwardRef(() => ScannerModule),
     forwardRef(() => NotificationsModule),
@@ -36,4 +34,3 @@ import { WebsocketModule } from '../websocket/websocket.module';
   exports: [ScansService],
 })
 export class ScansModule {}
-

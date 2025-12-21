@@ -1,11 +1,10 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { InjectQueue } from '@nestjs/bull';
 import { Model, Types } from 'mongoose';
-import { Queue } from 'bull';
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
 import { Subdomain, SubdomainDocument } from '../../schemas/subdomain.schema';
 import { Scan, ScanDocument, ScanType, ScanStatus } from '../../schemas/scan.schema';
+import { QueueService } from '../queue/queue.service';
 import { CreateDomainDto, UpdateDomainDto } from './dto/domain.dto';
 
 @Injectable()
@@ -14,7 +13,7 @@ export class DomainsService {
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     @InjectModel(Subdomain.name) private subdomainModel: Model<SubdomainDocument>,
     @InjectModel(Scan.name) private scanModel: Model<ScanDocument>,
-    @InjectQueue('scans') private scansQueue: Queue,
+    private queueService: QueueService,
   ) {}
 
   async create(createDomainDto: CreateDomainDto): Promise<DomainDocument> {
@@ -158,27 +157,14 @@ export class DomainsService {
       },
     });
 
-    // Queue the scan job
-    const job = await this.scansQueue.add(
-      'full-scan',
-      {
-        scanId: scan._id.toString(),
-        domainId: id,
-        domain: domain.domain,
-      },
-      {
-        priority: 1,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-      },
-    );
-
-    // Update scan with job ID
-    scan.jobId = job.id.toString();
-    await scan.save();
+    // Queue the scan job via RabbitMQ
+    await this.queueService.publishFullScan({
+      scanId: scan._id.toString(),
+      targetId: id,
+      target: domain.domain,
+      type: ScanType.FULL,
+      config: scan.config,
+    });
 
     // Update domain status
     await this.domainModel.findByIdAndUpdate(id, { status: 'scanning' });
@@ -186,7 +172,6 @@ export class DomainsService {
     return {
       message: 'Full scan started',
       scanId: scan._id,
-      jobId: job.id,
     };
   }
 
@@ -210,4 +195,3 @@ export class DomainsService {
     await this.domainModel.findByIdAndUpdate(id, { subdomainCount });
   }
 }
-

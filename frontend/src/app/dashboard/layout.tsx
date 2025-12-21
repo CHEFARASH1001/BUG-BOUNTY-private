@@ -22,6 +22,8 @@ import {
   Shield,
   BookOpen,
   ChevronDown,
+  Clock,
+  Activity,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 
@@ -32,6 +34,7 @@ const navigation = [
   { name: 'Subdomains', href: '/dashboard/subdomains', icon: Server },
   { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: AlertTriangle },
   { name: 'Scans', href: '/dashboard/scans', icon: Scan },
+  { name: 'Cron Jobs', href: '/dashboard/cron', icon: Clock },
   { name: 'Reports', href: '/dashboard/reports', icon: FileText },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];

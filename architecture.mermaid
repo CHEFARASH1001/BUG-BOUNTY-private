@@ -1,0 +1,346 @@
+%%{init: {'theme': 'base', 'themeVariables': { 'primaryColor': '#1a1a2e', 'primaryTextColor': '#eaeaea', 'primaryBorderColor': '#4a4a6a', 'lineColor': '#6366f1', 'secondaryColor': '#16213e', 'tertiaryColor': '#0f3460'}}}%%
+
+flowchart TB
+    subgraph FRONTEND["🖥️ FRONTEND - Next.js"]
+        direction TB
+        UI_DASHBOARD["📊 Dashboard<br/>Score Comparison<br/>Analytics"]
+        UI_PROGRAMS["📋 Programs Management<br/>Search & Filter"]
+        UI_WATCHERS["👁️ Watchers Panel<br/>Real-time Status"]
+        UI_SUBDOMAINS["🌐 Subdomains View<br/>Live/Fresh/All"]
+        UI_HTTP["🔗 HTTP Services<br/>Technologies/Headers"]
+        UI_VULNS["🔴 Vulnerabilities<br/>Nuclei Results"]
+        UI_DOCS["📚 Documentation<br/>Learning Notes<br/>Coverage Checker"]
+        UI_NOTIFICATIONS["🔔 Notifications Center"]
+        UI_SETTINGS["⚙️ Settings<br/>Cron Jobs Config"]
+    end
+
+    subgraph BACKEND["⚙️ BACKEND - NestJS"]
+        direction TB
+        
+        subgraph API_LAYER["🔌 API Layer"]
+            API_PROGRAMS["/api/programs"]
+            API_SUBDOMAINS["/api/subdomains/:domain<br/>/api/subdomains/all"]
+            API_LIVES["/api/lives/all<br/>/api/lives/fresh<br/>/api/lives/scope/:scope<br/>/api/lives/provider/:provider"]
+            API_HTTP["/api/http/all<br/>/api/http/fresh<br/>/api/http/single/:domain"]
+            API_TECHNOLOGIES["/api/technologies/list"]
+            API_NUCLEI["/api/nuclei/results"]
+            API_DOCS["/api/docs"]
+        end
+
+        subgraph SERVICES["🛠️ Core Services"]
+            SVC_SYNC["Sync Service"]
+            SVC_ENUM["Enumeration Service"]
+            SVC_DNS["DNS Resolution Service"]
+            SVC_HTTP["HTTP Discovery Service"]
+            SVC_VULN["Vulnerability Service"]
+            SVC_NOTIFY["Notification Service"]
+            SVC_SCORE["Scoring Service"]
+            SVC_CRON["Cron Job Service"]
+        end
+
+        subgraph CLI_MODULE["💻 CLI Module"]
+            CLI_MAIN["watchtower CLI"]
+            CLI_GET["get commands"]
+            CLI_WATCH["watch commands"]
+        end
+    end
+
+    subgraph DATABASE["🗄️ MongoDB"]
+        direction TB
+        DB_PROGRAMS[("programs")]
+        DB_SCOPES[("scopes")]
+        DB_DOMAINS[("domains")]
+        DB_SUBDOMAINS[("subdomains")]
+        DB_LIVES[("lives")]
+        DB_HTTP[("http_services")]
+        DB_VULNS[("vulnerabilities")]
+        DB_DOCS[("documentation")]
+        DB_NOTIFICATIONS[("notifications")]
+        DB_SCORES[("scores")]
+    end
+
+    subgraph PLATFORMS["🎯 Bug Bounty Platforms"]
+        HACKERONE["HackerOne API"]
+        BUGCROWD["Bugcrowd API"]
+        GITHUB_PROGRAMS["GitHub Programs"]
+    end
+
+    subgraph ENUM_PROVIDERS["🔍 Subdomain Enumeration Providers"]
+        direction TB
+        subgraph PASSIVE["Passive Enumeration"]
+            SUBFINDER["subfinder -d domain -all"]
+            CRTSH["crt.sh<br/>⚠️ IP Rotation Needed"]
+            ABUSEIPDB["abuseipdb<br/>⚠️ IP Rotation Needed"]
+            CHAOS["chaos-data<br/>projectdiscovery"]
+            WAYBACK["waybackurls<br/>unfurl domains"]
+            GAU["gau<br/>AlienVault, CommonCrawl"]
+            CERT_TRANS["Certificate Transparency"]
+        end
+        
+        subgraph ACTIVE["Active Enumeration"]
+            STATIC_BRUTE["Static Brute Force<br/>assetnote wordlists<br/>crunch generated"]
+            DYNAMIC_BRUTE["Dynamic Brute Force<br/>dnsgen + altdns words"]
+        end
+    end
+
+    subgraph DNS_RESOLUTION["📡 Name Resolution"]
+        direction TB
+        DNSX["dnsx<br/>-silent -resp -json"]
+        SHUFFLEDNS["shuffledns<br/>massdns resolver"]
+        DNS_BRUTE_STATIC["Static DNS Brute<br/>2m-subdomains.txt<br/>best-dns-wordlist.txt"]
+        DNS_BRUTE_DYNAMIC["Dynamic DNS Brute<br/>dnsgen permutations"]
+    end
+
+    subgraph HTTP_DISCOVERY["🌍 HTTP Service Discovery"]
+        direction TB
+        HTTPX["httpx<br/>-json -favicon -fhr<br/>-tech-detect -irh<br/>-include-chain<br/>-extract-fqdn"]
+        HTTP_INFO["Information Extraction"]
+        HTTP_HEADERS["Headers Analysis"]
+        HTTP_TITLES["Title Detection"]
+        HTTP_STATUS["Status Codes"]
+        HTTP_TECH["Technology Detection"]
+        HTTP_FAVICON["Favicon Hash"]
+        HTTP_CDN["CDN Detection"]
+    end
+
+    subgraph VULN_ASSESSMENT["🔴 Vulnerability Assessment"]
+        direction TB
+        NUCLEI["nuclei<br/>-config public-config.yaml"]
+        FFUF["ffuf<br/>Directory Fuzzing"]
+        CUSTOM_SCRIPTS["Custom Scripts"]
+        SQLMAP["sqlmap"]
+        DIRSEARCH["dirsearch"]
+        ARJUN["arjun<br/>Parameter Discovery"]
+    end
+
+    subgraph NOTIFICATIONS["📢 Notification System"]
+        direction TB
+        NOTIFY["notify"]
+        DISCORD["Discord Webhook"]
+        TELEGRAM["Telegram Bot"]
+        
+        subgraph ALERTS["Alert Types"]
+            ALERT_NEW_SUB["New Subdomain"]
+            ALERT_NEW_LIVE["New Live Host"]
+            ALERT_STATUS_CHANGE["Status Code Change<br/>403 → 200"]
+            ALERT_TITLE_CHANGE["Title Change"]
+            ALERT_TECH_CHANGE["Technology Change"]
+            ALERT_VULN["New Vulnerability"]
+        end
+    end
+
+    subgraph TOOLS_RECON["🧰 Reconnaissance Tools"]
+        AMASS["amass"]
+        FINDDOMAIN["findomain"]
+        HAKRAWLER["hakrawler"]
+        KATANA["katana"]
+        URLFINDER["urlfinder"]
+        LINKFINDER["LinkFinder"]
+        SECRETFINDER["SecretFinder"]
+        JSPARSER["JSParser"]
+    end
+
+    subgraph TOOLS_ANALYSIS["🔬 Analysis Tools"]
+        WHATWEB["whatweb"]
+        WAFW00F["wafw00f"]
+        NMAP["nmap"]
+        WHOIS["whois"]
+        BGP_TOOLS["bgp.tools"]
+        TRUFFLEHOG["trufflehog"]
+    end
+
+    subgraph SCORING_SYSTEM["📈 Scoring System"]
+        SCORE_CALC["Score Calculator"]
+        SCORE_PENTEST["Penetration Probability"]
+        SCORE_EXPOSURE["Exposure Score"]
+        SCORE_PRIORITY["Priority Ranking"]
+        SCORE_COMPARE["Score Comparison"]
+    end
+
+    subgraph CRON_JOBS["⏰ Scheduled Tasks"]
+        CRON_SYNC["watch_sync_programs<br/>Periodic Platform Sync"]
+        CRON_ENUM["watch_enum_all<br/>Full Enumeration"]
+        CRON_NS["watch_ns_all<br/>DNS Resolution"]
+        CRON_HTTP["watch_http_all<br/>HTTP Discovery"]
+        CRON_NUCLEI["watch_nuclei_all<br/>Vulnerability Scan"]
+        CRON_FRESH["Fresh Asset Detection"]
+    end
+
+    subgraph CLI_COMMANDS["📟 CLI Commands"]
+        direction TB
+        subgraph WATCH_CMDS["Watch Commands"]
+            W_SUBFINDER["watch_subfinder domain"]
+            W_CRTSH["watch_crtsh domain"]
+            W_ENUM_ALL["watch_enum_all"]
+            W_NS["watch_ns domain"]
+            W_NS_ALL["watch_ns_all"]
+            W_NS_BRUTE["watch_ns_brute domain"]
+            W_HTTP["watch_http domain"]
+            W_HTTP_ALL["watch_http_all"]
+            W_NUCLEI["watch_nuclei domain"]
+            W_NUCLEI_ALL["watch_nuclei_all"]
+            W_NUCLEI_FRESH["watch_nuclei_fresh"]
+            W_GAU["watch_gau domain"]
+            W_WAYBACK["watch_wayback domain"]
+            W_CHAOS["watch_chaos"]
+            W_SYNC_CHAOS["watch_sync_chaos"]
+            W_SYNC_PROGRAMS["watch_sync_programs"]
+        end
+        
+        subgraph GET_CMDS["Get Commands"]
+            G_FRESH_HTTP["get fresh http all"]
+            G_FRESH_LIVES["get fresh lives"]
+            G_FRESH_SUBS["get fresh subdomains"]
+            G_SINGLE_HTTP["get single http domain"]
+            G_SINGLE_TARGET["get single target scope"]
+            G_SINGLE_SUB["get single subdomain sub"]
+            G_SINGLE_LIVE["get single live sub"]
+            G_HTTP_TECH["get http all --tech TECH"]
+            G_HTTP_TITLE["get http all --title TITLE"]
+            G_HTTP_PROVIDER["get http all --provider PROV"]
+            G_TECH_LIST["get technologies list"]
+            G_LIVES_SCOPE["get lives scope name"]
+            G_LIVES_CDN["get lives scope --cdn"]
+            G_COMPARE["get http all --compare list"]
+        end
+    end
+
+    subgraph IP_ROTATION["🔄 IP Rotation Required"]
+        PROXY_POOL["Proxy Pool"]
+        RATE_LIMIT_HANDLER["Rate Limit Handler"]
+        IP_ROTATE_CRTSH["crt.sh Rotation"]
+        IP_ROTATE_ABUSE["abuseipdb Rotation"]
+    end
+
+    %% Frontend to Backend Connections
+    FRONTEND --> API_LAYER
+    UI_DASHBOARD --> API_PROGRAMS
+    UI_SUBDOMAINS --> API_SUBDOMAINS
+    UI_HTTP --> API_HTTP
+    UI_VULNS --> API_NUCLEI
+    UI_DOCS --> API_DOCS
+    
+    %% Backend to Database
+    SERVICES --> DATABASE
+    SVC_SYNC --> DB_PROGRAMS
+    SVC_SYNC --> DB_SCOPES
+    SVC_ENUM --> DB_SUBDOMAINS
+    SVC_DNS --> DB_LIVES
+    SVC_HTTP --> DB_HTTP
+    SVC_VULN --> DB_VULNS
+    SVC_SCORE --> DB_SCORES
+    SVC_NOTIFY --> DB_NOTIFICATIONS
+
+    %% Platform Sync Flow
+    PLATFORMS --> SVC_SYNC
+    HACKERONE --> SVC_SYNC
+    BUGCROWD --> SVC_SYNC
+    GITHUB_PROGRAMS --> SVC_SYNC
+
+    %% Enumeration Flow
+    SVC_ENUM --> ENUM_PROVIDERS
+    PASSIVE --> DB_SUBDOMAINS
+    ACTIVE --> SHUFFLEDNS
+    SHUFFLEDNS --> DB_SUBDOMAINS
+
+    %% DNS Resolution Flow
+    DB_SUBDOMAINS --> DNS_RESOLUTION
+    DNSX --> DB_LIVES
+    DNS_BRUTE_STATIC --> SHUFFLEDNS
+    DNS_BRUTE_DYNAMIC --> SHUFFLEDNS
+
+    %% HTTP Discovery Flow
+    DB_LIVES --> HTTP_DISCOVERY
+    HTTPX --> HTTP_INFO
+    HTTP_INFO --> DB_HTTP
+    HTTP_HEADERS --> DB_HTTP
+    HTTP_TECH --> DB_HTTP
+
+    %% Vulnerability Flow
+    DB_HTTP --> VULN_ASSESSMENT
+    NUCLEI --> DB_VULNS
+    FFUF --> DB_VULNS
+
+    %% Notification Flow
+    SVC_NOTIFY --> NOTIFICATIONS
+    ALERTS --> DISCORD
+    ALERTS --> TELEGRAM
+
+    %% CLI Connections
+    CLI_MODULE --> SERVICES
+    CLI_MAIN --> CLI_GET
+    CLI_MAIN --> CLI_WATCH
+    WATCH_CMDS --> SERVICES
+    GET_CMDS --> API_LAYER
+
+    %% Cron Jobs
+    SVC_CRON --> CRON_JOBS
+    CRON_SYNC --> SVC_SYNC
+    CRON_ENUM --> SVC_ENUM
+    CRON_NS --> SVC_DNS
+    CRON_HTTP --> SVC_HTTP
+    CRON_NUCLEI --> SVC_VULN
+
+    %% Scoring Flow
+    DB_PROGRAMS --> SCORING_SYSTEM
+    DB_HTTP --> SCORING_SYSTEM
+    DB_VULNS --> SCORING_SYSTEM
+    SCORING_SYSTEM --> DB_SCORES
+    SCORE_COMPARE --> UI_DASHBOARD
+
+    %% IP Rotation
+    IP_ROTATION --> CRTSH
+    IP_ROTATION --> ABUSEIPDB
+
+    %% Tools Integration
+    TOOLS_RECON --> SVC_ENUM
+    TOOLS_ANALYSIS --> SVC_HTTP
+
+    %% Data Flow Annotations
+    subgraph DATA_FLOW["📊 Data Flow States"]
+        FRESH_DATA["🆕 Fresh Assets<br/>New discoveries"]
+        CHANGED_DATA["🔄 Changed Assets<br/>Status/Title/Tech changes"]
+        HISTORICAL_DATA["📜 Historical Data<br/>All records"]
+    end
+
+    DB_SUBDOMAINS --> FRESH_DATA
+    DB_LIVES --> FRESH_DATA
+    DB_HTTP --> CHANGED_DATA
+    DATABASE --> HISTORICAL_DATA
+
+    %% Example Pipelines
+    subgraph EXAMPLE_PIPELINES["📋 Example Pipelines"]
+        PIPE1["subfinder -d domain -all | dnsx -silent"]
+        PIPE2["curl /api/subdomains/domain | nuclei"]
+        PIPE3["curl /api/lives/fresh | nuclei"]
+        PIPE4["waybackurls domain | unfurl domains | sort -u"]
+        PIPE5["echo subdomain | httpx -json | jq"]
+    end
+
+    %% Documentation System
+    subgraph DOC_SYSTEM["📖 Documentation System"]
+        DOC_NOTES["Learning Notes"]
+        DOC_COVERAGE["Coverage Checker<br/>What docs cover which targets"]
+        DOC_TECHNIQUES["Techniques Library"]
+    end
+
+    UI_DOCS --> DOC_SYSTEM
+    DOC_SYSTEM --> DB_DOCS
+
+    %% Styling
+    classDef frontend fill:#6366f1,stroke:#4338ca,color:#fff
+    classDef backend fill:#10b981,stroke:#059669,color:#fff
+    classDef database fill:#f59e0b,stroke:#d97706,color:#fff
+    classDef external fill:#ef4444,stroke:#dc2626,color:#fff
+    classDef tools fill:#8b5cf6,stroke:#7c3aed,color:#fff
+    classDef cron fill:#ec4899,stroke:#db2777,color:#fff
+    classDef alert fill:#f97316,stroke:#ea580c,color:#fff
+
+    class FRONTEND,UI_DASHBOARD,UI_PROGRAMS,UI_WATCHERS,UI_SUBDOMAINS,UI_HTTP,UI_VULNS,UI_DOCS,UI_NOTIFICATIONS,UI_SETTINGS frontend
+    class BACKEND,API_LAYER,SERVICES,CLI_MODULE backend
+    class DATABASE,DB_PROGRAMS,DB_SCOPES,DB_DOMAINS,DB_SUBDOMAINS,DB_LIVES,DB_HTTP,DB_VULNS,DB_DOCS,DB_NOTIFICATIONS,DB_SCORES database
+    class PLATFORMS,HACKERONE,BUGCROWD,GITHUB_PROGRAMS external
+    class TOOLS_RECON,TOOLS_ANALYSIS,VULN_ASSESSMENT tools
+    class CRON_JOBS,CRON_SYNC,CRON_ENUM,CRON_NS,CRON_HTTP,CRON_NUCLEI cron
+    class ALERTS,ALERT_NEW_SUB,ALERT_NEW_LIVE,ALERT_STATUS_CHANGE,ALERT_TITLE_CHANGE,ALERT_TECH_CHANGE,ALERT_VULN alert
+

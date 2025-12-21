@@ -1,6 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
-import { BullModule } from '@nestjs/bull';
 import { DomainsService } from './domains.service';
 import { DomainsController } from './domains.controller';
 import { Domain, DomainSchema } from '../../schemas/domain.schema';
@@ -8,6 +7,7 @@ import { Program, ProgramSchema } from '../../schemas/program.schema';
 import { Subdomain, SubdomainSchema } from '../../schemas/subdomain.schema';
 import { Scan, ScanSchema } from '../../schemas/scan.schema';
 import { ScansModule } from '../scans/scans.module';
+import { QueueModule } from '../queue/queue.module';
 
 @Module({
   imports: [
@@ -17,9 +17,7 @@ import { ScansModule } from '../scans/scans.module';
       { name: Subdomain.name, schema: SubdomainSchema },
       { name: Scan.name, schema: ScanSchema },
     ]),
-    BullModule.registerQueue({
-      name: 'scans',
-    }),
+    QueueModule,
     forwardRef(() => ScansModule),
   ],
   controllers: [DomainsController],
@@ -27,4 +25,3 @@ import { ScansModule } from '../scans/scans.module';
   exports: [DomainsService],
 })
 export class DomainsModule {}
-

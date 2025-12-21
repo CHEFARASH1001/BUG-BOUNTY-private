@@ -1,9 +1,8 @@
-import { Processor, Process, OnQueueActive, OnQueueCompleted, OnQueueFailed } from '@nestjs/bull';
-import { Job } from 'bull';
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, Logger } from '@nestjs/common';
+import { RabbitSubscribe, Nack } from '@golevelup/nestjs-rabbitmq';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Scan, ScanDocument, ScanStatus, ScanType } from '../../../schemas/scan.schema';
+import { Scan, ScanDocument, ScanStatus } from '../../../schemas/scan.schema';
 import { Domain, DomainDocument } from '../../../schemas/domain.schema';
 import { Subdomain, SubdomainDocument } from '../../../schemas/subdomain.schema';
 import { Vulnerability, VulnerabilityDocument } from '../../../schemas/vulnerability.schema';
@@ -12,18 +11,13 @@ import { ReconService } from '../../recon/recon.service';
 import { ScannerService } from '../../scanner/scanner.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { WebsocketGateway } from '../../websocket/websocket.gateway';
+import { QueueConstants } from '../../queue/queue.constants';
+import { ScanJobData } from '../../queue/queue.service';
 
-interface ScanJobData {
-  scanId: string;
-  targetId: string;
-  target: string;
-  type: string;
-  config?: Record<string, any>;
-}
-
-@Processor('scans')
 @Injectable()
 export class ScanProcessor {
+  private readonly logger = new Logger(ScanProcessor.name);
+
   constructor(
     @InjectModel(Scan.name) private scanModel: Model<ScanDocument>,
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
@@ -36,39 +30,25 @@ export class ScanProcessor {
     @Inject(forwardRef(() => WebsocketGateway)) private websocketGateway: WebsocketGateway,
   ) {}
 
-  @OnQueueActive()
-  onActive(job: Job<ScanJobData>) {
-    console.log(`[Scan] Starting job ${job.id} - ${job.data.type} on ${job.data.target}`);
-    this.websocketGateway.emitScanUpdate(job.data.scanId, {
-      status: 'running',
-      progress: 0,
-    });
-  }
-
-  @OnQueueCompleted()
-  onCompleted(job: Job<ScanJobData>) {
-    console.log(`[Scan] Completed job ${job.id}`);
-    this.websocketGateway.emitScanUpdate(job.data.scanId, {
-      status: 'completed',
-      progress: 100,
-    });
-  }
-
-  @OnQueueFailed()
-  onFailed(job: Job<ScanJobData>, error: Error) {
-    console.error(`[Scan] Failed job ${job.id}:`, error.message);
-    this.websocketGateway.emitScanUpdate(job.data.scanId, {
-      status: 'failed',
-      error: error.message,
-    });
-  }
-
-  @Process('full-scan')
-  async handleFullScan(job: Job<ScanJobData>) {
-    const { scanId, targetId, target } = job.data;
+  @RabbitSubscribe({
+    exchange: QueueConstants.EXCHANGE_DIRECT,
+    routingKey: QueueConstants.ROUTING_FULL_SCAN,
+    queue: QueueConstants.QUEUE_SCANS,
+    queueOptions: {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': QueueConstants.EXCHANGE_DLX,
+        'x-dead-letter-routing-key': QueueConstants.ROUTING_DLQ,
+      },
+    },
+  })
+  async handleFullScan(data: ScanJobData): Promise<void | Nack> {
+    const { scanId, targetId, target } = data;
+    this.logger.log(`Starting full scan for ${target} (scanId: ${scanId})`);
 
     try {
       await this.updateScanStatus(scanId, ScanStatus.RUNNING);
+      this.websocketGateway.emitScanUpdate(scanId, { status: 'running', progress: 0 });
 
       // Step 1: Subdomain Enumeration (0-30%)
       await this.updateProgress(scanId, 5, 'Enumerating subdomains...');
@@ -157,16 +137,31 @@ export class ScanProcessor {
         await this.notificationsService.sendVulnerabilityAlert(vulnResults, target);
       }
 
-      return { success: true, vulnerabilities: vulnResults.length };
+      this.websocketGateway.emitScanUpdate(scanId, { status: 'completed', progress: 100 });
+      this.logger.log(`Full scan completed for ${target}`);
     } catch (error: any) {
+      this.logger.error(`Full scan failed for ${target}: ${error.message}`);
       await this.failScan(scanId, error.message);
-      throw error;
+      this.websocketGateway.emitScanUpdate(scanId, { status: 'failed', error: error.message });
+      return new Nack(false); // Don't requeue on failure
     }
   }
 
-  @Process('subdomain-scan')
-  async handleSubdomainScan(job: Job<ScanJobData>) {
-    const { scanId, targetId, target } = job.data;
+  @RabbitSubscribe({
+    exchange: QueueConstants.EXCHANGE_DIRECT,
+    routingKey: QueueConstants.ROUTING_SUBDOMAIN_SCAN,
+    queue: QueueConstants.QUEUE_SCANS,
+    queueOptions: {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': QueueConstants.EXCHANGE_DLX,
+        'x-dead-letter-routing-key': QueueConstants.ROUTING_DLQ,
+      },
+    },
+  })
+  async handleSubdomainScan(data: ScanJobData): Promise<void | Nack> {
+    const { scanId, targetId, target } = data;
+    this.logger.log(`Starting subdomain scan for ${target}`);
 
     try {
       await this.updateScanStatus(scanId, ScanStatus.RUNNING);
@@ -180,16 +175,29 @@ export class ScanProcessor {
       }
 
       await this.completeScan(scanId, { subdomainsFound: subdomains.length });
-      return { success: true, count: subdomains.length };
+      this.logger.log(`Subdomain scan completed for ${target}: ${subdomains.length} found`);
     } catch (error: any) {
+      this.logger.error(`Subdomain scan failed for ${target}: ${error.message}`);
       await this.failScan(scanId, error.message);
-      throw error;
+      return new Nack(false);
     }
   }
 
-  @Process('port-scan')
-  async handlePortScan(job: Job<ScanJobData>) {
-    const { scanId, target } = job.data;
+  @RabbitSubscribe({
+    exchange: QueueConstants.EXCHANGE_DIRECT,
+    routingKey: QueueConstants.ROUTING_PORT_SCAN,
+    queue: QueueConstants.QUEUE_SCANS,
+    queueOptions: {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': QueueConstants.EXCHANGE_DLX,
+        'x-dead-letter-routing-key': QueueConstants.ROUTING_DLQ,
+      },
+    },
+  })
+  async handlePortScan(data: ScanJobData): Promise<void | Nack> {
+    const { scanId, target } = data;
+    this.logger.log(`Starting port scan for ${target}`);
 
     try {
       await this.updateScanStatus(scanId, ScanStatus.RUNNING);
@@ -199,16 +207,29 @@ export class ScanProcessor {
       await this.updateProgress(scanId, 90, `Found ${results[0]?.ports?.length || 0} open ports`);
 
       await this.completeScan(scanId, { portsFound: results[0]?.ports?.length || 0 });
-      return { success: true, ports: results[0]?.ports };
+      this.logger.log(`Port scan completed for ${target}`);
     } catch (error: any) {
+      this.logger.error(`Port scan failed for ${target}: ${error.message}`);
       await this.failScan(scanId, error.message);
-      throw error;
+      return new Nack(false);
     }
   }
 
-  @Process('nuclei-scan')
-  async handleNucleiScan(job: Job<ScanJobData>) {
-    const { scanId, target, config } = job.data;
+  @RabbitSubscribe({
+    exchange: QueueConstants.EXCHANGE_DIRECT,
+    routingKey: QueueConstants.ROUTING_NUCLEI_SCAN,
+    queue: QueueConstants.QUEUE_NUCLEI,
+    queueOptions: {
+      durable: true,
+      arguments: {
+        'x-dead-letter-exchange': QueueConstants.EXCHANGE_DLX,
+        'x-dead-letter-routing-key': QueueConstants.ROUTING_DLQ,
+      },
+    },
+  })
+  async handleNucleiScan(data: ScanJobData): Promise<void | Nack> {
+    const { scanId, target, config } = data;
+    this.logger.log(`Starting Nuclei scan for ${target}`);
 
     try {
       await this.updateScanStatus(scanId, ScanStatus.RUNNING);
@@ -221,10 +242,11 @@ export class ScanProcessor {
       await this.updateProgress(scanId, 90, `Found ${results.length} vulnerabilities`);
 
       await this.completeScan(scanId, { vulnerabilitiesFound: results.length });
-      return { success: true, vulnerabilities: results };
+      this.logger.log(`Nuclei scan completed for ${target}: ${results.length} vulnerabilities`);
     } catch (error: any) {
+      this.logger.error(`Nuclei scan failed for ${target}: ${error.message}`);
       await this.failScan(scanId, error.message);
-      throw error;
+      return new Nack(false);
     }
   }
 
@@ -314,4 +336,3 @@ export class ScanProcessor {
     return Buffer.from(data).toString('base64');
   }
 }
-

@@ -1,9 +1,14 @@
 node_modules
 .next
 .git
+.gitignore
+*.md
 .env
-*.log
-.DS_Store
+.env.*
 coverage
+.nyc_output
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
 out
-

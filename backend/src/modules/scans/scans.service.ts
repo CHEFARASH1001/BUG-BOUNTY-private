@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { InjectQueue } from '@nestjs/bull';
 import { Model, Types } from 'mongoose';
-import { Queue } from 'bull';
 import { Scan, ScanDocument, ScanType, ScanStatus } from '../../schemas/scan.schema';
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
+import { QueueService } from '../queue/queue.service';
+import { QueueConstants } from '../queue/queue.constants';
 import { CreateScanDto } from './dto/scan.dto';
 
 @Injectable()
@@ -12,7 +12,7 @@ export class ScansService {
   constructor(
     @InjectModel(Scan.name) private scanModel: Model<ScanDocument>,
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
-    @InjectQueue('scans') private scansQueue: Queue,
+    private queueService: QueueService,
   ) {}
 
   async create(createScanDto: CreateScanDto, userId?: string): Promise<ScanDocument> {
@@ -23,31 +23,44 @@ export class ScansService {
       status: ScanStatus.QUEUED,
     });
 
-    // Queue the scan job based on type
-    const jobName = this.getJobName(createScanDto.type);
-    const job = await this.scansQueue.add(
-      jobName,
-      {
+    // Publish scan job to RabbitMQ based on type
+    const jobData = {
         scanId: scan._id.toString(),
         targetId: createScanDto.targetId,
         target: createScanDto.target,
         type: createScanDto.type,
         config: createScanDto.config,
-      },
-      {
-        priority: createScanDto.priority || 1,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 5000,
-        },
-      },
-    );
+    };
 
-    scan.jobId = job.id.toString();
-    await scan.save();
+    await this.publishScanJob(createScanDto.type, jobData);
 
     return scan;
+  }
+
+  private async publishScanJob(type: string, jobData: any): Promise<void> {
+    switch (type) {
+      case ScanType.FULL:
+        await this.queueService.publishFullScan(jobData);
+        break;
+      case ScanType.SUBDOMAIN:
+        await this.queueService.publishSubdomainScan(jobData);
+        break;
+      case ScanType.PORT:
+        await this.queueService.publishPortScan(jobData);
+        break;
+      case ScanType.NUCLEI:
+        await this.queueService.publishNucleiScan(jobData);
+        break;
+      case ScanType.DNS:
+        await this.queueService.publishDnsScan(jobData);
+        break;
+      default:
+        // For other scan types, use the generic scan queue
+        await this.queueService.publishScanJob(
+          this.getRoutingKey(type),
+          jobData,
+        );
+    }
   }
 
   async findAll(filters?: {
@@ -145,14 +158,8 @@ export class ScansService {
       throw new Error('Cannot cancel a completed or failed scan');
     }
 
-    // Remove from queue if still queued
-    if (scan.jobId) {
-      const job = await this.scansQueue.getJob(scan.jobId);
-      if (job) {
-        await job.remove();
-      }
-    }
-
+    // Note: With RabbitMQ, we cannot directly cancel a queued job
+    // We just mark it as cancelled and the processor should check the status
     return this.updateStatus(id, ScanStatus.CANCELLED);
   }
 
@@ -163,7 +170,7 @@ export class ScansService {
       throw new Error('Can only retry failed or cancelled scans');
     }
 
-    // Reset scan status and queue new job
+    // Reset scan status and publish new job
     await this.scanModel.findByIdAndUpdate(id, {
       status: ScanStatus.QUEUED,
       progress: 0,
@@ -174,38 +181,29 @@ export class ScansService {
       duration: null,
     });
 
-    const jobName = this.getJobName(scan.type);
-    const job = await this.scansQueue.add(
-      jobName,
-      {
+    const jobData = {
         scanId: id,
         targetId: scan.targetId.toString(),
         target: scan.target,
         type: scan.type,
         config: scan.config,
-      },
-      {
-        priority: scan.priority,
-        attempts: 3,
-      },
-    );
+    };
 
-    return this.scanModel.findByIdAndUpdate(
-      id,
-      { jobId: job.id.toString() },
-      { new: true },
-    ).exec() as Promise<ScanDocument>;
+    await this.publishScanJob(scan.type, jobData);
+
+    return this.scanModel.findById(id).exec() as Promise<ScanDocument>;
   }
 
   async getQueueStats(): Promise<any> {
-    const [waiting, active, completed, failed] = await Promise.all([
-      this.scansQueue.getWaitingCount(),
-      this.scansQueue.getActiveCount(),
-      this.scansQueue.getCompletedCount(),
-      this.scansQueue.getFailedCount(),
+    // With RabbitMQ, we track stats in the database
+    const [queued, running, completed, failed] = await Promise.all([
+      this.scanModel.countDocuments({ status: ScanStatus.QUEUED }),
+      this.scanModel.countDocuments({ status: ScanStatus.RUNNING }),
+      this.scanModel.countDocuments({ status: ScanStatus.COMPLETED }),
+      this.scanModel.countDocuments({ status: ScanStatus.FAILED }),
     ]);
 
-    return { waiting, active, completed, failed };
+    return { waiting: queued, active: running, completed, failed };
   }
 
   async getRecentScans(limit = 10): Promise<ScanDocument[]> {
@@ -216,20 +214,19 @@ export class ScansService {
     return this.scanModel.find({ status: ScanStatus.RUNNING }).exec();
   }
 
-  private getJobName(type: string): string {
-    const jobNames: Record<string, string> = {
-      [ScanType.FULL]: 'full-scan',
-      [ScanType.SUBDOMAIN]: 'subdomain-scan',
-      [ScanType.PORT]: 'port-scan',
-      [ScanType.NUCLEI]: 'nuclei-scan',
-      [ScanType.TECHNOLOGY]: 'technology-scan',
-      [ScanType.SCREENSHOT]: 'screenshot-scan',
-      [ScanType.ENDPOINT]: 'endpoint-scan',
-      [ScanType.DNS]: 'dns-scan',
-      [ScanType.SSL]: 'ssl-scan',
-      [ScanType.WAF]: 'waf-scan',
+  private getRoutingKey(type: string): string {
+    const routingKeys: Record<string, string> = {
+      [ScanType.FULL]: QueueConstants.ROUTING_FULL_SCAN,
+      [ScanType.SUBDOMAIN]: QueueConstants.ROUTING_SUBDOMAIN_SCAN,
+      [ScanType.PORT]: QueueConstants.ROUTING_PORT_SCAN,
+      [ScanType.NUCLEI]: QueueConstants.ROUTING_NUCLEI_SCAN,
+      [ScanType.DNS]: QueueConstants.ROUTING_DNS_SCAN,
+      [ScanType.TECHNOLOGY]: 'scan.technology',
+      [ScanType.SCREENSHOT]: 'scan.screenshot',
+      [ScanType.ENDPOINT]: 'scan.endpoint',
+      [ScanType.SSL]: 'scan.ssl',
+      [ScanType.WAF]: 'scan.waf',
     };
-    return jobNames[type] || 'custom-scan';
+    return routingKeys[type] || 'scan.custom';
   }
 }
-

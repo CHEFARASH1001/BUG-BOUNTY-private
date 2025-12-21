@@ -6,4 +6,8 @@ export * from './scan.schema';
 export * from './vulnerability.schema';
 export * from './endpoint.schema';
 export * from './notification.schema';
-
+export * from './live.schema';
+export * from './http-service.schema';
+export * from './score.schema';
+export * from './documentation.schema';
+export * from './scope.schema';

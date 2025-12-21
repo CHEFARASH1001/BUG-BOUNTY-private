@@ -13,6 +13,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ProgramsService } from './programs.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { Public } from '../auth/decorators/public.decorator';
 import { CreateProgramDto, UpdateProgramDto } from './dto/program.dto';
 
 @ApiTags('programs')
@@ -29,6 +30,7 @@ export class ProgramsController {
   }
 
   @Get()
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get all programs' })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'platform', required: false })
@@ -42,24 +44,28 @@ export class ProgramsController {
   }
 
   @Get(':id')
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get program by ID' })
   findOne(@Param('id') id: string) {
     return this.programsService.findById(id);
   }
 
   @Get(':id/stats')
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get program statistics' })
   getStats(@Param('id') id: string) {
     return this.programsService.getStats(id);
   }
 
   @Get(':id/domains')
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get domains for a program' })
   getDomains(@Param('id') id: string) {
     return this.programsService.getDomains(id);
   }
 
   @Get(':id/vulnerabilities')
+  @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get vulnerabilities for a program' })
   getVulnerabilities(@Param('id') id: string) {
     return this.programsService.getVulnerabilities(id);

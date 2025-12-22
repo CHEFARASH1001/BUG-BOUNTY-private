@@ -54,8 +54,8 @@ export class AlertRule {
   @Prop({ default: true })
   enabled: boolean;
 
-  @Prop({ type: Types.ObjectId, ref: 'User', required: true })
-  userId: Types.ObjectId;
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  userId?: Types.ObjectId;
 
   @Prop({ type: Types.ObjectId, ref: 'Program' })
   programId?: Types.ObjectId;

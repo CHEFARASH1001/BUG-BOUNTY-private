@@ -23,6 +23,8 @@ import {
   Globe,
   Code,
   FileText,
+  AlertTriangle,
+  Link2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { subdomainsApi } from '@/lib/api';
@@ -52,6 +54,8 @@ interface Subdomain {
   ports?: { port: number }[];
   waf?: string[];
   sources?: string[];
+  endpointCount?: number;
+  abuseScore?: number;
   createdAt?: string;
   lastSeen?: string;
 }
@@ -88,6 +92,22 @@ const getStatusBgColor = (status: number | null | undefined) => {
   if (status >= 300 && status < 400) return 'bg-blue-500/20';
   if (status >= 400 && status < 500) return 'bg-yellow-500/20';
   return 'bg-red-500/20';
+};
+
+const getAbuseScoreColor = (score: number | null | undefined) => {
+  if (score === null || score === undefined) return 'text-slate-500';
+  if (score >= 75) return 'text-red-400';
+  if (score >= 50) return 'text-orange-400';
+  if (score >= 25) return 'text-yellow-400';
+  return 'text-green-400';
+};
+
+const getAbuseScoreBgColor = (score: number | null | undefined) => {
+  if (score === null || score === undefined) return 'bg-slate-500/20';
+  if (score >= 75) return 'bg-red-500/20';
+  if (score >= 50) return 'bg-orange-500/20';
+  if (score >= 25) return 'bg-yellow-500/20';
+  return 'bg-green-500/20';
 };
 
 function useDebounce<T>(value: T, delay: number): T {
@@ -579,6 +599,18 @@ export default function SubdomainsPage() {
                       Technologies
                     </div>
                   </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      Abuse
+                    </div>
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <Link2 className="w-3.5 h-3.5" />
+                      Endpoints
+                    </div>
+                  </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Actions</th>
                 </tr>
               </thead>
@@ -708,6 +740,30 @@ export default function SubdomainsPage() {
                             </span>
                           )}
                         </div>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {sub.abuseScore !== undefined && sub.abuseScore !== null ? (
+                        <span className={cn(
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium',
+                          getAbuseScoreBgColor(sub.abuseScore),
+                          getAbuseScoreColor(sub.abuseScore)
+                        )}>
+                          <AlertTriangle className="w-3 h-3" />
+                          {sub.abuseScore}%
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {sub.endpointCount && sub.endpointCount > 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
+                          <Link2 className="w-3 h-3" />
+                          {sub.endpointCount}
+                        </span>
                       ) : (
                         <span className="text-slate-500">-</span>
                       )}

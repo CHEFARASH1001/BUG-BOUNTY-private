@@ -35,19 +35,32 @@ export class AlertService {
     private notificationsService: NotificationsService,
   ) {}
 
-  async create(createDto: CreateAlertRuleDto, userId: string): Promise<AlertRuleDocument> {
-    const rule = await this.alertRuleModel.create({
-      ...createDto,
-      userId: new Types.ObjectId(userId),
-      programId: createDto.programId ? new Types.ObjectId(createDto.programId) : undefined,
-    });
+  async create(createDto: CreateAlertRuleDto, userId?: string): Promise<AlertRuleDocument> {
+    const ruleData: any = { ...createDto };
+    
+    // Only set userId if valid ObjectId
+    if (userId && Types.ObjectId.isValid(userId)) {
+      ruleData.userId = new Types.ObjectId(userId);
+    }
+    
+    // Only set programId if valid ObjectId
+    if (createDto.programId && Types.ObjectId.isValid(createDto.programId)) {
+      ruleData.programId = new Types.ObjectId(createDto.programId);
+    }
+
+    const rule = await this.alertRuleModel.create(ruleData);
     return rule;
   }
 
-  async findAll(userId: string, filters?: { programId?: string; enabled?: boolean }): Promise<AlertRuleDocument[]> {
-    const query: any = { userId: new Types.ObjectId(userId) };
+  async findAll(userId?: string, filters?: { programId?: string; enabled?: boolean }): Promise<AlertRuleDocument[]> {
+    const query: any = {};
 
-    if (filters?.programId) {
+    // Only filter by userId if provided and valid
+    if (userId && Types.ObjectId.isValid(userId)) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    if (filters?.programId && Types.ObjectId.isValid(filters.programId)) {
       query.programId = new Types.ObjectId(filters.programId);
     }
     if (filters?.enabled !== undefined) {
@@ -57,11 +70,15 @@ export class AlertService {
     return this.alertRuleModel.find(query).sort({ createdAt: -1 }).exec();
   }
 
-  async findById(id: string, userId: string): Promise<AlertRuleDocument> {
-    const rule = await this.alertRuleModel.findOne({
-      _id: new Types.ObjectId(id),
-      userId: new Types.ObjectId(userId),
-    }).exec();
+  async findById(id: string, userId?: string): Promise<AlertRuleDocument> {
+    const query: any = { _id: new Types.ObjectId(id) };
+    
+    // Only filter by userId if valid
+    if (userId && Types.ObjectId.isValid(userId)) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    const rule = await this.alertRuleModel.findOne(query).exec();
 
     if (!rule) {
       throw new NotFoundException('Alert rule not found');
@@ -69,14 +86,19 @@ export class AlertService {
     return rule;
   }
 
-  async update(id: string, updateDto: UpdateAlertRuleDto, userId: string): Promise<AlertRuleDocument> {
+  async update(id: string, updateDto: UpdateAlertRuleDto, userId?: string): Promise<AlertRuleDocument> {
     const updateData: any = { ...updateDto };
-    if (updateDto.programId) {
+    if (updateDto.programId && Types.ObjectId.isValid(updateDto.programId)) {
       updateData.programId = new Types.ObjectId(updateDto.programId);
     }
 
+    const query: any = { _id: new Types.ObjectId(id) };
+    if (userId && Types.ObjectId.isValid(userId)) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
     const rule = await this.alertRuleModel.findOneAndUpdate(
-      { _id: new Types.ObjectId(id), userId: new Types.ObjectId(userId) },
+      query,
       updateData,
       { new: true },
     ).exec();
@@ -87,11 +109,13 @@ export class AlertService {
     return rule;
   }
 
-  async delete(id: string, userId: string): Promise<void> {
-    const result = await this.alertRuleModel.findOneAndDelete({
-      _id: new Types.ObjectId(id),
-      userId: new Types.ObjectId(userId),
-    }).exec();
+  async delete(id: string, userId?: string): Promise<void> {
+    const query: any = { _id: new Types.ObjectId(id) };
+    if (userId && Types.ObjectId.isValid(userId)) {
+      query.userId = new Types.ObjectId(userId);
+    }
+
+    const result = await this.alertRuleModel.findOneAndDelete(query).exec();
 
     if (!result) {
       throw new NotFoundException('Alert rule not found');

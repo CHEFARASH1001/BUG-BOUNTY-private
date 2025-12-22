@@ -17,6 +17,8 @@ import { HttpMonitorService } from '../http-services/http-monitor.service';
 import { AbuseIPDBService } from '../external-apis/services/abuseipdb.service';
 import { CTService } from '../recon/services/ct.service';
 import { AlertService } from '../alerts/alert.service';
+import { WaybackService } from '../recon/services/wayback.service';
+import { EndpointsService } from '../endpoints/endpoints.service';
 
 export interface JobDefinition {
   name: string;
@@ -90,6 +92,11 @@ export class CronService implements OnModuleInit {
       schedule: '0 */4 * * *',
       description: 'Certificate Transparency log monitoring for new subdomains',
     },
+    {
+      name: 'watch_wayback',
+      schedule: '0 */8 * * *',
+      description: 'Waybackurls endpoint discovery for alive subdomains',
+    },
   ];
 
   constructor(
@@ -108,6 +115,8 @@ export class CronService implements OnModuleInit {
     @Inject(forwardRef(() => AbuseIPDBService)) private abuseIPDBService: AbuseIPDBService,
     @Inject(forwardRef(() => CTService)) private ctService: CTService,
     @Inject(forwardRef(() => AlertService)) private alertService: AlertService,
+    @Inject(forwardRef(() => WaybackService)) private waybackService: WaybackService,
+    @Inject(forwardRef(() => EndpointsService)) private endpointsService: EndpointsService,
   ) {}
 
   async onModuleInit() {
@@ -194,6 +203,11 @@ export class CronService implements OnModuleInit {
   @Cron(CronExpression.EVERY_4_HOURS)
   async scheduledCTMonitor() {
     await this.runJobIfEnabled('watch_ct_logs', (log) => this.runCTMonitor(log));
+  }
+
+  @Cron('0 */8 * * *') // Every 8 hours
+  async scheduledWaybackWatch() {
+    await this.runJobIfEnabled('watch_wayback', (log) => this.runWaybackWatch(log));
   }
 
   private async runJobIfEnabled(
@@ -335,6 +349,7 @@ export class CronService implements OnModuleInit {
       watch_http_monitor: (log) => this.runHttpMonitor(log),
       watch_abuseipdb: (log) => this.runAbuseIPDBWatch(log),
       watch_ct_logs: (log) => this.runCTMonitor(log),
+      watch_wayback: (log) => this.runWaybackWatch(log),
     };
 
     const handler = handlers[jobName];
@@ -528,6 +543,7 @@ export class CronService implements OnModuleInit {
 
     let alive = 0;
     let dead = 0;
+    const newlyAlive: string[] = []; // Track subdomains that became alive
     const dns = require('dns').promises;
 
     // Process in batches to avoid overwhelming DNS
@@ -543,16 +559,21 @@ export class CronService implements OnModuleInit {
       // Process batch in parallel
       const results = await Promise.allSettled(
         batch.map(async (sub) => {
+          const wasAlive = sub.isAlive;
           try {
             const addresses = await dns.resolve(sub.subdomain);
             await this.subdomainsService.update(sub._id.toString(), {
               isAlive: true,
               ip: addresses,
             });
-            return { alive: true };
+            // Track if this subdomain just became alive
+            if (!wasAlive) {
+              return { alive: true, newlyAlive: true, subdomain: sub.subdomain };
+            }
+            return { alive: true, newlyAlive: false };
           } catch {
             await this.subdomainsService.update(sub._id.toString(), { isAlive: false });
-            return { alive: false };
+            return { alive: false, newlyAlive: false };
           }
         })
       );
@@ -562,6 +583,9 @@ export class CronService implements OnModuleInit {
         if (result.status === 'fulfilled') {
           if (result.value.alive) {
             alive++;
+            if (result.value.newlyAlive && result.value.subdomain) {
+              newlyAlive.push(result.value.subdomain);
+            }
           } else {
             dead++;
           }
@@ -572,7 +596,34 @@ export class CronService implements OnModuleInit {
     }
 
     await log(`DNS resolution complete: ${alive} alive, ${dead} dead`);
-    return { message: 'DNS resolution completed', alive, dead, total: subdomains.length };
+    
+    // Send notification for newly alive subdomains
+    if (newlyAlive.length > 0) {
+      await log(`🆕 ${newlyAlive.length} subdomains became alive!`);
+      try {
+        await this.queueService.publishNotification({
+          type: 'new_live',
+          data: {
+            count: newlyAlive.length,
+            subdomains: newlyAlive.slice(0, 50), // Limit to first 50 for notification
+            timestamp: new Date(),
+            source: 'dns_resolution',
+          },
+          channels: ['discord', 'telegram'],
+        });
+        await log('Notification sent for newly alive subdomains');
+      } catch (e: any) {
+        await log(`Failed to send notification: ${e.message}`);
+      }
+    }
+
+    return { 
+      message: 'DNS resolution completed', 
+      alive, 
+      dead, 
+      total: subdomains.length,
+      newlyAlive: newlyAlive.length,
+    };
   }
 
   private async runLiveAll(log: LogFn): Promise<any> {
@@ -873,6 +924,13 @@ export class CronService implements OnModuleInit {
             domainId: subdomain?.domainId,
           });
 
+          // Update subdomain with abuse score
+          if (subdomain) {
+            await this.subdomainsService.update(subdomain._id.toString(), {
+              abuseScore: result.abuseConfidenceScore,
+            });
+          }
+
           // Check if abuse score exceeds threshold
           if (this.abuseIPDBService.exceedsThreshold(result.abuseConfidenceScore, abuseThreshold)) {
             highAbuseCount++;
@@ -1014,6 +1072,87 @@ export class CronService implements OnModuleInit {
       };
     } catch (error: any) {
       await log(`CT monitoring error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Waybackurls endpoint discovery
+   * Fetches historical URLs from Wayback Machine for alive subdomains
+   * Stores discovered endpoints and updates subdomain endpointCount
+   * Requirements: 2.1, 2.2, 2.3, 2.4
+   */
+  private async runWaybackWatch(log: LogFn): Promise<any> {
+    await log('Starting Waybackurls endpoint discovery...');
+
+    try {
+      // Get alive subdomains to scan
+      const subdomainsResult = await this.subdomainsService.findAll({
+        isAlive: true,
+        limit: 100,
+      });
+      const subdomains = subdomainsResult.data;
+      await log(`Found ${subdomains.length} alive subdomains to scan`);
+
+      if (subdomains.length === 0) {
+        await log('No alive subdomains found. Run DNS resolution first.');
+        return { message: 'No subdomains to scan', scanned: 0 };
+      }
+
+      let totalEndpoints = 0;
+      let totalNew = 0;
+      const maxSubdomains = 20; // Limit to avoid long execution
+
+      for (const sub of subdomains.slice(0, maxSubdomains)) {
+        try {
+          await log(`Fetching wayback URLs for: ${sub.subdomain}`);
+
+          const result = await this.waybackService.fetchUrls(sub.subdomain);
+          await log(`Found ${result.urls.length} URLs, ${result.extractedEndpoints.length} unique endpoints`);
+
+          if (result.extractedEndpoints.length > 0) {
+            // Store endpoints
+            const endpointsToCreate = result.extractedEndpoints.map(ep => ({
+              url: ep.url,
+              subdomainId: sub._id.toString(),
+              data: {
+                path: ep.path,
+                method: ep.method,
+                parameters: ep.parameters,
+                hasParams: ep.hasParams,
+                sources: ['waybackurls'],
+              },
+            }));
+
+            const { created, updated } = await this.endpointsService.bulkCreate(endpointsToCreate as any);
+            totalEndpoints += result.extractedEndpoints.length;
+            totalNew += created;
+
+            await log(`Stored ${created} new, ${updated} updated endpoints for ${sub.subdomain}`);
+
+            // Update subdomain endpointCount
+            await this.subdomainsService.update(sub._id.toString(), {
+              endpointCount: result.extractedEndpoints.length,
+            });
+          }
+
+          // Rate limiting
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        } catch (error: any) {
+          await log(`Error scanning ${sub.subdomain}: ${error.message}`);
+        }
+      }
+
+      await log(`Wayback scan complete: ${totalEndpoints} endpoints found, ${totalNew} new`);
+
+      return {
+        message: 'Wayback scan completed',
+        subdomainsScanned: Math.min(subdomains.length, maxSubdomains),
+        totalEndpoints,
+        newEndpoints: totalNew,
+      };
+    } catch (error: any) {
+      await log(`Wayback watch error: ${error.message}`);
       throw error;
     }
   }

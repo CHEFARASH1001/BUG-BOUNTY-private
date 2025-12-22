@@ -13,6 +13,7 @@ export class AlertConditionDto {
   operator: AlertConditionOperator;
 
   @ApiProperty({ description: 'Value to match against' })
+  @IsOptional()
   value: any;
 
   @ApiPropertyOptional({ description: 'Previous value for change detection' })

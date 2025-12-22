@@ -89,6 +89,9 @@ export class Subdomain {
   @Prop({ default: 0 })
   endpointCount: number;
 
+  @Prop()
+  abuseScore: number; // AbuseIPDB confidence score
+
   @Prop({ type: [String], default: [] })
   tags: string[];
 

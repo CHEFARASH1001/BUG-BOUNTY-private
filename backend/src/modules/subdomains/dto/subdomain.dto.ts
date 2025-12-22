@@ -92,5 +92,15 @@ export class UpdateSubdomainDto extends PartialType(CreateSubdomainDto) {
     isExpired?: boolean;
     isValid?: boolean;
   };
+
+  @ApiPropertyOptional({ description: 'AbuseIPDB confidence score' })
+  @IsNumber()
+  @IsOptional()
+  abuseScore?: number;
+
+  @ApiPropertyOptional({ description: 'Number of discovered endpoints' })
+  @IsNumber()
+  @IsOptional()
+  endpointCount?: number;
 }
 

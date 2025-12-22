@@ -159,7 +159,7 @@ export class WaybackService {
       const parameters: { name: string; type: string }[] = [];
 
       // Extract query parameters
-      parsed.searchParams.forEach((value, name) => {
+      parsed.searchParams.forEach((_value, name) => {
         parameters.push({ name, type: 'query' });
       });
 

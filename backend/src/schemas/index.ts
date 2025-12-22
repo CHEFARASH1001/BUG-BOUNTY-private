@@ -11,3 +11,6 @@ export * from './http-service.schema';
 export * from './score.schema';
 export * from './documentation.schema';
 export * from './scope.schema';
+export * from './alert-rule.schema';
+export * from './fuzz-job.schema';
+export * from './abuseipdb-result.schema';

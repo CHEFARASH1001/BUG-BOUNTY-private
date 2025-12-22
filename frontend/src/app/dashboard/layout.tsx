@@ -28,6 +28,8 @@ import {
   Info,
   X,
   Target,
+  Zap,
+  Radio,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi } from '@/lib/api';
@@ -38,9 +40,12 @@ const navigation = [
   { name: 'Scores', href: '/dashboard/scores', icon: Target },
   { name: 'Domains', href: '/dashboard/domains', icon: Globe },
   { name: 'Subdomains', href: '/dashboard/subdomains', icon: Server },
+  { name: 'HTTP Services', href: '/dashboard/http-services', icon: Radio },
   { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: AlertTriangle },
   { name: 'Scans', href: '/dashboard/scans', icon: Scan },
+  { name: 'Fuzzing', href: '/dashboard/fuzzing', icon: Zap },
   { name: 'Cron Jobs', href: '/dashboard/cron', icon: Clock },
+  { name: 'Alerts', href: '/dashboard/alerts', icon: Bell },
   { name: 'Reports', href: '/dashboard/reports', icon: FileText },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ];

@@ -74,6 +74,58 @@ services:
     networks:
       - bb-network
 
+  # Subfinder Workers - Scalable workers for parallel subdomain discovery
+  # Scale with: docker-compose -f docker-compose.dev.yml up -d --scale subfinder-worker=5
+  subfinder-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://admin:bugbounty2024@mongodb:27017/bugbounty?authSource=admin
+      RABBITMQ_URL: amqp://bugbounty:bugbounty2024@rabbitmq:5672/watchtower
+      WORKER_ID: subfinder-worker-${HOSTNAME:-default}
+    command: ["npm", "run", "start:worker"]
+    volumes:
+      - ./backend/src:/app/src
+      - scan_results:/app/results
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bb-network
+    deploy:
+      replicas: 3
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+
+  # Subfinder - Subdomain Discovery Tool (for direct CLI usage)
+  subfinder:
+    image: projectdiscovery/subfinder:latest
+    container_name: bb-subfinder
+    restart: unless-stopped
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+
+  # Httpx - HTTP Probing Tool
+  httpx:
+    image: projectdiscovery/httpx:latest
+    container_name: bb-httpx
+    restart: unless-stopped
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+
   # Next.js Frontend - Development Mode
   frontend:
     build:

@@ -4,7 +4,7 @@ import { HttpServicesService } from './http-services.service';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Technologies')
-@Controller('api/technologies')
+@Controller('technologies')
 export class TechnologiesController {
   constructor(private httpServicesService: HttpServicesService) {}
 

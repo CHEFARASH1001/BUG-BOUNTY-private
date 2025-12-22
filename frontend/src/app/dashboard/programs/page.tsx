@@ -32,7 +32,8 @@ interface Program {
   url?: string;
   status: string;
   offersBounties: boolean;
-  scopes?: { assetIdentifier: string; assetType: string }[];
+  scopes?: { assetIdentifier: string; assetType: string; status?: string }[];
+  scopeCount?: number;
   createdAt?: string;
 }
 
@@ -96,7 +97,7 @@ export default function ProgramsPage() {
   });
 
   const activeCount = programs.filter(p => p.status === 'active' || p.status === 'open' || p.status === 'public_mode').length;
-  const totalScopes = programs.reduce((a, b) => a + (b.scopes?.length || 0), 0);
+  const totalScopes = programs.reduce((a, b) => a + (b.scopeCount || b.scopes?.length || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -260,7 +261,7 @@ export default function ProgramsPage() {
                           </span>
                           <span className="flex items-center gap-1 text-slate-400">
                             <Globe className="w-4 h-4" />
-                            {program.scopes?.length || 0} scopes
+                            {program.scopeCount || program.scopes?.length || 0} scopes
                           </span>
                           {program.url && (
                             <a 

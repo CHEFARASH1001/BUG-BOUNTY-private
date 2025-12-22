@@ -1,0 +1,32 @@
+# Subfinder Worker Dockerfile
+# Lightweight worker for processing subfinder jobs from RabbitMQ
+
+FROM node:20-alpine
+
+# Install subfinder
+RUN apk add --no-cache curl ca-certificates \
+    && curl -sSL https://github.com/projectdiscovery/subfinder/releases/download/v2.6.3/subfinder_2.6.3_linux_amd64.zip -o /tmp/subfinder.zip \
+    && unzip /tmp/subfinder.zip -d /usr/local/bin/ \
+    && chmod +x /usr/local/bin/subfinder \
+    && rm /tmp/subfinder.zip \
+    && subfinder -version
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci --only=production
+
+# Copy source code
+COPY . .
+
+# Build TypeScript
+RUN npm run build
+
+# Create results directory
+RUN mkdir -p /app/results
+
+# Run worker
+CMD ["node", "dist/worker.js"]

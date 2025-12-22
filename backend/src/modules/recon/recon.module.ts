@@ -8,6 +8,8 @@ import { HttpProber } from './services/http-prober.service';
 import { TechnologyDetector } from './services/technology-detector.service';
 import { WafDetector } from './services/waf-detector.service';
 import { SslAnalyzer } from './services/ssl-analyzer.service';
+import { WaybackService } from './services/wayback.service';
+import { CTService } from './services/ct.service';
 import { ExternalApisModule } from '../external-apis/external-apis.module';
 
 @Module({
@@ -24,8 +26,10 @@ import { ExternalApisModule } from '../external-apis/external-apis.module';
     TechnologyDetector,
     WafDetector,
     SslAnalyzer,
+    WaybackService,
+    CTService,
   ],
-  exports: [ReconService],
+  exports: [ReconService, WaybackService, CTService, HttpProber],
 })
 export class ReconModule {}
 

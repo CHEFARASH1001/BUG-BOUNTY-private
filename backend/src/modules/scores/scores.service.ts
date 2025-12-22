@@ -45,6 +45,11 @@ export interface ScoreCalculationResult {
     hasTechnologyData: boolean;
     hasBountyData: boolean;
     hasHistoricalData: boolean;
+    // Enriched data availability (Requirements 5.4)
+    hasBountyTableData?: boolean;
+    hasResponseMetricsData?: boolean;
+    hasActivityStatsData?: boolean;
+    hasScopeStatsData?: boolean;
   };
 }
 
@@ -281,10 +286,10 @@ export class ScoresService {
 
     // Calculate individual score components
     const exploitability = this.calculateExploitability(allTechnologies, data.httpServices);
-    const historical = this.calculateHistorical(data.vulnerabilities, data.recentVulns);
+    const historical = this.calculateHistorical(data.vulnerabilities, data.recentVulns, data.program);
     const programQuality = this.calculateProgramQuality(data.program, data.scopes, data.domains);
     const competition = this.calculateCompetition(data.subdomains, data.liveHosts, data.domains);
-    const attackSurface = this.calculateAttackSurface(data.subdomains, data.liveHosts, data.httpServices);
+    const attackSurface = this.calculateAttackSurface(data.subdomains, data.liveHosts, data.httpServices, data.program);
     const penetration = this.calculatePenetration(allTechnologies, data.httpServices, data.vulnerabilities);
 
     // Build full breakdown
@@ -298,28 +303,63 @@ export class ScoresService {
     };
 
     // Calculate weighted total score
-    // Weights: Exploitability 25%, Historical 20%, Program Quality 15%, 
-    //          Competition 10%, Attack Surface 15%, Penetration 15%
-    const totalScore = Math.round(
-      (exploitability.total * 0.25) +
-      (historical.total * 0.20) +
-      (programQuality.total * 0.15) +
-      (competition.total * 0.10) +
-      (attackSurface.total * 0.15) +
-      (penetration.total * 0.15)
-    );
+    // Adjust weights based on data availability - give more weight to categories we have data for
+    const hasReconData = data.subdomains.length > 0 || data.httpServices.length > 0;
+    
+    let totalScore: number;
+    if (hasReconData) {
+      // Full weights when we have reconnaissance data
+      // Weights: Exploitability 25%, Historical 20%, Program Quality 15%, 
+      //          Competition 10%, Attack Surface 15%, Penetration 15%
+      totalScore = Math.round(
+        (exploitability.total * 0.25) +
+        (historical.total * 0.20) +
+        (programQuality.total * 0.15) +
+        (competition.total * 0.10) +
+        (attackSurface.total * 0.15) +
+        (penetration.total * 0.15)
+      );
+    } else {
+      // Adjusted weights when no recon data - emphasize program quality and competition
+      // These are the categories we can score from platform sync data alone
+      // Weights: Exploitability 10%, Historical 25%, Program Quality 35%, 
+      //          Competition 20%, Attack Surface 5%, Penetration 5%
+      totalScore = Math.round(
+        (exploitability.total * 0.10) +
+        (historical.total * 0.25) +
+        (programQuality.total * 0.35) +
+        (competition.total * 0.20) +
+        (attackSurface.total * 0.05) +
+        (penetration.total * 0.05)
+      );
+    }
 
     // Calculate tier (S/A/B/C/D/F)
     const tier = this.calculateTier(totalScore);
 
-    // Calculate confidence based on data availability
+    // Calculate confidence based on data availability (Requirements 5.4)
     const dataAvailability = {
       hasVulnerabilityData: data.vulnerabilities.length > 0,
       hasSubdomainData: data.subdomains.length > 0,
       hasHttpServiceData: data.httpServices.length > 0,
       hasTechnologyData: allTechnologies.size > 0,
-      hasBountyData: !!(data.program?.bountyRange?.max),
+      hasBountyData: !!(data.program?.bountyTable?.critical?.max || data.program?.bountyRange?.max),
       hasHistoricalData: data.vulnerabilities.length >= 3,
+      // New enriched data availability checks
+      hasBountyTableData: !!(data.program?.bountyTable && 
+        (data.program.bountyTable.critical || data.program.bountyTable.high || 
+         data.program.bountyTable.medium || data.program.bountyTable.low)),
+      hasResponseMetricsData: !!(data.program?.responseMetrics && 
+        (data.program.responseMetrics.averageTimeToFirstResponse !== undefined ||
+         data.program.responseMetrics.averageTimeToBounty !== undefined ||
+         data.program.responseMetrics.averageTimeToResolution !== undefined)),
+      hasActivityStatsData: !!(data.program?.activityStats && 
+        (data.program.activityStats.resolvedReportCount !== undefined ||
+         data.program.activityStats.totalBountiesPaid !== undefined ||
+         data.program.activityStats.hackersThanked !== undefined)),
+      hasScopeStatsData: !!(data.program?.scopeStats && 
+        (data.program.scopeStats.totalAssets !== undefined ||
+         data.program.scopeStats.wildcardCount !== undefined)),
     };
     const confidence = this.calculateConfidence(dataAvailability);
 
@@ -445,6 +485,7 @@ export class ScoresService {
   private calculateHistorical(
     allVulns: VulnerabilityDocument[],
     recentVulns: VulnerabilityDocument[],
+    program: ProgramDocument | null,
   ): HistoricalBreakdown {
     let pastVulnsCritical = 0;
     let pastVulnsHigh = 0;
@@ -455,7 +496,44 @@ export class ScoresService {
     let daysSinceLastVuln = 0;
     let successRate = 0;
 
-    // Count vulns by severity
+    // Use activityStats from program if available (Requirements 3.5)
+    if (program?.activityStats) {
+      const { resolvedReportCount, totalBountiesPaid } = program.activityStats;
+      
+      // Use resolvedReportCount for activity assessment
+      // More resolved reports = more active program = higher score
+      if (resolvedReportCount !== undefined && resolvedReportCount !== null) {
+        // Scale: 0-10 reports = 0-20, 10-50 = 20-50, 50-200 = 50-80, 200+ = 80-100
+        if (resolvedReportCount >= 200) {
+          pastVulnsCritical = Math.min(100, 80 + (resolvedReportCount - 200) / 50 * 20);
+        } else if (resolvedReportCount >= 50) {
+          pastVulnsCritical = 50 + (resolvedReportCount - 50) / 150 * 30;
+        } else if (resolvedReportCount >= 10) {
+          pastVulnsCritical = 20 + (resolvedReportCount - 10) / 40 * 30;
+        } else {
+          pastVulnsCritical = resolvedReportCount * 2;
+        }
+        pastVulnsCritical = Math.min(100, Math.round(pastVulnsCritical));
+      }
+      
+      // Use totalBountiesPaid for program value assessment
+      // Higher bounties paid = more valuable program = higher score
+      if (totalBountiesPaid !== undefined && totalBountiesPaid !== null) {
+        // Scale: $0-10k = 0-30, $10k-100k = 30-60, $100k-1M = 60-85, $1M+ = 85-100
+        if (totalBountiesPaid >= 1000000) {
+          pastVulnsHigh = Math.min(100, 85 + (totalBountiesPaid - 1000000) / 10000000 * 15);
+        } else if (totalBountiesPaid >= 100000) {
+          pastVulnsHigh = 60 + (totalBountiesPaid - 100000) / 900000 * 25;
+        } else if (totalBountiesPaid >= 10000) {
+          pastVulnsHigh = 30 + (totalBountiesPaid - 10000) / 90000 * 30;
+        } else {
+          pastVulnsHigh = totalBountiesPaid / 10000 * 30;
+        }
+        pastVulnsHigh = Math.min(100, Math.round(pastVulnsHigh));
+      }
+    }
+
+    // Count vulns by severity from local vulnerability data
     const severityCounts = {
       critical: 0,
       high: 0,
@@ -476,9 +554,15 @@ export class ScoresService {
       }
     }
 
-    // Score based on severity (critical findings = high exploitability)
-    pastVulnsCritical = Math.min(100, severityCounts.critical * 25);
-    pastVulnsHigh = Math.min(100, severityCounts.high * 15);
+    // If no activityStats, fall back to local vulnerability data
+    if (!program?.activityStats?.resolvedReportCount) {
+      // Score based on severity (critical findings = high exploitability)
+      pastVulnsCritical = Math.max(pastVulnsCritical, Math.min(100, severityCounts.critical * 25));
+    }
+    if (!program?.activityStats?.totalBountiesPaid) {
+      pastVulnsHigh = Math.max(pastVulnsHigh, Math.min(100, severityCounts.high * 15));
+    }
+    
     pastVulnsMedium = Math.min(100, severityCounts.medium * 8);
     pastVulnsLow = Math.min(100, severityCounts.low * 3);
 
@@ -557,18 +641,74 @@ export class ScoresService {
     let wildcards = 0;
 
     if (program) {
-      // Bounty scoring
-      const minBounty = program.bountyRange?.min || 0;
-      const maxBounty = program.bountyRange?.max || 0;
+      // Bounty scoring - use bountyTable data if available (Requirements 1.5, 5.1)
+      // Priority: bountyTable.critical > bountyRange (fallback)
+      const criticalMax = program.bountyTable?.critical?.max;
+      const criticalMin = program.bountyTable?.critical?.min;
       
-      bountyMin = Math.min(100, (minBounty / 100) * 10);
-      bountyMax = Math.min(100, (maxBounty / 5000) * 100);
-      bountyAverage = Math.round((bountyMin + bountyMax) / 2);
+      // Use bountyTable data if available, otherwise fall back to bountyRange
+      const maxBounty = criticalMax ?? program.bountyRange?.max ?? null;
+      const minBounty = criticalMin ?? program.bountyRange?.min ?? null;
+      
+      // Calculate bountyMax score: scale from 0-100 based on max bounty (up to $50,000)
+      if (maxBounty !== null) {
+        bountyMax = Math.min(100, (maxBounty / 50000) * 100);
+      }
+      
+      // Calculate bountyMin score: scale from 0-100 based on min bounty (up to $1,000)
+      if (minBounty !== null) {
+        bountyMin = Math.min(100, (minBounty / 1000) * 100);
+      }
+      
+      // Calculate bountyAverage from actual bountyTable data if available
+      if (program.bountyTable) {
+        const bountyValues: number[] = [];
+        const severities = ['critical', 'high', 'medium', 'low'] as const;
+        for (const severity of severities) {
+          const tier = program.bountyTable[severity];
+          if (tier?.min !== undefined && tier?.min !== null) bountyValues.push(tier.min);
+          if (tier?.max !== undefined && tier?.max !== null) bountyValues.push(tier.max);
+        }
+        if (bountyValues.length > 0) {
+          const avgBounty = bountyValues.reduce((a, b) => a + b, 0) / bountyValues.length;
+          bountyAverage = Math.min(100, (avgBounty / 10000) * 100);
+        }
+      } else {
+        // Fallback to simple average of min/max scores
+        bountyAverage = Math.round((bountyMin + bountyMax) / 2);
+      }
 
-      // Program age scoring
-      if (program.firstSyncedAt) {
+      // Response time scoring - use responseMetrics if available (Requirements 2.5, 5.2)
+      if (program.responseMetrics?.averageTimeToFirstResponse !== undefined && 
+          program.responseMetrics.averageTimeToFirstResponse !== null) {
+        // Faster response = higher score
+        // 1 day = 100, 7 days = 70, 14 days = 40, 30+ days = 10
+        const days = program.responseMetrics.averageTimeToFirstResponse;
+        if (days <= 1) responseTime = 100;
+        else if (days <= 3) responseTime = 90;
+        else if (days <= 7) responseTime = 70;
+        else if (days <= 14) responseTime = 50;
+        else if (days <= 30) responseTime = 30;
+        else responseTime = 10;
+      }
+      
+      // Factor in time to bounty and resolution for resolutionRate
+      if (program.responseMetrics?.averageTimeToBounty !== undefined && 
+          program.responseMetrics.averageTimeToBounty !== null) {
+        const bountyDays = program.responseMetrics.averageTimeToBounty;
+        // Faster bounty payment = higher score
+        if (bountyDays <= 7) resolutionRate = 100;
+        else if (bountyDays <= 14) resolutionRate = 80;
+        else if (bountyDays <= 30) resolutionRate = 60;
+        else if (bountyDays <= 60) resolutionRate = 40;
+        else resolutionRate = 20;
+      }
+
+      // Program age scoring - use launchedAt if available
+      const launchDate = program.launchedAt || program.firstSyncedAt;
+      if (launchDate) {
         const ageInDays = Math.floor(
-          (Date.now() - new Date(program.firstSyncedAt).getTime()) / (24 * 60 * 60 * 1000)
+          (Date.now() - new Date(launchDate).getTime()) / (24 * 60 * 60 * 1000)
         );
         if (ageInDays > 365) programAge = 80;
         else if (ageInDays > 180) programAge = 60;
@@ -582,16 +722,28 @@ export class ScoresService {
       }
     }
 
-    // Scope size scoring
-    const inScopeCount = scopes.filter(s => s.status === 'in_scope' || s.eligibility?.isEligible).length;
-    const domainCount = domains.length;
-    scopeSize = Math.min(100, ((inScopeCount + domainCount) / 20) * 100);
+    // Scope size scoring - use scopeStats if available (Requirements 4.4)
+    if (program?.scopeStats?.totalAssets !== undefined && program.scopeStats.totalAssets !== null) {
+      // Use enriched scopeStats data
+      scopeSize = Math.min(100, (program.scopeStats.totalAssets / 50) * 100);
+    } else {
+      // Fallback to counting scopes and domains
+      const inScopeCount = scopes.filter(s => s.status === 'in_scope' || s.eligibility?.isEligible).length;
+      const domainCount = domains.length;
+      scopeSize = Math.min(100, ((inScopeCount + domainCount) / 20) * 100);
+    }
 
-    // Wildcard scoring (more opportunity)
-    const wildcardScopes = scopes.filter(s => 
-      s.target?.startsWith('*.') || s.target?.includes('*') || s.type === 'wildcard'
-    );
-    wildcards = Math.min(100, wildcardScopes.length * 20);
+    // Wildcard scoring - use scopeStats.wildcardCount if available (Requirements 4.5)
+    if (program?.scopeStats?.wildcardCount !== undefined && program.scopeStats.wildcardCount !== null) {
+      // Programs with wildcards get higher scores - each wildcard adds significant value
+      wildcards = Math.min(100, program.scopeStats.wildcardCount * 25);
+    } else {
+      // Fallback to counting wildcard scopes manually
+      const wildcardScopes = scopes.filter(s => 
+        s.target?.startsWith('*.') || s.target?.includes('*') || s.type === 'wildcard'
+      );
+      wildcards = Math.min(100, wildcardScopes.length * 20);
+    }
 
     const total = Math.round(
       (bountyMax * 0.30) +
@@ -684,16 +836,56 @@ export class ScoresService {
     subdomains: SubdomainDocument[],
     liveHosts: LiveDocument[],
     httpServices: HttpServiceDocument[],
+    program: ProgramDocument | null,
   ): AttackSurfaceBreakdown {
-    const subdomainCount = Math.min(100, (subdomains.length / 500) * 100);
-    const liveHostCount = Math.min(100, (liveHosts.length / 100) * 100);
-    const httpServiceCount = Math.min(100, (httpServices.length / 50) * 100);
+    let subdomainCount = 0;
+    let liveHostCount = 0;
+    let httpServiceCount = 0;
     let openPortCount = 0;
     let endpointCount = 0;
     let apiEndpoints = 0;
     let adminPanels = 0;
     let loginPages = 0;
     let fileUploads = 0;
+
+    // Use scopeStats from program if available (Requirements 4.4)
+    if (program?.scopeStats) {
+      const { totalAssets, wildcardCount, apiCount } = program.scopeStats;
+      
+      // Use totalAssets for attack surface size
+      if (totalAssets !== undefined && totalAssets !== null) {
+        // Scale: 0-10 assets = 0-20, 10-50 = 20-50, 50-200 = 50-80, 200+ = 80-100
+        if (totalAssets >= 200) {
+          subdomainCount = Math.min(100, 80 + (totalAssets - 200) / 300 * 20);
+        } else if (totalAssets >= 50) {
+          subdomainCount = 50 + (totalAssets - 50) / 150 * 30;
+        } else if (totalAssets >= 10) {
+          subdomainCount = 20 + (totalAssets - 10) / 40 * 30;
+        } else {
+          subdomainCount = totalAssets * 2;
+        }
+      }
+      
+      // Use wildcardCount for opportunity assessment
+      // Wildcards significantly increase attack surface
+      if (wildcardCount !== undefined && wildcardCount !== null && wildcardCount > 0) {
+        // Each wildcard adds substantial value - scale up to 100
+        openPortCount = Math.min(100, wildcardCount * 25);
+      }
+      
+      // Use apiCount for API endpoint scoring
+      if (apiCount !== undefined && apiCount !== null) {
+        apiEndpoints = Math.min(100, apiCount * 15);
+      }
+    }
+    
+    // Fall back to or supplement with local data
+    if (!program?.scopeStats?.totalAssets) {
+      subdomainCount = Math.max(subdomainCount, Math.min(100, (subdomains.length / 500) * 100));
+    }
+    
+    liveHostCount = Math.min(100, (liveHosts.length / 100) * 100);
+    httpServiceCount = Math.min(100, (httpServices.length / 50) * 100);
 
     // Analyze HTTP services for interesting endpoints
     for (const service of httpServices) {
@@ -831,11 +1023,13 @@ export class ScoresService {
   }
 
   private calculateTier(totalScore: number): string {
-    if (totalScore >= 90) return 'S';
-    if (totalScore >= 80) return 'A';
-    if (totalScore >= 65) return 'B';
-    if (totalScore >= 50) return 'C';
-    if (totalScore >= 35) return 'D';
+    // Adjusted thresholds to account for programs without full reconnaissance data
+    // Programs start with limited data and scores improve as scanning progresses
+    if (totalScore >= 80) return 'S';
+    if (totalScore >= 65) return 'A';
+    if (totalScore >= 50) return 'B';
+    if (totalScore >= 35) return 'C';
+    if (totalScore >= 20) return 'D';
     return 'F';
   }
 
@@ -846,15 +1040,30 @@ export class ScoresService {
     hasTechnologyData: boolean;
     hasBountyData: boolean;
     hasHistoricalData: boolean;
+    // New enriched data fields (Requirements 5.4)
+    hasBountyTableData?: boolean;
+    hasResponseMetricsData?: boolean;
+    hasActivityStatsData?: boolean;
+    hasScopeStatsData?: boolean;
   }): number {
     let confidence = 0;
-    if (dataAvailability.hasVulnerabilityData) confidence += 20;
-    if (dataAvailability.hasSubdomainData) confidence += 20;
-    if (dataAvailability.hasHttpServiceData) confidence += 20;
-    if (dataAvailability.hasTechnologyData) confidence += 15;
-    if (dataAvailability.hasBountyData) confidence += 10;
-    if (dataAvailability.hasHistoricalData) confidence += 15;
-    return confidence;
+    
+    // Base data availability (60% weight)
+    if (dataAvailability.hasVulnerabilityData) confidence += 12;
+    if (dataAvailability.hasSubdomainData) confidence += 12;
+    if (dataAvailability.hasHttpServiceData) confidence += 12;
+    if (dataAvailability.hasTechnologyData) confidence += 12;
+    if (dataAvailability.hasBountyData) confidence += 6;
+    if (dataAvailability.hasHistoricalData) confidence += 6;
+    
+    // Enriched data availability (40% weight) - Requirements 5.4
+    // Higher confidence when more enriched fields are populated
+    if (dataAvailability.hasBountyTableData) confidence += 10;
+    if (dataAvailability.hasResponseMetricsData) confidence += 10;
+    if (dataAvailability.hasActivityStatsData) confidence += 10;
+    if (dataAvailability.hasScopeStatsData) confidence += 10;
+    
+    return Math.min(100, confidence);
   }
 
   private generateInsights(

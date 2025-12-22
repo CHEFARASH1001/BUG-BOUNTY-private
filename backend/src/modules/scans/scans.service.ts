@@ -18,7 +18,7 @@ export class ScansService {
   async create(createScanDto: CreateScanDto, userId?: string): Promise<ScanDocument> {
     const scan = await this.scanModel.create({
       ...createScanDto,
-      targetId: new Types.ObjectId(createScanDto.targetId),
+      targetId: createScanDto.targetId ? new Types.ObjectId(createScanDto.targetId) : undefined,
       initiatedBy: userId ? new Types.ObjectId(userId) : undefined,
       status: ScanStatus.QUEUED,
     });
@@ -26,7 +26,7 @@ export class ScansService {
     // Publish scan job to RabbitMQ based on type
     const jobData = {
         scanId: scan._id.toString(),
-        targetId: createScanDto.targetId,
+        targetId: createScanDto.targetId || undefined,
         target: createScanDto.target,
         type: createScanDto.type,
         config: createScanDto.config,

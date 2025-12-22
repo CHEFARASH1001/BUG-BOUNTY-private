@@ -1,0 +1,148 @@
+# Implementation Plan
+
+- [x] 1. Update Program Schema with enriched data fields
+  - [x] 1.1 Add bountyTable field with severity-based min/max structure
+    - Add nested object type for critical, high, medium, low bounty ranges
+    - Each severity level has optional min and max number fields
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x] 1.2 Add responseMetrics field for response time data
+    - Add averageTimeToFirstResponse, averageTimeToBounty, averageTimeToResolution fields
+    - All fields are optional numbers (days)
+    - _Requirements: 2.1, 2.2, 2.3_
+  - [x] 1.3 Add activityStats field for program activity data
+    - Add resolvedReportCount, totalBountiesPaid, hackersThanked fields
+    - All fields are optional numbers
+    - _Requirements: 3.1, 3.2, 3.3_
+  - [x] 1.4 Add scopeStats field for scope statistics
+    - Add totalAssets, wildcardCount, domainCount, apiCount, mobileAppCount, bountyEligibleCount
+    - All fields are optional numbers
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 1.5 Add launchedAt date field
+    - Optional Date field for program launch date
+    - _Requirements: 3.4_
+
+- [x] 2. Enhance HackerOneService to fetch enriched data
+  - [x] 2.1 Update GraphQL query to include bounty_table data
+    - Add bounty_split_enabled, bounty_table fields to query
+    - Extract min/max for each severity level
+    - _Requirements: 1.1, 1.2_
+  - [x] 2.2 Update GraphQL query to include response metrics
+    - Add average_time_to_first_program_response, average_time_to_bounty_awarded, average_time_to_resolution fields
+    - Convert from seconds to days
+    - _Requirements: 2.1, 2.2, 2.3_
+  - [x] 2.3 Update GraphQL query to include activity statistics
+    - Add resolved_report_count, total_bounties_paid_amount, hackers_thanked_count fields
+    - _Requirements: 3.1, 3.2, 3.3_
+  - [x] 2.4 Update HackerOneProgram interface with new fields
+    - Add bountyTable, responseMetrics, activityStats, launchedAt to interface
+    - Use null for missing data, not zero
+    - _Requirements: 1.4, 2.4_
+  - [x] 2.5 Update transformProgram method to extract new fields
+    - Map API response fields to new interface structure
+    - Handle missing/null values correctly
+    - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3_
+  - [x] 2.6 Write property test for bounty data extraction
+    - **Property 1: Bounty Data Extraction Preserves Values**
+    - **Validates: Requirements 1.1, 1.2**
+  - [x] 2.7 Write property test for null handling
+    - **Property 2: Missing Data Results in Null Not Zero**
+    - **Validates: Requirements 1.4, 2.4, 6.3**
+  - [x] 2.8 Write property test for response metrics extraction
+    - **Property 3: Response Metrics Extraction Accuracy**
+    - **Validates: Requirements 2.1, 2.2, 2.3**
+  - [x] 2.9 Write property test for activity statistics extraction
+    - **Property 4: Activity Statistics Extraction Accuracy**
+    - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+
+- [x] 3. Enhance BugcrowdService to capture available data
+  - [x] 3.1 Update BugcrowdProgram interface with scopeStats
+    - Add scopeStats object with asset counts by type
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 3.2 Update fetchPublicPrograms to extract reward data correctly
+    - Ensure minRewards/maxRewards are null when not available, not zero
+    - _Requirements: 1.3, 1.4_
+  - [x] 3.3 Add scope statistics calculation in transformProgram
+    - Count assets by type (domain, wildcard, API, mobile)
+    - Count bounty-eligible assets
+    - _Requirements: 4.1, 4.2, 4.3_
+
+- [x] 4. Update PlatformSyncService to store enriched data
+  - [x] 4.1 Update upsertProgram to store HackerOne enriched fields
+    - Store bountyTable, responseMetrics, activityStats, launchedAt
+    - Preserve null values for missing data
+    - _Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4_
+  - [x] 4.2 Update upsertBugcrowdProgram to store enriched fields
+    - Store bountyRange with null handling
+    - Store scopeStats calculated from scopes
+    - _Requirements: 1.3, 4.1, 4.2, 4.3_
+  - [x] 4.3 Add calculateScopeStats helper method
+    - Count scopes by type (domain, wildcard, API, mobile app)
+    - Count bounty-eligible scopes
+    - Identify wildcards by pattern matching (*.domain.com)
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 4.4 Write property test for scope statistics calculation
+    - **Property 5: Scope Statistics Calculation Correctness**
+    - **Validates: Requirements 4.1, 4.2, 4.3**
+  - [x] 4.5 Add rate limit handling with exponential backoff
+    - Implement retry logic for 429 responses
+    - Use delays: 1s, 2s, 4s, 8s with max 3 retries
+    - _Requirements: 6.1_
+  - [x] 4.6 Add error isolation for individual program failures
+    - Catch errors per program, log and continue
+    - Track success/failure counts in sync result
+    - _Requirements: 6.2_
+  - [x] 4.7 Write property test for rate limit retry behavior
+    - **Property 11: Rate Limit Retry with Exponential Backoff**
+    - **Validates: Requirements 6.1**
+  - [x] 4.8 Write property test for error isolation
+    - **Property 12: Error Isolation - Sync Continues After Individual Failures**
+    - **Validates: Requirements 6.2**
+
+- [x] 5. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 6. Update ScoresService to use enriched data for differentiated scoring
+  - [x] 6.1 Update calculateProgramQuality to use bountyTable data
+    - Use actual critical bounty max for bountyMax score
+    - Use actual bounty min for bountyMin score
+    - Calculate bountyAverage from actual data
+    - _Requirements: 1.5, 5.1_
+  - [x] 6.2 Update calculateProgramQuality to use responseMetrics
+    - Factor in averageTimeToFirstResponse (faster = higher score)
+    - Factor in averageTimeToBounty
+    - Factor in averageTimeToResolution
+    - _Requirements: 2.5, 5.2_
+  - [x] 6.3 Update calculateHistorical to use activityStats
+    - Use resolvedReportCount for activity assessment
+    - Use totalBountiesPaid for program value assessment
+    - _Requirements: 3.5_
+  - [x] 6.4 Update calculateAttackSurface to use scopeStats
+    - Use totalAssets for attack surface size
+    - Use wildcardCount for opportunity assessment
+    - _Requirements: 4.4_
+  - [x] 6.5 Update calculateProgramQuality to give wildcard bonus
+    - Programs with wildcards get higher scopeSize score
+    - _Requirements: 4.5_
+  - [x] 6.6 Update calculateConfidence to reflect data completeness
+    - Add checks for bountyTable, responseMetrics, activityStats, scopeStats
+    - Higher confidence when more fields are populated
+    - _Requirements: 5.4_
+  - [x] 6.7 Write property test for bounty score differentiation
+    - **Property 6: Bounty Amount Score Differentiation**
+    - **Validates: Requirements 1.5, 5.1**
+  - [x] 6.8 Write property test for response time score differentiation
+    - **Property 7: Response Time Score Differentiation**
+    - **Validates: Requirements 2.5, 5.2**
+  - [x] 6.9 Write property test for attack surface score differentiation
+    - **Property 8: Attack Surface Score Differentiation**
+    - **Validates: Requirements 4.4, 5.3**
+  - [x] 6.10 Write property test for wildcard scope bonus
+    - **Property 9: Wildcard Scope Score Bonus**
+    - **Validates: Requirements 4.5**
+  - [x] 6.11 Write property test for confidence score calculation
+    - **Property 10: Confidence Score Reflects Data Completeness**
+    - **Validates: Requirements 5.4**
+
+- [x] 7. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

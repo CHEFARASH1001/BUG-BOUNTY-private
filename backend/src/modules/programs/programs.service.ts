@@ -28,7 +28,7 @@ export class ProgramsService {
     status?: string;
     platform?: string;
     search?: string;
-  }): Promise<ProgramDocument[]> {
+  }): Promise<any[]> {
     const query: any = {};
 
     if (filters?.status) {
@@ -44,7 +44,42 @@ export class ProgramsService {
       ];
     }
 
-    return this.programModel.find(query).sort({ createdAt: -1 }).exec();
+    // Use aggregation to include scope counts
+    const programs = await this.programModel.aggregate([
+      { $match: query },
+      { $sort: { createdAt: -1 } },
+      {
+        $lookup: {
+          from: 'scopes',
+          localField: '_id',
+          foreignField: 'programId',
+          as: 'scopesList',
+        },
+      },
+      {
+        $addFields: {
+          scopeCount: { $size: '$scopesList' },
+          scopes: {
+            $map: {
+              input: { $slice: ['$scopesList', 10] }, // Limit to first 10 for preview
+              as: 'scope',
+              in: {
+                assetIdentifier: '$$scope.target',
+                assetType: '$$scope.type',
+                status: '$$scope.status',
+              },
+            },
+          },
+        },
+      },
+      {
+        $project: {
+          scopesList: 0, // Remove the full list to reduce payload
+        },
+      },
+    ]).exec();
+
+    return programs;
   }
 
   async findById(id: string): Promise<ProgramDocument> {

@@ -13,6 +13,7 @@ export class QueueConstants {
   static readonly QUEUE_HTTP = 'watchtower.http';
   static readonly QUEUE_NUCLEI = 'watchtower.nuclei';
   static readonly QUEUE_NOTIFY = 'watchtower.notify';
+  static readonly QUEUE_SUBFINDER = 'watchtower.subfinder';
   static readonly QUEUE_DLQ = 'watchtower.dlq';
 
   // Routing keys
@@ -26,6 +27,7 @@ export class QueueConstants {
   static readonly ROUTING_DNS = 'dns.resolve';
   static readonly ROUTING_HTTP = 'http.probe';
   static readonly ROUTING_NUCLEI = 'nuclei.scan';
+  static readonly ROUTING_SUBFINDER = 'subfinder.scan';
   static readonly ROUTING_NOTIFY = 'notify';
   static readonly ROUTING_DLQ = 'dlq';
 }

@@ -17,9 +17,37 @@ export interface SyncResult {
   newScopes: number;
   errors: string[];
   duration: number;
+  successCount?: number;
+  failureCount?: number;
 }
 
 export type LogFn = (message: string) => Promise<void>;
+
+/**
+ * Rate limit error class for identifying 429 responses
+ */
+export class RateLimitError extends Error {
+  constructor(message: string, public readonly retryAfter?: number) {
+    super(message);
+    this.name = 'RateLimitError';
+  }
+}
+
+/**
+ * Configuration for exponential backoff retry
+ * Requirements: 6.1 - Implement retry logic for 429 responses
+ */
+export interface RetryConfig {
+  maxRetries: number;
+  baseDelayMs: number;
+  maxDelayMs: number;
+}
+
+const DEFAULT_RETRY_CONFIG: RetryConfig = {
+  maxRetries: 3,
+  baseDelayMs: 1000,  // 1s, 2s, 4s, 8s
+  maxDelayMs: 8000,
+};
 
 @Injectable()
 export class PlatformSyncService {
@@ -34,6 +62,79 @@ export class PlatformSyncService {
     private queueService: QueueService,
     private notificationsService: NotificationsService,
   ) {}
+
+  /**
+   * Sleep utility for delays
+   * @param ms Milliseconds to sleep
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Calculate exponential backoff delay
+   * Requirements: 6.1 - Use delays: 1s, 2s, 4s, 8s with max 3 retries
+   * 
+   * @param attempt Current attempt number (0-indexed)
+   * @param config Retry configuration
+   * @returns Delay in milliseconds
+   */
+  calculateBackoffDelay(attempt: number, config: RetryConfig = DEFAULT_RETRY_CONFIG): number {
+    // Exponential backoff: baseDelay * 2^attempt
+    const delay = config.baseDelayMs * Math.pow(2, attempt);
+    return Math.min(delay, config.maxDelayMs);
+  }
+
+  /**
+   * Execute an async operation with exponential backoff retry on rate limit errors
+   * Requirements: 6.1 - Implement retry logic for 429 responses
+   * 
+   * @param operation The async operation to execute
+   * @param operationName Name for logging purposes
+   * @param config Retry configuration
+   * @returns Result of the operation
+   */
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    config: RetryConfig = DEFAULT_RETRY_CONFIG,
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 0; attempt <= config.maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error: any) {
+        lastError = error;
+
+        // Check if this is a rate limit error (429)
+        const isRateLimitError = 
+          error instanceof RateLimitError ||
+          error.response?.status === 429 ||
+          error.status === 429 ||
+          error.message?.includes('429') ||
+          error.message?.toLowerCase().includes('rate limit');
+
+        if (!isRateLimitError) {
+          // Not a rate limit error, don't retry
+          throw error;
+        }
+
+        if (attempt < config.maxRetries) {
+          const delay = this.calculateBackoffDelay(attempt, config);
+          this.logger.warn(
+            `Rate limit hit for ${operationName}, attempt ${attempt + 1}/${config.maxRetries + 1}. ` +
+            `Retrying in ${delay}ms...`
+          );
+          await this.sleep(delay);
+        }
+      }
+    }
+
+    // All retries exhausted
+    this.logger.error(`All ${config.maxRetries + 1} attempts failed for ${operationName}`);
+    throw lastError;
+  }
 
   // Run every 6 hours
   @Cron(CronExpression.EVERY_6_HOURS)
@@ -83,13 +184,21 @@ export class PlatformSyncService {
       newScopes: 0,
       errors: [],
       duration: 0,
+      successCount: 0,
+      failureCount: 0,
     };
 
     try {
       await logMsg('Fetching HackerOne public programs...');
-      const programs = await this.hackerOneService.getPublicPrograms();
+      
+      // Use retry with exponential backoff for fetching programs (Requirement 6.1)
+      const programs = await this.withRetry(
+        () => this.hackerOneService.getPublicPrograms(),
+        'HackerOne getPublicPrograms',
+      );
       await logMsg(`Found ${programs.length} HackerOne programs`);
 
+      // Process each program with error isolation (Requirement 6.2)
       for (const program of programs) {
         try {
           const { isNew, programId } = await this.upsertProgram(program, 'hackerone');
@@ -108,9 +217,15 @@ export class PlatformSyncService {
             await logMsg(`  - ${scopeCount} new scopes for ${program.handle}`);
           }
           result.newScopes += scopeCount;
+          
+          // Track success (Requirement 6.2)
+          result.successCount!++;
         } catch (error: any) {
+          // Error isolation: catch errors per program, log and continue (Requirement 6.2)
           result.errors.push(`${program.handle}: ${error.message}`);
+          result.failureCount!++;
           await logMsg(`ERROR: ${program.handle}: ${error.message}`);
+          // Continue with remaining programs - don't rethrow
         }
       }
     } catch (error: any) {
@@ -119,7 +234,14 @@ export class PlatformSyncService {
     }
 
     result.duration = Date.now() - startTime;
-    await logMsg(`HackerOne sync completed in ${result.duration}ms`);
+    
+    // Log sync summary (Requirement 6.4)
+    await logMsg(
+      `HackerOne sync completed in ${result.duration}ms - ` +
+      `Success: ${result.successCount}, Failures: ${result.failureCount}, ` +
+      `New: ${result.newPrograms}, Updated: ${result.updatedPrograms}, Scopes: ${result.newScopes}`
+    );
+    
     return result;
   }
 
@@ -133,13 +255,21 @@ export class PlatformSyncService {
       newScopes: 0,
       errors: [],
       duration: 0,
+      successCount: 0,
+      failureCount: 0,
     };
 
     try {
       await logMsg('Fetching Bugcrowd public programs...');
-      const programs = await this.bugcrowdService.fetchPublicPrograms();
+      
+      // Use retry with exponential backoff for fetching programs (Requirement 6.1)
+      const programs = await this.withRetry(
+        () => this.bugcrowdService.fetchPublicPrograms(),
+        'Bugcrowd fetchPublicPrograms',
+      );
       await logMsg(`Found ${programs.length} Bugcrowd programs`);
 
+      // Process each program with error isolation (Requirement 6.2)
       for (const program of programs) {
         try {
           const { isNew, programId } = await this.upsertBugcrowdProgram(program);
@@ -158,9 +288,15 @@ export class PlatformSyncService {
             await logMsg(`  - ${scopeCount} new scopes for ${program.code}`);
           }
           result.newScopes += scopeCount;
+          
+          // Track success (Requirement 6.2)
+          result.successCount!++;
         } catch (error: any) {
+          // Error isolation: catch errors per program, log and continue (Requirement 6.2)
           result.errors.push(`${program.code}: ${error.message}`);
+          result.failureCount!++;
           await logMsg(`ERROR: ${program.code}: ${error.message}`);
+          // Continue with remaining programs - don't rethrow
         }
       }
     } catch (error: any) {
@@ -169,7 +305,14 @@ export class PlatformSyncService {
     }
 
     result.duration = Date.now() - startTime;
-    await logMsg(`Bugcrowd sync completed in ${result.duration}ms`);
+    
+    // Log sync summary (Requirement 6.4)
+    await logMsg(
+      `Bugcrowd sync completed in ${result.duration}ms - ` +
+      `Success: ${result.successCount}, Failures: ${result.failureCount}, ` +
+      `New: ${result.newPrograms}, Updated: ${result.updatedPrograms}, Scopes: ${result.newScopes}`
+    );
+    
     return result;
   }
 
@@ -182,16 +325,40 @@ export class PlatformSyncService {
       handle: h1Program.handle,
     });
 
+    // Build enriched data object, preserving null values for missing data
+    // Requirements: 1.1, 1.2, 2.1, 2.2, 2.3, 3.1, 3.2, 3.3, 3.4
+    const enrichedData: Record<string, any> = {
+      name: h1Program.name,
+      url: h1Program.url,
+      state: h1Program.state,
+      offersBounties: h1Program.offersBounties,
+      lastSyncedAt: new Date(),
+    };
+
+    // Store bountyTable - preserve null for missing data (Requirement 1.4)
+    if (h1Program.bountyTable !== undefined) {
+      enrichedData.bountyTable = h1Program.bountyTable;
+    }
+
+    // Store responseMetrics - preserve null for missing data (Requirement 2.4)
+    if (h1Program.responseMetrics !== undefined) {
+      enrichedData.responseMetrics = h1Program.responseMetrics;
+    }
+
+    // Store activityStats - preserve null for missing data
+    if (h1Program.activityStats !== undefined) {
+      enrichedData.activityStats = h1Program.activityStats;
+    }
+
+    // Store launchedAt - convert string to Date if present (Requirement 3.4)
+    if (h1Program.launchedAt !== undefined) {
+      enrichedData.launchedAt = h1Program.launchedAt ? new Date(h1Program.launchedAt) : null;
+    }
+
     if (existing) {
       await this.programModel.updateOne(
         { _id: existing._id },
-        {
-          name: h1Program.name,
-          url: h1Program.url,
-          state: h1Program.state,
-          offersBounties: h1Program.offersBounties,
-          lastSyncedAt: new Date(),
-        },
+        { $set: enrichedData },
       );
       return { isNew: false, programId: existing._id };
     }
@@ -199,15 +366,11 @@ export class PlatformSyncService {
     const program = await this.programModel.create({
       platform,
       handle: h1Program.handle,
-      name: h1Program.name,
-      url: h1Program.url,
-      state: h1Program.state,
-      offersBounties: h1Program.offersBounties,
+      ...enrichedData,
       isActive: true,
       scope: [],
       outOfScope: [],
       firstSyncedAt: new Date(),
-      lastSyncedAt: new Date(),
     });
 
     return { isNew: true, programId: program._id };
@@ -221,19 +384,31 @@ export class PlatformSyncService {
       handle: bcProgram.code,
     });
 
+    // Build enriched data object, preserving null values for missing data
+    // Requirements: 1.3, 4.1, 4.2, 4.3
+    const enrichedData: Record<string, any> = {
+      name: bcProgram.name,
+      url: bcProgram.programUrl,
+      state: bcProgram.status,
+      lastSyncedAt: new Date(),
+    };
+
+    // Store bountyRange with null handling (Requirement 1.3)
+    // Only set bountyRange if we have actual data
+    enrichedData.bountyRange = {
+      min: bcProgram.minRewards,
+      max: bcProgram.maxRewards,
+    };
+
+    // Store scopeStats calculated from scopes (Requirements: 4.1, 4.2, 4.3)
+    if (bcProgram.scopeStats) {
+      enrichedData.scopeStats = bcProgram.scopeStats;
+    }
+
     if (existing) {
       await this.programModel.updateOne(
         { _id: existing._id },
-        {
-          name: bcProgram.name,
-          url: bcProgram.programUrl,
-          state: bcProgram.status,
-          bountyRange: {
-            min: bcProgram.minRewards,
-            max: bcProgram.maxRewards,
-          },
-          lastSyncedAt: new Date(),
-        },
+        { $set: enrichedData },
       );
       return { isNew: false, programId: existing._id };
     }
@@ -241,19 +416,12 @@ export class PlatformSyncService {
     const program = await this.programModel.create({
       platform: 'bugcrowd',
       handle: bcProgram.code,
-      name: bcProgram.name,
-      url: bcProgram.programUrl,
-      state: bcProgram.status,
-      offersBounties: bcProgram.maxRewards > 0,
-      bountyRange: {
-        min: bcProgram.minRewards,
-        max: bcProgram.maxRewards,
-      },
+      ...enrichedData,
+      offersBounties: bcProgram.maxRewards != null && bcProgram.maxRewards > 0,
       isActive: true,
       scope: [],
       outOfScope: [],
       firstSyncedAt: new Date(),
-      lastSyncedAt: new Date(),
     });
 
     return { isNew: true, programId: program._id };
@@ -419,6 +587,83 @@ export class PlatformSyncService {
       other: ScopeType.OTHER,
     };
     return mapping[targetType] || ScopeType.OTHER;
+  }
+
+  /**
+   * Calculate scope statistics from an array of scopes
+   * Requirements: 4.1, 4.2, 4.3
+   * 
+   * Counts scopes by type (domain, wildcard, API, mobile app)
+   * Counts bounty-eligible scopes
+   * Identifies wildcards by pattern matching (*.domain.com)
+   * 
+   * @param scopes Array of scope documents
+   * @returns ScopeStats object with counts by type
+   */
+  calculateScopeStats(scopes: ScopeDocument[]): {
+    totalAssets: number;
+    wildcardCount: number;
+    domainCount: number;
+    apiCount: number;
+    mobileAppCount: number;
+    bountyEligibleCount: number;
+  } {
+    // Filter to only in-scope assets
+    const inScopeAssets = scopes.filter(scope => scope.status === ScopeStatus.IN_SCOPE);
+    
+    let wildcardCount = 0;
+    let domainCount = 0;
+    let apiCount = 0;
+    let mobileAppCount = 0;
+    let bountyEligibleCount = 0;
+
+    for (const scope of inScopeAssets) {
+      const target = scope.target || '';
+      const scopeType = scope.type;
+
+      // Check for wildcard pattern (*.domain.com) - Requirements: 4.2
+      // A scope is a wildcard if:
+      // 1. Its type is explicitly WILDCARD, OR
+      // 2. Its target starts with '*.' or contains '*'
+      const isWildcard = 
+        scopeType === ScopeType.WILDCARD ||
+        target.startsWith('*.') ||
+        target.includes('*');
+
+      if (isWildcard) {
+        wildcardCount++;
+      }
+
+      // Count by type - Requirements: 4.1
+      switch (scopeType) {
+        case ScopeType.API:
+          apiCount++;
+          break;
+        case ScopeType.MOBILE_APP:
+          mobileAppCount++;
+          break;
+        case ScopeType.DOMAIN:
+        case ScopeType.URL:
+        case ScopeType.WILDCARD:
+          domainCount++;
+          break;
+        // IP, IP_RANGE, OTHER are counted in totalAssets but not in specific categories
+      }
+
+      // Count bounty-eligible scopes - Requirements: 4.3
+      if (scope.eligibility?.isEligible === true) {
+        bountyEligibleCount++;
+      }
+    }
+
+    return {
+      totalAssets: inScopeAssets.length,
+      wildcardCount,
+      domainCount,
+      apiCount,
+      mobileAppCount,
+      bountyEligibleCount,
+    };
   }
 
   private async notifyNewProgram(name: string, platform: string): Promise<void> {

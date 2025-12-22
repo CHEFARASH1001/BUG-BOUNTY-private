@@ -41,6 +41,13 @@ export interface NotifyJobData {
   channels?: string[];
 }
 
+export interface SubfinderJobData {
+  domain: string;
+  domainId: string;
+  jobId?: string;
+  batchId?: string;
+}
+
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
@@ -183,6 +190,43 @@ export class QueueService {
       this.logger.error(`Failed to publish notification: ${error.message}`);
       throw error;
     }
+  }
+
+  async publishSubfinderJob(data: SubfinderJobData): Promise<void> {
+    try {
+      await this.amqpConnection.publish(
+        QueueConstants.EXCHANGE_DIRECT,
+        QueueConstants.ROUTING_SUBFINDER,
+        data,
+        {
+          persistent: true,
+          contentType: 'application/json',
+          timestamp: Date.now(),
+        },
+      );
+      this.logger.log(`Published subfinder job for domain: ${data.domain}`);
+    } catch (error) {
+      this.logger.error(`Failed to publish subfinder job: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async publishSubfinderBatch(domains: { domain: string; domainId: string }[], batchId: string): Promise<number> {
+    let published = 0;
+    for (const d of domains) {
+      try {
+        await this.publishSubfinderJob({
+          domain: d.domain,
+          domainId: d.domainId,
+          batchId,
+        });
+        published++;
+      } catch (error) {
+        this.logger.error(`Failed to publish subfinder job for ${d.domain}: ${error.message}`);
+      }
+    }
+    this.logger.log(`Published ${published}/${domains.length} subfinder jobs for batch ${batchId}`);
+    return published;
   }
 }
 

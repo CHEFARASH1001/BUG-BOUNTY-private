@@ -6,6 +6,16 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
+# Install tools
+RUN apk add --no-cache curl bind-tools unzip
+
+# Install subfinder binary
+RUN curl -sL https://github.com/projectdiscovery/subfinder/releases/download/v2.6.7/subfinder_2.6.7_linux_amd64.zip -o /tmp/subfinder.zip && \
+    unzip /tmp/subfinder.zip -d /tmp && \
+    mv /tmp/subfinder /usr/local/bin/ && \
+    chmod +x /usr/local/bin/subfinder && \
+    rm -rf /tmp/*
+
 # Install dependencies
 COPY package*.json ./
 RUN npm install

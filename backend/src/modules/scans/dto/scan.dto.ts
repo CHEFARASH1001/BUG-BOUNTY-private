@@ -7,9 +7,10 @@ export class CreateScanDto {
   @IsEnum(ScanType)
   type: ScanType;
 
-  @ApiProperty({ example: '507f1f77bcf86cd799439011' })
+  @ApiPropertyOptional({ example: '507f1f77bcf86cd799439011' })
   @IsMongoId()
-  targetId: string;
+  @IsOptional()
+  targetId?: string;
 
   @ApiProperty({ enum: ['domain', 'subdomain', 'program'] })
   @IsEnum(['domain', 'subdomain', 'program'])

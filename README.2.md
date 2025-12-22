@@ -304,10 +304,29 @@ nuclei_all:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/docs` | GET | List all documentation |
+| `/api/docs` | GET | List all documentation with filters |
 | `/api/docs` | POST | Create documentation |
-| `/api/docs/:id` | PUT | Update documentation |
+| `/api/docs/search` | GET | Full-text search (query param: `q`) |
+| `/api/docs/stats` | GET | Get aggregate statistics |
 | `/api/docs/coverage/:target` | GET | Get coverage for target |
+| `/api/docs/:id` | GET | Get documentation by ID |
+| `/api/docs/:id` | PUT | Update documentation |
+| `/api/docs/:id` | DELETE | Delete documentation |
+| `/api/docs/:id/pin` | POST | Pin documentation |
+| `/api/docs/:id/pin` | DELETE | Unpin documentation |
+| `/api/docs/:id/related/:relatedId` | POST | Add related document |
+| `/api/docs/:id/related/:relatedId` | DELETE | Remove related document |
+
+**Query Parameters for `/api/docs`:**
+- `type` - Filter by type (note, technique, writeup, reference, checklist)
+- `tag` - Filter by tag
+- `category` - Filter by category
+- `target` - Filter by target
+- `technology` - Filter by technology
+- `isPinned` - Filter by pinned status
+- `limit` - Pagination limit
+- `offset` - Pagination offset
+- `sort` - Sort field
 
 ---
 
@@ -635,37 +654,246 @@ The dashboard provides:
 
 ## 📖 Documentation System
 
+The Documentation System is a fully implemented feature that enables bug bounty hunters to store personal learning notes, build a technique library, and map which documentation covers which targets.
+
 ### Features
 
-1. **Learning Notes** - Store personal notes and findings
-2. **Technique Library** - Catalog of attack techniques
-3. **Coverage Checker** - Map which documentation covers which targets
+| Feature | Description | Status |
+|---------|-------------|--------|
+| **Learning Notes** | Store personal notes and findings with rich metadata | ✅ Implemented |
+| **Technique Library** | Catalog attack techniques by type, tags, and categories | ✅ Implemented |
+| **Coverage Checker** | Map which documentation covers which targets with relevance scores | ✅ Implemented |
+| **Full-Text Search** | Search across title, content, and tags | ✅ Implemented |
+| **Pinning** | Pin important docs for quick access | ✅ Implemented |
+| **Related Docs** | Link related documentation together | ✅ Implemented |
+| **View Tracking** | Track view counts and last accessed timestamps | ✅ Implemented |
 
-### Coverage Mapping
+### Document Types
 
-```javascript
-// Check which docs cover a target
-GET /api/docs/coverage/target.com
+The system supports five document types:
 
-// Response
+| Type | Use Case |
+|------|----------|
+| `note` | Personal learning notes and observations |
+| `technique` | Attack techniques and methodologies |
+| `writeup` | Bug bounty writeups and case studies |
+| `reference` | Reference materials and cheat sheets |
+| `checklist` | Testing checklists and procedures |
+
+### API Endpoints
+
+#### CRUD Operations
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/docs` | GET | List all documentation with filters | No |
+| `/api/docs` | POST | Create new documentation | Yes |
+| `/api/docs/:id` | GET | Get documentation by ID (increments view count) | No |
+| `/api/docs/:id` | PUT | Update documentation | Yes |
+| `/api/docs/:id` | DELETE | Delete documentation | Yes |
+
+#### Search & Discovery
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/docs/search?q=<query>` | GET | Full-text search across title, content, tags | No |
+| `/api/docs/coverage/:target` | GET | Get coverage for a specific target | No |
+| `/api/docs/stats` | GET | Get aggregate statistics | No |
+
+#### Pin Operations
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/docs/:id/pin` | POST | Pin a document | Yes |
+| `/api/docs/:id/pin` | DELETE | Unpin a document | Yes |
+
+#### Related Documents
+
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/docs/:id/related/:relatedId` | POST | Add related document | Yes |
+| `/api/docs/:id/related/:relatedId` | DELETE | Remove related document | Yes |
+
+### Query Parameters
+
+The list endpoint (`GET /api/docs`) supports the following filters:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `type` | string | Filter by document type (note, technique, writeup, reference, checklist) |
+| `tag` | string | Filter by tag |
+| `category` | string | Filter by category |
+| `target` | string | Filter by target |
+| `technology` | string | Filter by technology |
+| `isPinned` | boolean | Filter by pinned status |
+| `limit` | number | Maximum number of results (pagination) |
+| `offset` | number | Number of results to skip (pagination) |
+| `sort` | string | Sort field and direction |
+
+### Usage Examples
+
+#### Create a Technique Document
+
+```bash
+curl -X POST http://localhost:3000/api/docs \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{
+    "title": "SQL Injection Techniques",
+    "content": "# SQL Injection\n\n## Union-based SQLi\n...",
+    "type": "technique",
+    "tags": ["sqli", "injection", "database"],
+    "categories": ["web-security"],
+    "targets": ["example.com", "api.example.com"],
+    "technologies": ["MySQL", "PostgreSQL"],
+    "vulnerabilityTypes": ["SQL Injection"]
+  }'
+```
+
+#### Search Documentation
+
+```bash
+# Full-text search
+curl "http://localhost:3000/api/docs/search?q=sql+injection"
+
+# Search with filters
+curl "http://localhost:3000/api/docs/search?q=authentication&type=technique&limit=10"
+```
+
+#### Filter by Technology
+
+```bash
+# Get all docs related to a specific technology
+curl "http://localhost:3000/api/docs?technology=React"
+```
+
+#### Get Coverage for a Target
+
+```bash
+curl http://localhost:3000/api/docs/coverage/target.com
+```
+
+**Response:**
+```json
 {
   "target": "target.com",
   "coverage": [
     {
-      "doc_id": "doc_123",
+      "docId": "507f1f77bcf86cd799439011",
       "title": "SQL Injection Techniques",
-      "relevance": 0.85,
-      "sections": ["Authentication Bypass", "Union-based SQLi"]
+      "type": "technique",
+      "relevanceScore": 1.0,
+      "sections": ["Authentication Bypass", "Union-based SQLi"],
+      "tags": ["sqli", "injection"]
     },
     {
-      "doc_id": "doc_456",
+      "docId": "507f1f77bcf86cd799439012",
       "title": "API Security Testing",
-      "relevance": 0.72,
-      "sections": ["REST API Testing", "JWT Vulnerabilities"]
+      "type": "checklist",
+      "relevanceScore": 0.5,
+      "sections": ["REST API Testing", "JWT Vulnerabilities"],
+      "tags": ["api", "jwt"]
     }
   ]
 }
 ```
+
+#### Pin Important Documents
+
+```bash
+# Pin a document
+curl -X POST http://localhost:3000/api/docs/507f1f77bcf86cd799439011/pin \
+  -H "Authorization: Bearer <token>"
+
+# Unpin a document
+curl -X DELETE http://localhost:3000/api/docs/507f1f77bcf86cd799439011/pin \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Link Related Documents
+
+```bash
+# Add related document
+curl -X POST http://localhost:3000/api/docs/doc1_id/related/doc2_id \
+  -H "Authorization: Bearer <token>"
+
+# Remove related document
+curl -X DELETE http://localhost:3000/api/docs/doc1_id/related/doc2_id \
+  -H "Authorization: Bearer <token>"
+```
+
+#### Get Statistics
+
+```bash
+curl http://localhost:3000/api/docs/stats
+```
+
+**Response:**
+```json
+{
+  "total": 150,
+  "byType": {
+    "note": 45,
+    "technique": 38,
+    "writeup": 25,
+    "reference": 30,
+    "checklist": 12
+  },
+  "byTag": {
+    "sqli": 15,
+    "xss": 22,
+    "ssrf": 8
+  },
+  "pinnedCount": 5
+}
+```
+
+### Data Model
+
+```javascript
+// documentation collection
+{
+  _id: ObjectId,
+  title: String,              // Required - document title
+  content: String,            // Required - document content (supports markdown)
+  type: String,               // note | technique | writeup | reference | checklist
+  tags: [String],             // Searchable tags
+  categories: [String],       // Category groupings
+  targets: [String],          // Target names this doc covers
+  technologies: [String],     // Related technologies
+  vulnerabilityTypes: [String], // Vulnerability types covered
+  coverage: [{                // Detailed coverage mapping
+    targetId: ObjectId,
+    targetType: String,
+    targetName: String,
+    relevanceScore: Number,   // 0-1 relevance score
+    sections: [String]
+  }],
+  createdBy: ObjectId,        // User who created the doc
+  updatedBy: ObjectId,        // User who last updated
+  isPublic: Boolean,          // Public visibility flag
+  isPinned: Boolean,          // Pinned for quick access
+  viewCount: Number,          // Number of views
+  relatedDocs: [ObjectId],    // Related documentation IDs
+  lastAccessedAt: Date,       // Last view timestamp
+  createdAt: Date,            // Auto-generated
+  updatedAt: Date             // Auto-generated
+}
+```
+
+### Sorting Behavior
+
+- **Default sort**: Pinned documents appear first, then sorted by creation date (newest first)
+- **View tracking**: Each GET request to `/api/docs/:id` increments the view count and updates `lastAccessedAt`
+- **Related docs cleanup**: When a document is deleted, its ID is automatically removed from all other documents' `relatedDocs` arrays
+
+### Indexes
+
+The following indexes are created for optimal query performance:
+
+- Full-text index on `title`, `content`, `tags`
+- Single-field indexes on `type`, `tags`, `categories`, `targets`, `technologies`, `createdBy`
+- Compound index on `isPinned` (desc) + `createdAt` (desc) for default sorting
 
 ---
 
@@ -841,12 +1069,30 @@ done && rm -rf *.zip
 // documentation
 {
   _id: ObjectId,
-  title: String,
-  content: String,
+  title: String,              // Required
+  content: String,            // Required
+  type: String,               // note | technique | writeup | reference | checklist
   tags: [String],
-  targets: [String],
-  created_at: Date,
-  updated_at: Date
+  categories: [String],
+  targets: [String],          // Target names this doc covers
+  technologies: [String],     // Related technologies
+  vulnerabilityTypes: [String], // Vulnerability types covered
+  coverage: [{                // Detailed coverage mapping
+    targetId: ObjectId,
+    targetType: String,
+    targetName: String,
+    relevanceScore: Number,
+    sections: [String]
+  }],
+  createdBy: ObjectId,
+  updatedBy: ObjectId,
+  isPublic: Boolean,
+  isPinned: Boolean,
+  viewCount: Number,
+  relatedDocs: [ObjectId],    // Related documentation IDs
+  lastAccessedAt: Date,
+  createdAt: Date,
+  updatedAt: Date
 }
 ```
 

@@ -77,6 +77,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             },
           },
           {
+            name: 'watchtower.subfinder',
+            options: {
+              durable: true,
+              arguments: {
+                'x-dead-letter-exchange': 'watchtower.dlx',
+                'x-dead-letter-routing-key': 'dlq',
+              },
+            },
+          },
+          {
             name: 'watchtower.dlq',
             options: {
               durable: true,
@@ -85,6 +95,8 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         ],
         connectionInitOptions: { wait: true, timeout: 30000 },
         enableControllerDiscovery: true,
+        // Allow 10 concurrent messages per consumer
+        prefetchCount: 10,
       }),
       inject: [ConfigService],
     }),

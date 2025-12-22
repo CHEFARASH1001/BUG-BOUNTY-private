@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { scoresApi } from '@/lib/api';
+import { scoresApi, platformsApi } from '@/lib/api';
 
 interface ScoreBreakdown {
   exploitability?: {
@@ -198,11 +198,13 @@ function ScoreCard({ score, rank }: { score: Score; rank: number }) {
           </div>
 
           {/* Score Rings */}
-          <div className="hidden md:flex items-center gap-3">
+          <div className="hidden md:flex items-center gap-2">
             <ScoreRing value={score.exploitabilityScore} label="EXP" color="#f59e0b" />
             <ScoreRing value={score.historicalScore} label="HIS" color="#10b981" />
-            <ScoreRing value={score.attackSurfaceScore} label="ATK" color="#3b82f6" />
-            <ScoreRing value={score.pentestScore} label="PEN" color="#8b5cf6" />
+            <ScoreRing value={score.programQualityScore} label="PRG" color="#3b82f6" />
+            <ScoreRing value={score.competitionScore} label="CMP" color="#a855f7" />
+            <ScoreRing value={score.attackSurfaceScore} label="ATK" color="#06b6d4" />
+            <ScoreRing value={score.pentestScore} label="PEN" color="#ef4444" />
           </div>
 
           {/* Expand Icon */}
@@ -343,6 +345,7 @@ export default function ScoresPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [calculating, setCalculating] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [sortBy, setSortBy] = useState('totalScore');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
 
@@ -354,7 +357,7 @@ export default function ScoresPage() {
     try {
       setLoading(true);
       const [scoresRes, statsRes] = await Promise.all([
-        scoresApi.getTopPrograms({ limit: 50, sortBy: sortBy as any }),
+        scoresApi.getTopPrograms({ limit: 500, sortBy: sortBy as any }),
         scoresApi.getStats(),
       ]);
       setScores(scoresRes.data || []);
@@ -378,6 +381,20 @@ export default function ScoresPage() {
     }
   };
 
+  const handleSyncPlatforms = async () => {
+    try {
+      setSyncing(true);
+      await platformsApi.syncAll();
+      // After sync, recalculate scores to use the new enriched data
+      await scoresApi.calculateAll();
+      await fetchData();
+    } catch (error) {
+      console.error('Failed to sync platforms:', error);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const filteredScores = selectedTier
     ? scores.filter(s => s.tier === selectedTier)
     : scores;
@@ -396,28 +413,52 @@ export default function ScoresPage() {
               AI-powered program scoring based on exploitability, history, and attack surface
             </p>
           </div>
-          <button
-            onClick={handleCalculateAll}
-            disabled={calculating}
-            className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            {calculating ? (
-              <>
-                <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                </svg>
-                Calculating...
-              </>
-            ) : (
-              <>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Recalculate All
-              </>
-            )}
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleSyncPlatforms}
+              disabled={syncing || calculating}
+              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {syncing ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Syncing...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                  </svg>
+                  Sync Platforms
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleCalculateAll}
+              disabled={calculating || syncing}
+              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {calculating ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                  Calculating...
+                </>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Recalculate All
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Stats Cards */}
@@ -542,5 +583,6 @@ export default function ScoresPage() {
     </div>
   );
 }
+
 
 

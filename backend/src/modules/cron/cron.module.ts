@@ -12,6 +12,9 @@ import { ScoresModule } from '../scores/scores.module';
 import { DomainsModule } from '../domains/domains.module';
 import { SubdomainsModule } from '../subdomains/subdomains.module';
 import { ReconModule } from '../recon/recon.module';
+import { CliModule } from '../cli/cli.module';
+import { ExternalApisModule } from '../external-apis/external-apis.module';
+import { AlertModule } from '../alerts/alert.module';
 
 @Module({
   imports: [
@@ -27,10 +30,12 @@ import { ReconModule } from '../recon/recon.module';
     forwardRef(() => DomainsModule),
     forwardRef(() => SubdomainsModule),
     forwardRef(() => ReconModule),
+    forwardRef(() => CliModule),
+    forwardRef(() => ExternalApisModule),
+    forwardRef(() => AlertModule),
   ],
   controllers: [CronController],
   providers: [CronService],
   exports: [CronService],
 })
 export class CronModule {}
-

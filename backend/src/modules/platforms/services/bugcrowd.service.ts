@@ -2,6 +2,15 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
+export interface ScopeStats {
+  totalAssets: number;
+  wildcardCount: number;
+  domainCount: number;
+  apiCount: number;
+  mobileAppCount: number;
+  bountyEligibleCount: number;
+}
+
 export interface BugcrowdProgram {
   id: string;
   code: string;
@@ -10,9 +19,10 @@ export interface BugcrowdProgram {
   programUrl: string;
   status: string;
   managed: boolean;
-  minRewards: number;
-  maxRewards: number;
+  minRewards: number | null;
+  maxRewards: number | null;
   scopes: BugcrowdScope[];
+  scopeStats: ScopeStats;
   createdAt: string;
   updatedAt: string;
 }
@@ -143,6 +153,13 @@ export class BugcrowdService {
 
       if (response.data.programs) {
         for (const item of response.data.programs) {
+          // Use null for missing reward data instead of defaulting to zero
+          const minRewards = item.min_rewards != null ? item.min_rewards : null;
+          const maxRewards = item.max_rewards != null ? item.max_rewards : null;
+          
+          // Calculate scope stats (empty for public programs without scope data)
+          const scopeStats = this.calculateScopeStats([]);
+          
           programs.push({
             id: item.uuid || item.code,
             code: item.code,
@@ -151,9 +168,10 @@ export class BugcrowdService {
             programUrl: `https://bugcrowd.com/${item.code}`,
             status: item.status || 'open',
             managed: item.managed || false,
-            minRewards: item.min_rewards || 0,
-            maxRewards: item.max_rewards || 0,
+            minRewards,
+            maxRewards,
             scopes: [],
+            scopeStats,
             createdAt: item.starts_at,
             updatedAt: item.ends_at || item.starts_at,
           });
@@ -181,6 +199,13 @@ export class BugcrowdService {
       }
     }
 
+    // Use null for missing reward data instead of defaulting to zero
+    const minRewards = data.min_rewards != null ? data.min_rewards : null;
+    const maxRewards = data.max_rewards != null ? data.max_rewards : null;
+
+    // Calculate scope statistics
+    const scopeStats = this.calculateScopeStats(scopes);
+
     return {
       id: data.uuid || data.code,
       code: data.code,
@@ -189,11 +214,70 @@ export class BugcrowdService {
       programUrl: `https://bugcrowd.com/${data.code}`,
       status: data.status || 'open',
       managed: data.managed || false,
-      minRewards: data.min_rewards || 0,
-      maxRewards: data.max_rewards || 0,
+      minRewards,
+      maxRewards,
       scopes,
+      scopeStats,
       createdAt: data.starts_at,
       updatedAt: data.ends_at || data.starts_at,
+    };
+  }
+
+  /**
+   * Calculate scope statistics from an array of scopes
+   * Counts assets by type (domain, wildcard, API, mobile) and bounty-eligible assets
+   */
+  calculateScopeStats(scopes: BugcrowdScope[]): ScopeStats {
+    const inScopeAssets = scopes.filter(scope => scope.inScope);
+    
+    let wildcardCount = 0;
+    let domainCount = 0;
+    let apiCount = 0;
+    let mobileAppCount = 0;
+
+    for (const scope of inScopeAssets) {
+      const targetType = scope.targetType?.toLowerCase() || '';
+      const category = scope.category?.toLowerCase() || '';
+      const uri = scope.uri || '';
+
+      // Check for wildcard (*.domain.com pattern)
+      if (uri.startsWith('*.') || uri.includes('*')) {
+        wildcardCount++;
+      }
+
+      // Count by target type
+      if (targetType === 'api' || category === 'api') {
+        apiCount++;
+      } else if (
+        targetType === 'android' || 
+        targetType === 'ios' || 
+        targetType === 'mobile' ||
+        category === 'android' ||
+        category === 'ios' ||
+        category === 'mobile'
+      ) {
+        mobileAppCount++;
+      } else if (
+        targetType === 'website' || 
+        targetType === 'domain' ||
+        category === 'website' ||
+        category === 'domain' ||
+        category === 'url'
+      ) {
+        domainCount++;
+      } else {
+        // Default to domain for unknown types
+        domainCount++;
+      }
+    }
+
+    return {
+      totalAssets: inScopeAssets.length,
+      wildcardCount,
+      domainCount,
+      apiCount,
+      mobileAppCount,
+      bountyEligibleCount: inScopeAssets.length, // All in-scope assets are bounty-eligible on Bugcrowd
     };
   }
 

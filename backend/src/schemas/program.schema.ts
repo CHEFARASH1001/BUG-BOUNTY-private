@@ -96,6 +96,48 @@ export class Program {
 
   @Prop()
   notes: string;
+
+  // Enriched data fields for platform data enrichment feature
+
+  // Bounty table with severity-based min/max structure (Requirements: 1.1, 1.2, 1.3)
+  @Prop({ type: Object })
+  bountyTable: {
+    critical?: { min?: number; max?: number };
+    high?: { min?: number; max?: number };
+    medium?: { min?: number; max?: number };
+    low?: { min?: number; max?: number };
+  };
+
+  // Response metrics for response time data (Requirements: 2.1, 2.2, 2.3)
+  @Prop({ type: Object })
+  responseMetrics: {
+    averageTimeToFirstResponse?: number;  // in days
+    averageTimeToBounty?: number;         // in days
+    averageTimeToResolution?: number;     // in days
+  };
+
+  // Activity statistics for program activity data (Requirements: 3.1, 3.2, 3.3)
+  @Prop({ type: Object })
+  activityStats: {
+    resolvedReportCount?: number;
+    totalBountiesPaid?: number;
+    hackersThanked?: number;
+  };
+
+  // Scope statistics for scope information (Requirements: 4.1, 4.2, 4.3)
+  @Prop({ type: Object })
+  scopeStats: {
+    totalAssets?: number;
+    wildcardCount?: number;
+    domainCount?: number;
+    apiCount?: number;
+    mobileAppCount?: number;
+    bountyEligibleCount?: number;
+  };
+
+  // Program launch date (Requirements: 3.4)
+  @Prop()
+  launchedAt: Date;
 }
 
 export const ProgramSchema = SchemaFactory.createForClass(Program);

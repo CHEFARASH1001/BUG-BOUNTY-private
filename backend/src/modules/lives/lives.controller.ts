@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('Lives')
-@Controller('api/lives')
+@Controller('lives')
 export class LivesController {
   constructor(private livesService: LivesService) {}
 

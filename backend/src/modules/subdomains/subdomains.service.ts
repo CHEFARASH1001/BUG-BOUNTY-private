@@ -87,14 +87,46 @@ export class SubdomainsService {
 
   async findAll(filters?: {
     domainId?: string;
+    programId?: string;
     isAlive?: boolean;
     hasVulnerabilities?: boolean;
+    httpStatus?: string;
+    hasCdn?: boolean;
+    cdn?: string;
+    technology?: string;
+    source?: string;
     search?: string;
-  }): Promise<SubdomainDocument[]> {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{
+    data: SubdomainDocument[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const query: any = {};
+    const page = filters?.page || 1;
+    // Allow higher limits for internal service calls (up to 10000), default 50 for API
+    const limit = Math.min(filters?.limit || 50, 10000);
+    const skip = (page - 1) * limit;
+    const sortBy = filters?.sortBy || 'createdAt';
+    const sortOrder = filters?.sortOrder === 'asc' ? 1 : -1;
 
     if (filters?.domainId) {
       query.domainId = new Types.ObjectId(filters.domainId);
+    }
+    if (filters?.programId) {
+      // Find all domains for this program first
+      const domains = await this.domainModel.find({ programId: new Types.ObjectId(filters.programId) }).select('_id');
+      const domainIds = domains.map(d => d._id);
+      query.domainId = { $in: domainIds };
     }
     if (filters?.isAlive !== undefined) {
       query.isAlive = filters.isAlive;
@@ -102,21 +134,76 @@ export class SubdomainsService {
     if (filters?.hasVulnerabilities) {
       query.vulnerabilityCount = { $gt: 0 };
     }
+    if (filters?.httpStatus) {
+      const status = parseInt(filters.httpStatus, 10);
+      if (!isNaN(status)) {
+        query.httpStatus = status;
+      }
+    }
+    if (filters?.hasCdn !== undefined) {
+      if (filters.hasCdn) {
+        query.cdn = { $exists: true, $ne: [] };
+      } else {
+        query.$or = [{ cdn: { $exists: false } }, { cdn: [] }];
+      }
+    }
+    if (filters?.cdn) {
+      query.cdn = { $in: [filters.cdn] };
+    }
+    if (filters?.technology) {
+      query.technologies = { $in: [filters.technology] };
+    }
+    if (filters?.source) {
+      query.sources = { $in: [filters.source] };
+    }
     if (filters?.search) {
       query.subdomain = { $regex: filters.search, $options: 'i' };
     }
 
-    return this.subdomainModel
-      .find(query)
-      .populate('domainId', 'domain')
-      .sort({ subdomain: 1 })
-      .exec();
+    const [data, total] = await Promise.all([
+      this.subdomainModel
+        .find(query)
+        .populate({
+          path: 'domainId',
+          select: 'domain programId',
+          populate: {
+            path: 'programId',
+            select: 'name handle platform',
+          },
+        })
+        .sort({ [sortBy]: sortOrder })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.subdomainModel.countDocuments(query),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async findById(id: string): Promise<SubdomainDocument> {
     const subdomain = await this.subdomainModel
       .findById(id)
-      .populate('domainId', 'domain programId')
+      .populate({
+        path: 'domainId',
+        select: 'domain programId',
+        populate: {
+          path: 'programId',
+          select: 'name handle platform',
+        },
+      })
       .exec();
     if (!subdomain) {
       throw new NotFoundException('Subdomain not found');
@@ -192,6 +279,70 @@ export class SubdomainsService {
       { _id: { $in: ids.map((id) => new Types.ObjectId(id)) } },
       { $set: { isNew: false } },
     );
+  }
+
+  async getOverviewStats(): Promise<{
+    total: number;
+    alive: number;
+    dead: number;
+    withWaf: number;
+    withVulnerabilities: number;
+    newToday: number;
+  }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const [total, alive, withWaf, withVulnerabilities, newToday] = await Promise.all([
+      this.subdomainModel.countDocuments(),
+      this.subdomainModel.countDocuments({ isAlive: true }),
+      this.subdomainModel.countDocuments({ waf: { $exists: true, $ne: [] } }),
+      this.subdomainModel.countDocuments({ vulnerabilityCount: { $gt: 0 } }),
+      this.subdomainModel.countDocuments({ firstSeen: { $gte: today } }),
+    ]);
+
+    return {
+      total,
+      alive,
+      dead: total - alive,
+      withWaf,
+      withVulnerabilities,
+      newToday,
+    };
+  }
+
+  async getFilterOptions(): Promise<{
+    technologies: string[];
+    sources: string[];
+    cdns: string[];
+    httpStatuses: number[];
+    domains: { _id: string; domain: string }[];
+    programs: { _id: string; name: string }[];
+  }> {
+    const [technologies, sources, cdns, httpStatuses, domains] = await Promise.all([
+      this.subdomainModel.distinct('technologies'),
+      this.subdomainModel.distinct('sources'),
+      this.subdomainModel.distinct('cdn'),
+      this.subdomainModel.distinct('httpStatus'),
+      this.domainModel.find().select('_id domain programId').populate('programId', 'name').lean(),
+    ]);
+
+    // Extract unique programs from domains
+    const programMap = new Map<string, string>();
+    domains.forEach((d: any) => {
+      if (d.programId && d.programId._id) {
+        programMap.set(d.programId._id.toString(), d.programId.name);
+      }
+    });
+    const programs = Array.from(programMap.entries()).map(([_id, name]) => ({ _id, name }));
+
+    return {
+      technologies: technologies.filter(Boolean).sort(),
+      sources: sources.filter(Boolean).sort(),
+      cdns: cdns.filter(Boolean).sort(),
+      httpStatuses: httpStatuses.filter(Boolean).sort((a, b) => a - b),
+      domains: domains.map((d: any) => ({ _id: d._id.toString(), domain: d.domain })),
+      programs: programs.sort((a, b) => a.name.localeCompare(b.name)),
+    };
   }
 
   private async updateDomainCount(domainId: string): Promise<void> {

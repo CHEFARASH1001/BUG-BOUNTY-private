@@ -1,0 +1,174 @@
+# Implementation Plan
+
+- [x] 1. Create DocumentationModule and DTOs
+  - [x] 1.1 Create documentation.module.ts with schema registration
+    - Register Documentation schema with MongooseModule
+    - Import required modules (User schema for population)
+    - Export DocumentationService
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+  - [x] 1.2 Create documentation.dto.ts with CreateDocumentationDto
+    - Add title (required string), content (required string)
+    - Add type (optional DocType enum), tags, categories, targets, technologies, vulnerabilityTypes (optional string arrays)
+    - Add isPublic (optional boolean), relatedDocs (optional string array)
+    - Use class-validator decorators
+    - _Requirements: 1.1, 2.1, 2.2, 3.1, 3.2, 3.4_
+  - [x] 1.3 Create UpdateDocumentationDto using PartialType
+    - Extend CreateDocumentationDto with PartialType for partial updates
+    - _Requirements: 1.2_
+  - [x] 1.4 Create DocumentationFilterDto for query parameters
+    - Add type, tag, category, target, technology filters
+    - Add isPinned boolean filter with Transform
+    - Add limit, offset, sort with Transform for number conversion
+    - _Requirements: 1.5, 2.3, 2.4, 3.3, 3.5, 4.1_
+
+- [x] 2. Implement DocumentationService core CRUD operations
+  - [x] 2.1 Implement create method
+    - Accept CreateDocumentationDto and optional userId
+    - Set createdBy if userId provided
+    - Return created document
+    - _Requirements: 1.1_
+  - [x] 2.2 Write property test for create-read round trip
+    - **Property 1: Create-Read Round Trip**
+    - **Validates: Requirements 1.1, 1.4**
+  - [x] 2.3 Implement findById method with optional view increment
+    - Find document by ID
+    - If incrementView=true, increment viewCount and update lastAccessedAt
+    - Populate relatedDocs with _id, title, type
+    - Throw NotFoundException if not found
+    - _Requirements: 1.4, 5.4, 6.2_
+  - [x] 2.4 Write property test for view increment
+    - **Property 13: View Increments Count and Timestamp**
+    - **Validates: Requirements 5.4**
+  - [x] 2.5 Implement update method
+    - Find document by ID, throw NotFoundException if not found
+    - Update only provided fields using $set
+    - Set updatedBy if userId provided
+    - Return updated document
+    - _Requirements: 1.2_
+  - [x] 2.6 Write property test for update preserves unchanged fields
+    - **Property 2: Update Preserves Unchanged Fields**
+    - **Validates: Requirements 1.2**
+  - [x] 2.7 Implement delete method with related docs cleanup
+    - Find and delete document by ID
+    - Remove deleted doc ID from all other documents' relatedDocs arrays
+    - Throw NotFoundException if not found
+    - _Requirements: 1.3, 6.3_
+  - [x] 2.8 Write property test for delete removes document
+    - **Property 3: Delete Removes Document**
+    - **Validates: Requirements 1.3**
+  - [x] 2.9 Write property test for deleted doc removed from related refs
+    - **Property 15: Deleted Doc Removed from Related Refs**
+    - **Validates: Requirements 6.3**
+
+- [x] 3. Implement DocumentationService findAll and filtering
+  - [x] 3.1 Implement findAll method with filtering and pagination
+    - Build query from DocumentationFilter
+    - Sort by isPinned desc, then createdAt desc by default
+    - Apply limit and offset for pagination
+    - _Requirements: 1.5, 5.3_
+  - [x] 3.2 Write property test for list sorting by date
+    - **Property 4: List Sorting by Date**
+    - **Validates: Requirements 1.5**
+  - [x] 3.3 Write property test for pinned documents sort first
+    - **Property 12: Pinned Documents Sort First**
+    - **Validates: Requirements 5.3**
+  - [x] 3.4 Write property test for pagination correctness
+    - **Property 10: Pagination Correctness**
+    - **Validates: Requirements 4.1**
+  - [x] 3.5 Implement findByTag method
+    - Query documents where tags array contains the specified tag
+    - Apply additional filters from DocumentationFilter
+    - _Requirements: 2.1, 2.3_
+  - [x] 3.6 Write property test for tag search returns matching documents
+    - **Property 5: Tag Search Returns Matching Documents**
+    - **Validates: Requirements 2.1, 2.3**
+  - [x] 3.7 Implement findByType method
+    - Query documents where type equals specified DocType
+    - Apply additional filters
+    - _Requirements: 2.4_
+  - [x] 3.8 Write property test for type filter returns correct type
+    - **Property 6: Type Filter Returns Correct Type**
+    - **Validates: Requirements 2.4**
+  - [x] 3.9 Implement findByTechnology method
+    - Query documents where technologies array contains specified technology
+    - Apply additional filters
+    - _Requirements: 3.5_
+  - [x] 3.10 Write property test for technology filter returns matching documents
+    - **Property 9: Technology Filter Returns Matching Documents**
+    - **Validates: Requirements 3.5**
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Implement DocumentationService search and coverage
+  - [x] 5.1 Implement search method using text index
+    - Use MongoDB $text search on title, content, tags
+    - Apply additional filters from DocumentationFilter
+    - Sort by text score relevance
+    - _Requirements: 2.5_
+  - [x] 5.2 Write property test for text search across fields
+    - **Property 7: Text Search Across Fields**
+    - **Validates: Requirements 2.5**
+  - [x] 5.3 Implement getCoverageForTarget method
+    - Find documents where targets array contains target OR coverage array has matching targetName
+    - Calculate relevance scores based on match type
+    - Return CoverageResult with doc details and relevance
+    - _Requirements: 3.3_
+  - [x] 5.4 Write property test for coverage query returns target documents
+    - **Property 8: Coverage Query Returns Target Documents**
+    - **Validates: Requirements 3.3**
+
+- [x] 6. Implement DocumentationService pin and related docs operations
+  - [x] 6.1 Implement pin and unpin methods
+    - pin: Set isPinned to true
+    - unpin: Set isPinned to false
+    - Return updated document
+    - _Requirements: 5.1, 5.2_
+  - [x] 6.2 Write property test for pin toggle correctness
+    - **Property 11: Pin Toggle Correctness**
+    - **Validates: Requirements 5.1, 5.2**
+  - [x] 6.3 Implement addRelatedDoc and removeRelatedDoc methods
+    - addRelatedDoc: Add relatedId to relatedDocs array if not present
+    - removeRelatedDoc: Remove relatedId from relatedDocs array
+    - Validate both document IDs exist
+    - _Requirements: 6.1_
+  - [x] 6.4 Write property test for related docs populated on fetch
+    - **Property 14: Related Docs Populated on Fetch**
+    - **Validates: Requirements 6.2**
+  - [x] 6.5 Implement count and getStats methods
+    - count: Return document count with optional filter
+    - getStats: Return aggregate stats (total, by type, by tag, etc.)
+    - _Requirements: 4.1_
+
+- [x] 7. Implement DocumentationController
+  - [x] 7.1 Create documentation.controller.ts with CRUD endpoints
+    - GET / - findAll with filter query params
+    - GET /:id - findOne
+    - POST / - create
+    - PUT /:id - update
+    - DELETE /:id - delete
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [x] 7.2 Add search and coverage endpoints
+    - GET /search - search with query param q
+    - GET /coverage/:target - getCoverageForTarget
+    - GET /stats - getStats
+    - _Requirements: 2.5, 3.3, 4.6_
+  - [x] 7.3 Add pin and related docs endpoints
+    - POST /:id/pin - pin document
+    - DELETE /:id/pin - unpin document
+    - POST /:id/related/:relatedId - add related doc
+    - DELETE /:id/related/:relatedId - remove related doc
+    - _Requirements: 5.1, 5.2, 6.1_
+  - [x] 7.4 Add Swagger decorators for API documentation
+    - Add @ApiTags, @ApiOperation, @ApiResponse decorators
+    - Document all endpoints and DTOs
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6_
+
+- [x] 8. Register module in AppModule
+  - [x] 8.1 Import DocumentationModule in app.module.ts
+    - Add DocumentationModule to imports array
+    - Ensure proper module loading order
+    - _Requirements: 4.1_
+
+- [x] 9. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

@@ -7,9 +7,21 @@ import { v4 as uuidv4 } from 'uuid';
 
 const execAsync = promisify(exec);
 
+export type NucleiSeverity = 'info' | 'low' | 'medium' | 'high' | 'critical';
+
 export interface NucleiResult {
-  templateID: string;
-  info: {
+  templateId: string;
+  templateName: string;
+  severity: NucleiSeverity;
+  host: string;
+  matchedAt: string;
+  extractedResults: string[];
+  timestamp: Date;
+  curl: string;
+  matcher: string;
+  // Extended fields for compatibility
+  templateID?: string;
+  info?: {
     name: string;
     author: string;
     severity: string;
@@ -23,20 +35,168 @@ export interface NucleiResult {
       cweId?: string[];
     };
   };
-  type: string;
-  host: string;
-  matched: string;
+  type?: string;
+  matched?: string;
   matcherName?: string;
+  request?: string;
+  response?: string;
+  curlCommand?: string;
+}
+
+export interface NucleiCommandOptions {
+  targets: string[];
+  templates?: string[];
+  severities?: NucleiSeverity[];
+  rateLimit?: number;
+  bulkSize?: number;
+  concurrency?: number;
+  timeout?: number;
+  retries?: number;
+  tags?: string[];
+}
+
+export interface RawNucleiOutput {
+  'template-id'?: string;
+  templateID?: string;
+  info?: {
+    name?: string;
+    author?: string;
+    severity?: string;
+    description?: string;
+    reference?: string[];
+    tags?: string[];
+    classification?: {
+      cvssMetrics?: string;
+      cvssScore?: number;
+      cveId?: string[];
+      cweId?: string[];
+    };
+  };
+  type?: string;
+  host?: string;
+  matched?: string;
+  'matched-at'?: string;
+  'matcher-name'?: string;
+  matcherName?: string;
+  'extracted-results'?: string[];
   extractedResults?: string[];
   request?: string;
   response?: string;
-  timestamp: string;
+  timestamp?: string;
+  'curl-command'?: string;
   curlCommand?: string;
 }
 
 @Injectable()
 export class NucleiService {
   private resultsDir = '/app/results';
+
+  /**
+   * Build nuclei command from options
+   * This method is exposed for testing purposes
+   */
+  buildCommand(options: NucleiCommandOptions, inputFile: string, outputFile: string): string {
+    const { targets, templates, severities, rateLimit = 100, bulkSize = 25, concurrency = 25, timeout = 10, retries = 2, tags } = options;
+
+    if (targets.length === 0) {
+      throw new Error('At least one target is required');
+    }
+
+    let command = `docker exec bb-nuclei nuclei -l /results/${path.basename(inputFile)} ` +
+      `-json -o /results/${path.basename(outputFile)} ` +
+      `-rate-limit ${rateLimit} -bulk-size ${bulkSize} -concurrency ${concurrency} ` +
+      `-timeout ${timeout} -retries ${retries}`;
+
+    // Add severity filter
+    if (severities && severities.length > 0) {
+      command += ` -severity ${severities.join(',')}`;
+    } else {
+      command += ` -severity critical,high,medium,low,info`;
+    }
+
+    // Add specific templates if provided
+    if (templates && templates.length > 0) {
+      command += ` -t ${templates.join(',')}`;
+    } else if (tags && tags.length > 0) {
+      // Use tags if no templates specified
+      command += ` -tags ${tags.join(',')}`;
+    } else {
+      // Default to commonly useful templates
+      command += ` -tags cve,exposure,misconfig,tech,token,file`;
+    }
+
+    return command;
+  }
+
+  /**
+   * Parse a single line of Nuclei JSON output
+   * This method is exposed for testing purposes
+   */
+  parseNucleiOutput(rawOutput: RawNucleiOutput): NucleiResult {
+    const templateId = rawOutput['template-id'] || rawOutput.templateID || '';
+    const severity = (rawOutput.info?.severity || 'info').toLowerCase() as NucleiSeverity;
+    const validSeverities: NucleiSeverity[] = ['info', 'low', 'medium', 'high', 'critical'];
+    const normalizedSeverity = validSeverities.includes(severity) ? severity : 'info';
+
+    return {
+      templateId,
+      templateName: rawOutput.info?.name || templateId,
+      severity: normalizedSeverity,
+      host: rawOutput.host || '',
+      matchedAt: rawOutput.matched || rawOutput['matched-at'] || '',
+      extractedResults: rawOutput['extracted-results'] || rawOutput.extractedResults || [],
+      timestamp: rawOutput.timestamp ? new Date(rawOutput.timestamp) : new Date(),
+      curl: rawOutput['curl-command'] || rawOutput.curlCommand || '',
+      matcher: rawOutput['matcher-name'] || rawOutput.matcherName || '',
+      // Extended fields for backward compatibility
+      templateID: templateId,
+      info: {
+        name: rawOutput.info?.name || templateId,
+        author: rawOutput.info?.author || '',
+        severity: normalizedSeverity,
+        description: rawOutput.info?.description,
+        reference: rawOutput.info?.reference,
+        tags: rawOutput.info?.tags,
+        classification: rawOutput.info?.classification,
+      },
+      type: rawOutput.type || '',
+      matched: rawOutput.matched || rawOutput['matched-at'] || '',
+      matcherName: rawOutput['matcher-name'] || rawOutput.matcherName,
+      request: rawOutput.request,
+      response: rawOutput.response,
+      curlCommand: rawOutput['curl-command'] || rawOutput.curlCommand,
+    };
+  }
+
+  /**
+   * Check if a severity should trigger an immediate alert
+   * Returns true for critical or high severity findings
+   */
+  shouldTriggerAlert(severity: NucleiSeverity): boolean {
+    return severity === 'critical' || severity === 'high';
+  }
+
+  /**
+   * Run Nuclei scan on a single target
+   */
+  async scanSingle(target: string, templates?: string[]): Promise<NucleiResult[]> {
+    return this.scan([target], templates);
+  }
+
+  /**
+   * Get available templates
+   */
+  async getAvailableTemplates(): Promise<string[]> {
+    try {
+      const { stdout } = await execAsync(
+        'docker exec bb-nuclei nuclei -tl -silent',
+        { timeout: 60000 },
+      );
+      return stdout.split('\n').filter(Boolean);
+    } catch {
+      return [];
+    }
+  }
 
   /**
    * Run Nuclei scan on targets
@@ -55,20 +215,13 @@ export class NucleiService {
       // Write targets to file
       await fs.writeFile(inputFile, targets.join('\n'));
 
-      // Build nuclei command
-      let command = `docker exec bb-nuclei nuclei -l /results/${path.basename(inputFile)} ` +
-        `-json -o /results/${path.basename(outputFile)} ` +
-        `-severity critical,high,medium,low,info ` +
-        `-rate-limit 100 -bulk-size 25 -concurrency 25 ` +
-        `-timeout 10 -retries 2`;
-
-      // Add specific templates if provided
-      if (templates && templates.length > 0) {
-        command += ` -t ${templates.join(',')}`;
-      } else {
-        // Default to commonly useful templates
-        command += ` -tags cve,exposure,misconfig,tech,token,file`;
-      }
+      // Build nuclei command using the helper method
+      const options: NucleiCommandOptions = {
+        targets,
+        templates,
+        tags: templates ? undefined : ['cve', 'exposure', 'misconfig', 'tech', 'token', 'file'],
+      };
+      const command = this.buildCommand(options, inputFile, outputFile);
 
       // Run nuclei
       await execAsync(command, { timeout: 1800000 }); // 30 minute timeout
@@ -80,8 +233,8 @@ export class NucleiService {
 
         for (const line of lines) {
           try {
-            const result = JSON.parse(line);
-            results.push(this.normalizeResult(result));
+            const rawResult = JSON.parse(line) as RawNucleiOutput;
+            results.push(this.parseNucleiOutput(rawResult));
           } catch {
             continue;
           }
@@ -105,7 +258,7 @@ export class NucleiService {
    */
   async scanBySeverity(
     targets: string[],
-    severities: ('critical' | 'high' | 'medium' | 'low' | 'info')[],
+    severities: NucleiSeverity[],
   ): Promise<NucleiResult[]> {
     if (targets.length === 0) {
       return [];
@@ -119,10 +272,11 @@ export class NucleiService {
 
       await fs.writeFile(inputFile, targets.join('\n'));
 
-      const command = `docker exec bb-nuclei nuclei -l /results/${path.basename(inputFile)} ` +
-        `-json -o /results/${path.basename(outputFile)} ` +
-        `-severity ${severities.join(',')} ` +
-        `-rate-limit 100 -bulk-size 25 -concurrency 25`;
+      const options: NucleiCommandOptions = {
+        targets,
+        severities,
+      };
+      const command = this.buildCommand(options, inputFile, outputFile);
 
       await execAsync(command, { timeout: 1800000 });
 
@@ -132,8 +286,8 @@ export class NucleiService {
 
         for (const line of lines) {
           try {
-            const result = JSON.parse(line);
-            results.push(this.normalizeResult(result));
+            const rawResult = JSON.parse(line) as RawNucleiOutput;
+            results.push(this.parseNucleiOutput(rawResult));
           } catch {
             continue;
           }
@@ -207,42 +361,7 @@ export class NucleiService {
    * List available template tags
    */
   async listTemplateTags(): Promise<string[]> {
-    try {
-      const { stdout } = await execAsync(
-        'docker exec bb-nuclei nuclei -tl -silent',
-        { timeout: 60000 },
-      );
-      return stdout.split('\n').filter(Boolean);
-    } catch {
-      return [];
-    }
-  }
-
-  /**
-   * Normalize Nuclei result
-   */
-  private normalizeResult(result: any): NucleiResult {
-    return {
-      templateID: result['template-id'] || result.templateID || '',
-      info: {
-        name: result.info?.name || result['template-id'] || '',
-        author: result.info?.author || '',
-        severity: (result.info?.severity || 'info').toLowerCase(),
-        description: result.info?.description,
-        reference: result.info?.reference,
-        tags: result.info?.tags,
-        classification: result.info?.classification,
-      },
-      type: result.type || '',
-      host: result.host || '',
-      matched: result.matched || result['matched-at'] || '',
-      matcherName: result['matcher-name'] || result.matcherName,
-      extractedResults: result['extracted-results'] || result.extractedResults,
-      request: result.request,
-      response: result.response,
-      timestamp: result.timestamp || new Date().toISOString(),
-      curlCommand: result['curl-command'] || result.curlCommand,
-    };
+    return this.getAvailableTemplates();
   }
 }
 

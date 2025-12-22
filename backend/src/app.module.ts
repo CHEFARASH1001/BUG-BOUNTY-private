@@ -16,6 +16,7 @@ import { EndpointsModule } from './modules/endpoints/endpoints.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { WebsocketModule } from './modules/websocket/websocket.module';
+import { AlertModule } from './modules/alerts/alert.module';
 
 // Service Modules
 import { ReconModule } from './modules/recon/recon.module';
@@ -28,6 +29,8 @@ import { LivesModule } from './modules/lives/lives.module';
 import { HttpServicesModule } from './modules/http-services/http-services.module';
 import { ScoresModule } from './modules/scores/scores.module';
 import { CronModule } from './modules/cron/cron.module';
+import { DocumentationModule } from './modules/documentation/documentation.module';
+import { CliModule } from './modules/cli/cli.module';
 
 @Module({
   imports: [
@@ -75,6 +78,7 @@ import { CronModule } from './modules/cron/cron.module';
     ReportsModule,
     NotificationsModule,
     WebsocketModule,
+    AlertModule,
 
     // Service Modules
     ReconModule,
@@ -85,6 +89,8 @@ import { CronModule } from './modules/cron/cron.module';
     HttpServicesModule,
     ScoresModule,
     CronModule,
+    DocumentationModule,
+    CliModule,
   ],
 })
 export class AppModule {}

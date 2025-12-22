@@ -1,0 +1,272 @@
+# Implementation Plan
+
+- [x] 1. Set up new schemas and base infrastructure
+  - [x] 1.1 Create AlertRule schema in backend/src/schemas/alert-rule.schema.ts
+    - Define AlertRule schema with condition, severity, channels, enabled fields
+    - Add indexes for userId, programId, enabled
+    - _Requirements: 10.1, 10.2_
+  - [x] 1.2 Create FuzzJob schema in backend/src/schemas/fuzz-job.schema.ts
+    - Define FuzzJob schema with url, wordlist, extensions, filters, status, results
+    - Add indexes for status, programId, userId
+    - _Requirements: 7.2, 7.5_
+  - [x] 1.3 Create AbuseIPDBResult schema in backend/src/schemas/abuseipdb-result.schema.ts
+    - Define schema with ipAddress, abuseConfidenceScore, countryCode, isp, totalReports
+    - Add indexes for ipAddress, subdomainId, domainId
+    - _Requirements: 1.1, 1.2_
+  - [x] 1.4 Update schema index file to export new schemas
+    - Add exports for AlertRule, FuzzJob, AbuseIPDBResult
+    - _Requirements: 1.1, 7.2, 10.1_
+
+- [x] 2. Implement AbuseIPDB integration
+  - [x] 2.1 Create AbuseIPDB service in backend/src/modules/external-apis/services/abuseipdb.service.ts
+    - Implement checkIP method to query AbuseIPDB API
+    - Implement checkIPs for batch lookups
+    - Parse API response into AbuseIPDBResult structure
+    - _Requirements: 1.1, 1.2_
+  - [x] 2.2 Write property test for AbuseIPDB response parsing
+    - **Property 1: AbuseIPDB Response Parsing**
+    - **Validates: Requirements 1.1**
+  - [x] 2.3 Write property test for AbuseIPDB result persistence
+    - **Property 2: AbuseIPDB Result Persistence**
+    - **Validates: Requirements 1.2**
+  - [x] 2.4 Write property test for abuse score threshold alerting
+    - **Property 3: Abuse Score Threshold Alerting**
+    - **Validates: Requirements 1.3**
+  - [x] 2.5 Add AbuseIPDB service to external-apis module
+    - Register service in module providers
+    - Export service for use by other modules
+    - _Requirements: 1.1_
+
+- [x] 3. Implement Waybackurls integration
+  - [x] 3.1 Create Wayback service in backend/src/modules/recon/services/wayback.service.ts
+    - Implement fetchUrls method to execute waybackurls CLI
+    - Implement extractDomains using unfurl logic
+    - Implement extractEndpoints for URL path extraction
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - [x] 3.2 Write property test for domain extraction from URLs
+    - **Property 4: Domain Extraction from URLs**
+    - **Validates: Requirements 2.2**
+  - [x] 3.3 Write property test for Wayback discovery storage
+    - **Property 5: Wayback Discovery Storage**
+    - **Validates: Requirements 2.3, 2.4**
+  - [x] 3.4 Add Wayback service to recon module
+    - Register service in module providers
+    - _Requirements: 2.1_
+
+- [x] 4. Implement Nuclei scanner integration
+  - [x] 4.1 Create Nuclei service in backend/src/modules/scanner/services/nuclei.service.ts
+    - Implement scan method to execute nuclei with templates
+    - Implement scanSingle for single target scanning
+    - Parse JSON output into NucleiResult structure
+    - _Requirements: 3.1, 3.2_
+  - [x] 4.2 Write property test for Nuclei command construction
+    - **Property 6: Nuclei Command Construction**
+    - **Validates: Requirements 3.1**
+  - [x] 4.3 Write property test for Nuclei result parsing
+    - **Property 7: Nuclei Result Parsing**
+    - **Validates: Requirements 3.2**
+  - [x] 4.4 Write property test for severity-based alerting
+    - **Property 8: Severity-Based Alerting**
+    - **Validates: Requirements 3.3**
+  - [x] 4.5 Update scanner module to include Nuclei service
+    - Register service in module providers
+    - _Requirements: 3.1_
+
+- [x] 5. Implement Certificate Transparency monitoring
+  - [x] 5.1 Create CT service in backend/src/modules/recon/services/ct.service.ts
+    - Implement queryDomain to fetch certificates from CT logs
+    - Implement SAN extraction from certificate data
+    - Store discovered subdomains with cert_trans source
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 5.2 Write property test for certificate SAN extraction
+    - **Property 9: Certificate SAN Extraction**
+    - **Validates: Requirements 4.2**
+  - [x] 5.3 Write property test for CT discovery attribution
+    - **Property 10: CT Discovery Attribution**
+    - **Validates: Requirements 4.3**
+  - [x] 5.4 Add CT service to recon module
+    - Register service in module providers
+    - _Requirements: 4.1_
+
+- [x] 6. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 7. Enhance HTTP monitoring with change detection
+  - [x] 7.1 Update HTTP prober service with enhanced options
+    - Add favicon, headers, tech-detect, redirect chain options
+    - Implement 5-second timeout with 3 retries
+    - _Requirements: 6.1, 6.4_
+  - [x] 7.2 Write property test for HTTPx command options
+    - **Property 12: HTTPx Command Options**
+    - **Validates: Requirements 6.1, 6.4**
+  - [x] 7.3 Create HTTP monitor service in backend/src/modules/http-services/http-monitor.service.ts
+    - Implement detectChanges method comparing current vs previous scan
+    - Implement watchAll for monitoring all services
+    - Implement watchFresh for monitoring fresh services only
+    - Set change flags (statusCodeChanged, titleChanged, techChanged)
+    - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5, 8.6_
+  - [x] 7.4 Write property test for HTTP change detection
+    - **Property 17: HTTP Change Detection**
+    - **Validates: Requirements 8.1, 8.2, 8.3, 8.4, 8.5**
+  - [x] 7.5 Write property test for previous scan preservation
+    - **Property 18: Previous Scan Preservation**
+    - **Validates: Requirements 8.6**
+  - [x] 7.6 Write property test for HTTP probe result storage
+    - **Property 13: HTTP Probe Result Storage**
+    - **Validates: Requirements 6.2**
+  - [x] 7.7 Write property test for HTTPx JSON parsing
+    - **Property 14: HTTPx JSON Parsing**
+    - **Validates: Requirements 6.3**
+
+- [x] 8. Implement fuzzing service and API
+  - [x] 8.1 Create Fuzz service in backend/src/modules/scanner/services/fuzz.service.ts
+    - Implement startFuzz method to execute ffuf with config
+    - Implement result streaming via AsyncGenerator
+    - Implement stopFuzz for job cancellation
+    - _Requirements: 7.2, 7.3_
+  - [x] 8.2 Write property test for FFUF command construction
+    - **Property 15: FFUF Command Construction**
+    - **Validates: Requirements 7.2**
+  - [x] 8.3 Write property test for fuzz result storage
+    - **Property 16: Fuzz Result Storage**
+    - **Validates: Requirements 7.5**
+  - [x] 8.4 Create Fuzz controller in backend/src/modules/scanner/fuzz.controller.ts
+    - POST /api/v1/fuzz - Start fuzzing job
+    - GET /api/v1/fuzz/:id - Get job status and results
+    - DELETE /api/v1/fuzz/:id - Cancel job
+    - GET /api/v1/fuzz/wordlists - List available wordlists
+    - _Requirements: 7.1, 7.2, 7.5_
+  - [x] 8.5 Update scanner module with fuzz service and controller
+    - Register FuzzService and FuzzController
+    - Import FuzzJob schema
+    - _Requirements: 7.2_
+
+- [x] 9. Implement Alert service
+  - [x] 9.1 Create Alert module in backend/src/modules/alerts/
+    - Create alert.service.ts with CRUD operations for rules
+    - Implement evaluateCondition for rule matching
+    - Implement triggerAlert to send notifications
+    - _Requirements: 10.1, 10.2, 10.3_
+  - [x] 9.2 Write property test for alert rule condition evaluation
+    - **Property 21: Alert Rule Condition Evaluation**
+    - **Validates: Requirements 10.1, 10.2**
+  - [x] 9.3 Write property test for multi-channel alert delivery
+    - **Property 22: Multi-Channel Alert Delivery**
+    - **Validates: Requirements 10.3**
+  - [x] 9.4 Create Alert controller in backend/src/modules/alerts/alert.controller.ts
+    - POST /api/v1/alerts/rules - Create alert rule
+    - GET /api/v1/alerts/rules - List alert rules
+    - PUT /api/v1/alerts/rules/:id - Update rule
+    - DELETE /api/v1/alerts/rules/:id - Delete rule
+    - _Requirements: 10.1, 10.2_
+  - [x] 9.5 Register Alert module in app.module.ts
+    - Import AlertModule
+    - _Requirements: 10.1_
+
+- [x] 10. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 11. Enhance HTTP services API with filtering
+  - [x] 11.1 Update HTTP services controller with advanced filtering
+    - Add query params for statusCode, technology, isCdn, isFresh
+    - Add query params for statusCodeChanged, titleChanged, techChanged
+    - Implement regex-based header search
+    - _Requirements: 9.1, 9.2, 9.3, 9.4_
+  - [x] 11.2 Write property test for HTTP service filtering
+    - **Property 19: HTTP Service Filtering**
+    - **Validates: Requirements 9.1, 9.2, 9.4**
+  - [x] 11.3 Write property test for header regex matching
+    - **Property 20: Header Regex Matching**
+    - **Validates: Requirements 9.3**
+  - [x] 11.4 Update subdomains API with live filtering
+    - Add isAlive query parameter to GET /api/v1/subdomains
+    - Return only live subdomains when filter is applied
+    - _Requirements: 5.2_
+  - [x] 11.5 Write property test for live subdomain filtering
+    - **Property 11: Live Subdomain Filtering**
+    - **Validates: Requirements 5.2**
+
+- [x] 12. Implement cron jobs for monitoring
+  - [x] 12.1 Add HTTP monitoring cron job
+    - Schedule periodic HTTP probing of all services
+    - Trigger change detection and alerts
+    - _Requirements: 8.1, 8.2, 8.3_
+  - [x] 12.2 Add AbuseIPDB watching cron job
+    - Schedule periodic IP checks for watched domains
+    - Trigger alerts for high abuse scores
+    - _Requirements: 1.4_
+  - [x] 12.3 Add CT monitoring cron job
+    - Schedule periodic CT log queries for watched domains
+    - Add new subdomains and trigger alerts
+    - _Requirements: 4.1, 4.4_
+  - [x] 12.4 Update cron module with new jobs
+    - Register new cron jobs in cron.service.ts
+    - _Requirements: 1.4, 4.1, 8.1_
+
+- [x] 13. Implement frontend subdomain page enhancements
+  - [x] 13.1 Add live filter toggle to subdomain page
+    - Add toggle button for live/all subdomains
+    - Update API call with isAlive parameter
+    - _Requirements: 5.1, 5.2_
+  - [x] 13.2 Display HTTP metadata for live subdomains
+    - Show status code, title, technologies columns
+    - Add visual indicators for status codes
+    - _Requirements: 5.3_
+  - [x] 13.3 Add WebSocket subscription for real-time updates
+    - Subscribe to subdomain status changes
+    - Update UI when subdomain goes live/offline
+    - _Requirements: 5.4_
+
+- [x] 14. Implement frontend fuzzing page
+  - [x] 14.1 Create fuzzing page at frontend/src/app/dashboard/fuzzing/page.tsx
+    - Create form with URL input, wordlist dropdown, extensions input
+    - Add filter options (match codes, filter words/lines/size)
+    - _Requirements: 7.1, 7.4_
+  - [x] 14.2 Implement fuzzing job submission and result display
+    - Submit job to backend API
+    - Display streaming results in table
+    - Show job status and progress
+    - _Requirements: 7.2, 7.3_
+  - [x] 14.3 Add fuzzing page to dashboard navigation
+    - Add menu item in dashboard layout
+    - _Requirements: 7.1_
+
+- [x] 15. Implement frontend HTTP services page enhancements
+  - [x] 15.1 Add advanced filters to HTTP services page
+    - Add filter dropdowns for status code, technology, CDN, freshness
+    - Add change detection filters (status changed, title changed, tech changed)
+    - _Requirements: 9.1, 9.2, 9.4_
+  - [x] 15.2 Add header search functionality
+    - Add regex input for header value search
+    - Display matching services
+    - _Requirements: 9.3_
+  - [x] 15.3 Add change indicators to service list
+    - Visual badges for changed services
+    - Show previous vs current values on hover
+    - _Requirements: 8.2, 8.3, 8.4, 8.5_
+
+- [x] 16. Implement frontend alert configuration
+  - [x] 16.1 Create alert rules page at frontend/src/app/dashboard/alerts/page.tsx
+    - List existing alert rules
+    - Add/edit/delete rule functionality
+    - _Requirements: 10.1, 10.2_
+  - [x] 16.2 Create alert rule form component
+    - Condition type selector (status change, title match, etc.)
+    - Operator and value inputs
+    - Severity and channel selection
+    - _Requirements: 10.1, 10.2, 10.4_
+  - [x] 16.3 Add alerts page to dashboard navigation
+    - Add menu item in dashboard layout
+    - _Requirements: 10.4_
+
+- [x] 17. Update frontend API client
+  - [x] 17.1 Add API methods for new endpoints
+    - Add fuzz API methods (start, status, cancel, wordlists)
+    - Add alert rules API methods (CRUD)
+    - Add AbuseIPDB lookup method
+    - Add Waybackurls enumeration method
+    - Add Nuclei scan method
+    - _Requirements: 1.1, 2.1, 3.1, 7.2, 10.1_
+
+- [x] 18. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

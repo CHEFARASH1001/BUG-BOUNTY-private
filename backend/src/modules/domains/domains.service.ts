@@ -43,8 +43,28 @@ export class DomainsService {
     programId?: string;
     status?: string;
     search?: string;
-  }): Promise<DomainDocument[]> {
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    hasSubdomains?: boolean;
+  }): Promise<{
+    data: DomainDocument[];
+    pagination: {
+      page: number;
+      limit: number;
+      total: number;
+      totalPages: number;
+      hasNext: boolean;
+      hasPrev: boolean;
+    };
+  }> {
     const query: any = {};
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 20;
+    const skip = (page - 1) * limit;
+    const sortBy = filters?.sortBy || 'createdAt';
+    const sortOrder = filters?.sortOrder === 'asc' ? 1 : -1;
 
     if (filters?.programId) {
       query.programId = new Types.ObjectId(filters.programId);
@@ -55,12 +75,34 @@ export class DomainsService {
     if (filters?.search) {
       query.domain = { $regex: filters.search, $options: 'i' };
     }
+    if (filters?.hasSubdomains) {
+      query.subdomainCount = { $gt: 0 };
+    }
 
-    return this.domainModel
-      .find(query)
-      .populate('programId', 'name platform')
-      .sort({ createdAt: -1 })
-      .exec();
+    const [data, total] = await Promise.all([
+      this.domainModel
+        .find(query)
+        .populate('programId', 'name platform')
+        .sort({ [sortBy]: sortOrder })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.domainModel.countDocuments(query),
+    ]);
+
+    const totalPages = Math.ceil(total / limit);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1,
+      },
+    };
   }
 
   async findById(id: string): Promise<DomainDocument> {

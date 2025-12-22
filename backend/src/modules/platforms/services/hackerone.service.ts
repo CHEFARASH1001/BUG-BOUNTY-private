@@ -2,6 +2,36 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 
+// Bounty tier structure for severity-based bounty ranges
+export interface BountyTier {
+  severity: string;  // 'critical', 'high', 'medium', 'low'
+  min: number | null;
+  max: number | null;
+}
+
+// Response metrics interface
+export interface ResponseMetrics {
+  averageTimeToFirstResponse: number | null;  // in days
+  averageTimeToBounty: number | null;         // in days
+  averageTimeToResolution: number | null;     // in days
+}
+
+// Activity statistics interface
+export interface ActivityStats {
+  resolvedReportCount: number | null;
+  totalBountiesPaid: number | null;
+  hackersThanked: number | null;
+  reportsLast90Days?: number | null;
+}
+
+// Bounty table structure with severity-based min/max
+export interface BountyTable {
+  critical?: { min: number | null; max: number | null };
+  high?: { min: number | null; max: number | null };
+  medium?: { min: number | null; max: number | null };
+  low?: { min: number | null; max: number | null };
+}
+
 export interface HackerOneProgram {
   id: string;
   handle: string;
@@ -14,6 +44,19 @@ export interface HackerOneProgram {
     low: number;
     high: number;
   }[];
+  
+  // NEW: Bounty information (Requirements: 1.1, 1.2, 1.4)
+  bountyTable: BountyTable | null;
+  
+  // NEW: Response metrics (Requirements: 2.1, 2.2, 2.3, 2.4)
+  responseMetrics: ResponseMetrics | null;
+  
+  // NEW: Activity statistics (Requirements: 3.1, 3.2, 3.3)
+  activityStats: ActivityStats | null;
+  
+  // NEW: Program launch date (Requirements: 3.4)
+  launchedAt: string | null;
+  
   scopes: HackerOneScope[];
   createdAt: string;
   updatedAt: string;
@@ -66,7 +109,7 @@ export class HackerOneService {
       });
 
       const data = response.data;
-
+      console.log(data, 'kkpopokpopko')
       if (data.data && Array.isArray(data.data)) {
         for (const item of data.data) {
           const program = this.transformProgram(item);
@@ -154,6 +197,7 @@ export class HackerOneService {
       this.logger.log('Fetching HackerOne public directory via GraphQL');
 
       // Use HackerOne's GraphQL endpoint for public programs
+      // Fetch all available fields for better scoring
       const query = `
         query DirectoryQuery($cursor: String, $secureOrderBy: FiltersTeamFilterOrder, $where: FiltersTeamFilterInput) {
           teams(first: 100, after: $cursor, secure_order_by: $secureOrderBy, where: $where) {
@@ -171,6 +215,21 @@ export class HackerOneService {
                 submission_state
                 started_accepting_at
                 url
+                launched_at
+                currency
+                base_bounty
+                resolved_report_count
+                reports_received_last_90_days
+                first_response_time
+                bounty_time
+                resolution_time
+                average_bounty_lower_amount
+                average_bounty_upper_amount
+                top_bounty_lower_amount
+                top_bounty_upper_amount
+                minimum_bounty_table_value
+                maximum_bounty_table_value
+                response_efficiency_percentage
                 in_scope: structured_scopes(first: 100, archived: false, eligible_for_submission: true) {
                   edges {
                     node {
@@ -288,6 +347,19 @@ export class HackerOneService {
               submissionState: node.submission_state || 'open',
               offersBounties: node.offers_bounties || false,
               bountyRanges: [],
+              // Build bounty table from available fields
+              bountyTable: this.buildBountyTableFromGraphQL(node),
+              // Build response metrics from available fields
+              responseMetrics: this.buildResponseMetricsFromGraphQL(node),
+              // Extract activity statistics from available fields
+              activityStats: {
+                resolvedReportCount: node.resolved_report_count ?? null,
+                totalBountiesPaid: null, // Not directly available
+                hackersThanked: null,    // Not directly available
+                reportsLast90Days: node.reports_received_last_90_days ?? null,
+              },
+              // Extract launch date
+              launchedAt: node.launched_at || null,
               scopes,
               createdAt: node.started_accepting_at,
               updatedAt: node.started_accepting_at,
@@ -316,6 +388,9 @@ export class HackerOneService {
       if (error.response) {
         this.logger.error(`Response status: ${error.response.status}`);
         this.logger.error(`Response data: ${JSON.stringify(error.response.data).substring(0, 500)}`);
+      }
+      if (error.stack) {
+        this.logger.error(`Stack trace: ${error.stack.substring(0, 500)}`);
       }
       return programs;
     }
@@ -351,10 +426,268 @@ export class HackerOneService {
       submissionState: attributes.submission_state,
       offersBounties: attributes.offers_bounties || false,
       bountyRanges,
+      // Extract bounty table data (Requirements: 1.1, 1.2)
+      bountyTable: this.extractBountyTableFromAttributes(attributes),
+      // Extract response metrics (Requirements: 2.1, 2.2, 2.3)
+      responseMetrics: this.extractResponseMetricsFromAttributes(attributes),
+      // Extract activity statistics (Requirements: 3.1, 3.2, 3.3)
+      activityStats: this.extractActivityStatsFromAttributes(attributes),
+      // Extract launch date (Requirements: 3.4)
+      launchedAt: attributes.launched_at || null,
       scopes,
       createdAt: attributes.started_accepting_at,
       updatedAt: attributes.updated_at,
     };
+  }
+
+  /**
+   * Build bounty table from GraphQL response fields
+   * Uses average_bounty, top_bounty, minimum/maximum_bounty_table_value
+   */
+  private buildBountyTableFromGraphQL(node: any): BountyTable | null {
+    const hasAnyBountyData = 
+      node.minimum_bounty_table_value !== undefined ||
+      node.maximum_bounty_table_value !== undefined ||
+      node.average_bounty_lower_amount !== undefined ||
+      node.average_bounty_upper_amount !== undefined ||
+      node.top_bounty_lower_amount !== undefined ||
+      node.top_bounty_upper_amount !== undefined ||
+      node.base_bounty !== undefined;
+
+    if (!hasAnyBountyData) {
+      return null;
+    }
+
+    // Build bounty table using available data
+    // Use top_bounty as critical, average as medium, minimum as low
+    const bountyTable: BountyTable = {};
+
+    // Critical: use top bounty or maximum table value
+    if (node.top_bounty_lower_amount !== undefined || node.top_bounty_upper_amount !== undefined || node.maximum_bounty_table_value !== undefined) {
+      bountyTable.critical = {
+        min: node.top_bounty_lower_amount ?? null,
+        max: node.top_bounty_upper_amount ?? node.maximum_bounty_table_value ?? null,
+      };
+    }
+
+    // High: estimate between top and average
+    if (node.average_bounty_upper_amount !== undefined && node.top_bounty_lower_amount !== undefined) {
+      bountyTable.high = {
+        min: node.average_bounty_upper_amount ?? null,
+        max: node.top_bounty_lower_amount ?? null,
+      };
+    }
+
+    // Medium: use average bounty
+    if (node.average_bounty_lower_amount !== undefined || node.average_bounty_upper_amount !== undefined) {
+      bountyTable.medium = {
+        min: node.average_bounty_lower_amount ?? null,
+        max: node.average_bounty_upper_amount ?? null,
+      };
+    }
+
+    // Low: use minimum table value or base bounty
+    if (node.minimum_bounty_table_value !== undefined || node.base_bounty !== undefined) {
+      bountyTable.low = {
+        min: node.minimum_bounty_table_value ?? node.base_bounty ?? null,
+        max: node.average_bounty_lower_amount ?? node.base_bounty ?? null,
+      };
+    }
+
+    return Object.keys(bountyTable).length > 0 ? bountyTable : null;
+  }
+
+  /**
+   * Build response metrics from GraphQL response fields
+   * Uses first_response_time, bounty_time, resolution_time (in seconds)
+   */
+  private buildResponseMetricsFromGraphQL(node: any): ResponseMetrics | null {
+    const hasAnyMetric = 
+      node.first_response_time !== undefined ||
+      node.bounty_time !== undefined ||
+      node.resolution_time !== undefined ||
+      node.response_efficiency_percentage !== undefined;
+
+    if (!hasAnyMetric) {
+      return null;
+    }
+
+    return {
+      // Convert from seconds to days
+      averageTimeToFirstResponse: this.convertSecondsToDays(node.first_response_time),
+      averageTimeToBounty: this.convertSecondsToDays(node.bounty_time),
+      averageTimeToResolution: this.convertSecondsToDays(node.resolution_time),
+    };
+  }
+
+  /**
+   * Extract bounty table from GraphQL response node
+   * Requirements: 1.1, 1.2 - Extract min/max for each severity level
+   * Uses null for missing data, not zero (Requirement 1.4)
+   */
+  extractBountyTable(bountyTableData: any): BountyTable | null {
+    if (!bountyTableData) {
+      return null;
+    }
+
+    const bountyTable: BountyTable = {};
+
+    // Extract critical severity bounty range
+    if (bountyTableData.critical_minimum !== undefined || bountyTableData.critical_maximum !== undefined) {
+      bountyTable.critical = {
+        min: bountyTableData.critical_minimum ?? null,
+        max: bountyTableData.critical_maximum ?? null,
+      };
+    }
+
+    // Extract high severity bounty range
+    if (bountyTableData.high_minimum !== undefined || bountyTableData.high_maximum !== undefined) {
+      bountyTable.high = {
+        min: bountyTableData.high_minimum ?? null,
+        max: bountyTableData.high_maximum ?? null,
+      };
+    }
+
+    // Extract medium severity bounty range
+    if (bountyTableData.medium_minimum !== undefined || bountyTableData.medium_maximum !== undefined) {
+      bountyTable.medium = {
+        min: bountyTableData.medium_minimum ?? null,
+        max: bountyTableData.medium_maximum ?? null,
+      };
+    }
+
+    // Extract low severity bounty range
+    if (bountyTableData.low_minimum !== undefined || bountyTableData.low_maximum !== undefined) {
+      bountyTable.low = {
+        min: bountyTableData.low_minimum ?? null,
+        max: bountyTableData.low_maximum ?? null,
+      };
+    }
+
+    // Return null if no bounty data was found
+    return Object.keys(bountyTable).length > 0 ? bountyTable : null;
+  }
+
+  /**
+   * Extract bounty table from REST API attributes
+   * Requirements: 1.1, 1.2 - Extract min/max for each severity level
+   */
+  private extractBountyTableFromAttributes(attributes: any): BountyTable | null {
+    if (!attributes.bounty_table || !Array.isArray(attributes.bounty_table)) {
+      return null;
+    }
+
+    const bountyTable: BountyTable = {};
+
+    for (const tier of attributes.bounty_table) {
+      const severity = tier.severity?.toLowerCase();
+      if (severity && ['critical', 'high', 'medium', 'low'].includes(severity)) {
+        bountyTable[severity as keyof BountyTable] = {
+          min: tier.low ?? tier.min ?? null,
+          max: tier.high ?? tier.max ?? null,
+        };
+      }
+    }
+
+    return Object.keys(bountyTable).length > 0 ? bountyTable : null;
+  }
+
+  /**
+   * Extract response metrics from GraphQL response node
+   * Requirements: 2.1, 2.2, 2.3 - Extract response time metrics
+   * Converts from seconds to days
+   */
+  extractResponseMetrics(node: any): ResponseMetrics | null {
+    const hasAnyMetric = 
+      node.average_time_to_first_program_response !== undefined ||
+      node.average_time_to_bounty_awarded !== undefined ||
+      node.average_time_to_resolution !== undefined;
+
+    if (!hasAnyMetric) {
+      return null;
+    }
+
+    return {
+      // Convert from seconds to days (Requirements: 2.1, 2.2, 2.3)
+      averageTimeToFirstResponse: this.convertSecondsToDays(node.average_time_to_first_program_response),
+      averageTimeToBounty: this.convertSecondsToDays(node.average_time_to_bounty_awarded),
+      averageTimeToResolution: this.convertSecondsToDays(node.average_time_to_resolution),
+    };
+  }
+
+  /**
+   * Extract response metrics from REST API attributes
+   * Requirements: 2.1, 2.2, 2.3 - Extract response time metrics
+   */
+  private extractResponseMetricsFromAttributes(attributes: any): ResponseMetrics | null {
+    const hasAnyMetric = 
+      attributes.average_time_to_first_program_response !== undefined ||
+      attributes.average_time_to_bounty_awarded !== undefined ||
+      attributes.average_time_to_resolution !== undefined;
+
+    if (!hasAnyMetric) {
+      return null;
+    }
+
+    return {
+      averageTimeToFirstResponse: this.convertSecondsToDays(attributes.average_time_to_first_program_response),
+      averageTimeToBounty: this.convertSecondsToDays(attributes.average_time_to_bounty_awarded),
+      averageTimeToResolution: this.convertSecondsToDays(attributes.average_time_to_resolution),
+    };
+  }
+
+  /**
+   * Extract activity statistics from GraphQL response node
+   * Requirements: 3.1, 3.2, 3.3 - Extract activity stats
+   */
+  extractActivityStats(node: any): ActivityStats | null {
+    const hasAnyStats = 
+      node.resolved_report_count !== undefined ||
+      node.total_bounties_paid_amount !== undefined ||
+      node.hackers_thanked_count !== undefined;
+
+    if (!hasAnyStats) {
+      return null;
+    }
+
+    return {
+      resolvedReportCount: node.resolved_report_count ?? null,
+      totalBountiesPaid: node.total_bounties_paid_amount ?? null,
+      hackersThanked: node.hackers_thanked_count ?? null,
+    };
+  }
+
+  /**
+   * Extract activity statistics from REST API attributes
+   * Requirements: 3.1, 3.2, 3.3 - Extract activity stats
+   */
+  private extractActivityStatsFromAttributes(attributes: any): ActivityStats | null {
+    const hasAnyStats = 
+      attributes.resolved_report_count !== undefined ||
+      attributes.total_bounties_paid_amount !== undefined ||
+      attributes.hackers_thanked_count !== undefined;
+
+    if (!hasAnyStats) {
+      return null;
+    }
+
+    return {
+      resolvedReportCount: attributes.resolved_report_count ?? null,
+      totalBountiesPaid: attributes.total_bounties_paid_amount ?? null,
+      hackersThanked: attributes.hackers_thanked_count ?? null,
+    };
+  }
+
+  /**
+   * Convert seconds to days
+   * Returns null if input is null/undefined
+   */
+  private convertSecondsToDays(seconds: number | null | undefined): number | null {
+    if (seconds === null || seconds === undefined) {
+      return null;
+    }
+    // Convert seconds to days (86400 seconds per day)
+    return Math.round((seconds / 86400) * 100) / 100;
   }
 
   private transformScope(data: any): HackerOneScope {

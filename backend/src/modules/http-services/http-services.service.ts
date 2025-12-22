@@ -17,6 +17,7 @@ export interface HttpServicesFilter {
   statusCodeChanged?: boolean;
   titleChanged?: boolean;
   techChanged?: boolean;
+  headerRegex?: string;
   limit?: number;
   offset?: number;
   sort?: string;
@@ -361,6 +362,62 @@ export class HttpServicesService {
     }
 
     return query;
+  }
+
+  /**
+   * Find HTTP services where any header value matches the given regex pattern.
+   * This performs in-memory filtering after fetching services with headers.
+   * 
+   * @param pattern - Regex pattern to match against header values
+   * @param filter - Additional filter criteria
+   * @returns HTTP services with matching header values
+   */
+  async findByHeaderRegex(pattern: string, filter: HttpServicesFilter = {}): Promise<HttpServiceDocument[]> {
+    const query = this.buildQuery(filter);
+    // Only include services that have headers
+    query.headers = { $exists: true, $ne: {} };
+
+    const services = await this.httpServiceModel.find(query).exec();
+    
+    try {
+      const regex = new RegExp(pattern, 'i');
+      return services.filter(service => {
+        if (!service.headers || typeof service.headers !== 'object') {
+          return false;
+        }
+        // Check if any header value matches the regex
+        return Object.values(service.headers).some(value => 
+          typeof value === 'string' && regex.test(value)
+        );
+      });
+    } catch (error) {
+      // Invalid regex pattern
+      this.logger.warn(`Invalid regex pattern for header search: ${pattern}`);
+      return [];
+    }
+  }
+
+  /**
+   * Check if a service's headers match a given regex pattern.
+   * Pure function for testing purposes.
+   * 
+   * @param headers - Headers object to check
+   * @param pattern - Regex pattern to match
+   * @returns true if any header value matches the pattern
+   */
+  matchHeadersWithRegex(headers: Record<string, string> | undefined, pattern: string): boolean {
+    if (!headers || typeof headers !== 'object') {
+      return false;
+    }
+    
+    try {
+      const regex = new RegExp(pattern, 'i');
+      return Object.values(headers).some(value => 
+        typeof value === 'string' && regex.test(value)
+      );
+    } catch {
+      return false;
+    }
   }
 }
 

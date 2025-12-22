@@ -122,4 +122,67 @@ update-mongo-validator:
 	docker compose exec -T mongodb mongosh -u admin -p bugbounty2024 --authenticationDatabase admin bugbounty < docker/update-validator.js
 	@echo "✅ MongoDB validator updated successfully!"
 
+# ===========================================
+# Worker Commands (Parallel Processing)
+# ===========================================
+
+# Start workers (default 3 replicas)
+workers-up:
+	docker compose -f docker-compose.dev.yml up -d subfinder-worker
+	@echo ""
+	@echo "🚀 Subfinder workers started!"
+	@echo "   Monitor: http://localhost:15672 (RabbitMQ)"
+	@echo ""
+
+# Scale workers (usage: make workers-scale N=5)
+workers-scale:
+	docker compose -f docker-compose.dev.yml up -d --scale subfinder-worker=$(N)
+	@echo "✅ Scaled to $(N) subfinder workers"
+
+# Stop workers
+workers-down:
+	docker compose -f docker-compose.dev.yml stop subfinder-worker
+	docker compose -f docker-compose.dev.yml rm -f subfinder-worker
+
+# View worker logs
+workers-logs:
+	docker compose -f docker-compose.dev.yml logs -f subfinder-worker
+
+# Rebuild workers
+workers-rebuild:
+	docker compose -f docker-compose.dev.yml build --no-cache subfinder-worker
+	docker compose -f docker-compose.dev.yml up -d subfinder-worker
+
+# ===========================================
+# CLI Commands
+# ===========================================
+
+cli-install:
+	cd cli && npm install
+	@echo "✅ CLI installed! Run 'make bb' or './cli/bb' to use"
+
+# Run CLI commands
+bb:
+	@./cli/bb $(filter-out $@,$(MAKECMDGOALS))
+
+# CLI shortcuts
+subfinder:
+	@./cli/bb subfinder $(filter-out $@,$(MAKECMDGOALS))
+
+recon:
+	@./cli/bb recon $(filter-out $@,$(MAKECMDGOALS))
+
+enum-all:
+	@./cli/bb enum-all
+
+ns-all:
+	@./cli/bb ns-all
+
+http-all:
+	@./cli/bb http-all
+
+# Prevent make from treating arguments as targets
+%:
+	@:
+
 

@@ -5,7 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../auth/decorators/public.decorator';
 
 @ApiTags('HTTP Services')
-@Controller('api/http')
+@Controller('http')
 export class HttpServicesController {
   constructor(private httpServicesService: HttpServicesService) {}
 
@@ -19,6 +19,11 @@ export class HttpServicesController {
   @ApiQuery({ name: 'statusCode', required: false, type: Number })
   @ApiQuery({ name: 'provider', required: false })
   @ApiQuery({ name: 'isCdn', required: false, type: Boolean })
+  @ApiQuery({ name: 'isFresh', required: false, type: Boolean, description: 'Filter by fresh services' })
+  @ApiQuery({ name: 'statusCodeChanged', required: false, type: Boolean, description: 'Filter by status code changed' })
+  @ApiQuery({ name: 'titleChanged', required: false, type: Boolean, description: 'Filter by title changed' })
+  @ApiQuery({ name: 'techChanged', required: false, type: Boolean, description: 'Filter by technology changed' })
+  @ApiQuery({ name: 'headerRegex', required: false, description: 'Regex pattern to match header values' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'offset', required: false, type: Number })
   @ApiQuery({ name: 'compare', required: false, description: 'Return comparison data' })
@@ -31,6 +36,11 @@ export class HttpServicesController {
     @Query('statusCode') statusCode?: string,
     @Query('provider') provider?: string,
     @Query('isCdn') isCdn?: string,
+    @Query('isFresh') isFresh?: string,
+    @Query('statusCodeChanged') statusCodeChanged?: string,
+    @Query('titleChanged') titleChanged?: string,
+    @Query('techChanged') techChanged?: string,
+    @Query('headerRegex') headerRegex?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
     @Query('compare') compare?: string,
@@ -43,12 +53,21 @@ export class HttpServicesController {
       statusCode: statusCode ? parseInt(statusCode, 10) : undefined,
       provider,
       isCdn: isCdn !== undefined ? isCdn === 'true' : undefined,
+      isFresh: isFresh !== undefined ? isFresh === 'true' : undefined,
+      statusCodeChanged: statusCodeChanged !== undefined ? statusCodeChanged === 'true' : undefined,
+      titleChanged: titleChanged !== undefined ? titleChanged === 'true' : undefined,
+      techChanged: techChanged !== undefined ? techChanged === 'true' : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
       offset: offset ? parseInt(offset, 10) : undefined,
     };
 
     if (compare === 'list') {
       return this.httpServicesService.getChanges(filter);
+    }
+
+    // If headerRegex is provided, use the specialized method
+    if (headerRegex) {
+      return this.httpServicesService.findByHeaderRegex(headerRegex, filter);
     }
 
     return this.httpServicesService.findAll(filter);

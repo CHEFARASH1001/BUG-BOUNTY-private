@@ -31,16 +31,35 @@ export class DomainsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Get all domains' })
+  @ApiOperation({ summary: 'Get all domains with pagination' })
   @ApiQuery({ name: 'programId', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (1-based)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20, max: 100)' })
+  @ApiQuery({ name: 'sortBy', required: false, description: 'Sort field (default: createdAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'], description: 'Sort order (default: desc)' })
+  @ApiQuery({ name: 'hasSubdomains', required: false, type: Boolean, description: 'Filter domains with subdomains' })
   findAll(
     @Query('programId') programId?: string,
     @Query('status') status?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: string,
+    @Query('hasSubdomains') hasSubdomains?: string,
   ) {
-    return this.domainsService.findAll({ programId, status, search });
+    return this.domainsService.findAll({
+      programId,
+      status,
+      search,
+      page: page ? parseInt(page, 10) : 1,
+      limit: limit ? Math.min(parseInt(limit, 10), 100) : 20,
+      sortBy: sortBy || 'createdAt',
+      sortOrder: (sortOrder as 'asc' | 'desc') || 'desc',
+      hasSubdomains: hasSubdomains === 'true',
+    });
   }
 
   @Get(':id')

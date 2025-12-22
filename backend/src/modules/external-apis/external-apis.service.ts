@@ -8,6 +8,7 @@ import { AlienVaultService } from './services/alienvault.service';
 import { HackerTargetService } from './services/hackertarget.service';
 import { CrtShService } from './services/crtsh.service';
 import { UrlScanService } from './services/urlscan.service';
+import { AbuseIPDBService } from './services/abuseipdb.service';
 
 @Injectable()
 export class ExternalApisService {
@@ -21,6 +22,7 @@ export class ExternalApisService {
     public readonly hackerTarget: HackerTargetService,
     public readonly crtsh: CrtShService,
     public readonly urlscan: UrlScanService,
+    public readonly abuseIPDB: AbuseIPDBService,
   ) {}
 
   /**
@@ -88,6 +90,7 @@ export class ExternalApisService {
       { name: 'HackerTarget', configured: true }, // Free service
       { name: 'crt.sh', configured: true }, // Free service
       { name: 'URLScan', configured: this.urlscan.isConfigured() },
+      { name: 'AbuseIPDB', configured: this.abuseIPDB.isConfigured() },
     ];
   }
 }

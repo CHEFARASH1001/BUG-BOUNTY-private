@@ -30,23 +30,67 @@ export class SubdomainsController {
 
   @Get()
   @Public()
-  @ApiOperation({ summary: 'Get all subdomains' })
+  @ApiOperation({ summary: 'Get all subdomains with pagination' })
   @ApiQuery({ name: 'domainId', required: false })
+  @ApiQuery({ name: 'programId', required: false })
   @ApiQuery({ name: 'isAlive', required: false, type: Boolean })
   @ApiQuery({ name: 'hasVulnerabilities', required: false, type: Boolean })
+  @ApiQuery({ name: 'httpStatus', required: false })
+  @ApiQuery({ name: 'hasCdn', required: false, type: Boolean })
+  @ApiQuery({ name: 'cdn', required: false })
+  @ApiQuery({ name: 'technology', required: false })
+  @ApiQuery({ name: 'source', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
   findAll(
     @Query('domainId') domainId?: string,
-    @Query('isAlive') isAlive?: boolean,
-    @Query('hasVulnerabilities') hasVulnerabilities?: boolean,
+    @Query('programId') programId?: string,
+    @Query('isAlive') isAlive?: string,
+    @Query('hasVulnerabilities') hasVulnerabilities?: string,
+    @Query('httpStatus') httpStatus?: string,
+    @Query('hasCdn') hasCdn?: string,
+    @Query('cdn') cdn?: string,
+    @Query('technology') technology?: string,
+    @Query('source') source?: string,
     @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     return this.subdomainsService.findAll({
       domainId,
-      isAlive,
-      hasVulnerabilities,
+      programId,
+      isAlive: isAlive === undefined ? undefined : isAlive === 'true',
+      hasVulnerabilities: hasVulnerabilities === 'true',
+      httpStatus,
+      hasCdn: hasCdn === undefined ? undefined : hasCdn === 'true',
+      cdn,
+      technology,
+      source,
       search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortOrder,
     });
+  }
+
+  @Get('stats/overview')
+  @Public()
+  @ApiOperation({ summary: 'Get subdomain statistics overview' })
+  async getOverviewStats() {
+    return this.subdomainsService.getOverviewStats();
+  }
+
+  @Get('filters/options')
+  @Public()
+  @ApiOperation({ summary: 'Get available filter options' })
+  async getFilterOptions() {
+    return this.subdomainsService.getFilterOptions();
   }
 
   @Get(':id')

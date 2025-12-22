@@ -609,7 +609,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithBountyTable = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -622,7 +622,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithoutBountyTable = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -647,7 +647,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithMetrics = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -660,7 +660,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithoutMetrics = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -685,7 +685,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithStats = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -698,7 +698,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithoutStats = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -723,7 +723,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithScope = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -736,7 +736,7 @@ describe('ScoresService Property-Based Tests', () => {
           const dataWithoutScope = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -761,7 +761,7 @@ describe('ScoresService Property-Based Tests', () => {
           const fullData = {
             hasVulnerabilityData: true,
             hasSubdomainData: true,
-            hasHttpServiceData: true,
+            
             hasTechnologyData: true,
             hasBountyData: true,
             hasHistoricalData: true,
@@ -786,7 +786,7 @@ describe('ScoresService Property-Based Tests', () => {
           const noData = {
             hasVulnerabilityData: false,
             hasSubdomainData: false,
-            hasHttpServiceData: false,
+            
             hasTechnologyData: false,
             hasBountyData: false,
             hasHistoricalData: false,
@@ -815,7 +815,7 @@ describe('ScoresService Property-Based Tests', () => {
             let currentData = {
               hasVulnerabilityData: false,
               hasSubdomainData: false,
-              hasHttpServiceData: false,
+              
               hasTechnologyData: false,
               hasBountyData: false,
               hasHistoricalData: false,

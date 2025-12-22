@@ -7,7 +7,6 @@ import { CronConfig, CronConfigSchema } from './schemas/cron-config.schema';
 import { QueueModule } from '../queue/queue.module';
 import { PlatformsModule } from '../platforms/platforms.module';
 import { LivesModule } from '../lives/lives.module';
-import { HttpServicesModule } from '../http-services/http-services.module';
 import { ScoresModule } from '../scores/scores.module';
 import { DomainsModule } from '../domains/domains.module';
 import { SubdomainsModule } from '../subdomains/subdomains.module';
@@ -16,6 +15,7 @@ import { CliModule } from '../cli/cli.module';
 import { ExternalApisModule } from '../external-apis/external-apis.module';
 import { AlertModule } from '../alerts/alert.module';
 import { EndpointsModule } from '../endpoints/endpoints.module';
+import { ScannerModule } from '../scanner/scanner.module';
 
 @Module({
   imports: [
@@ -26,7 +26,6 @@ import { EndpointsModule } from '../endpoints/endpoints.module';
     QueueModule,
     forwardRef(() => PlatformsModule),
     forwardRef(() => LivesModule),
-    forwardRef(() => HttpServicesModule),
     forwardRef(() => ScoresModule),
     forwardRef(() => DomainsModule),
     forwardRef(() => SubdomainsModule),
@@ -35,6 +34,7 @@ import { EndpointsModule } from '../endpoints/endpoints.module';
     forwardRef(() => ExternalApisModule),
     forwardRef(() => AlertModule),
     forwardRef(() => EndpointsModule),
+    forwardRef(() => ScannerModule),
   ],
   controllers: [CronController],
   providers: [CronService],

@@ -22,7 +22,7 @@ if [ $? -eq 0 ]; then
     echo "Usage:"
     echo "  bb subfinder example.com"
     echo "  bb recon example.com"
-    echo "  bb enum-all"
+    echo "  bb trigger watch_subfinder_all"
     echo ""
     echo "Set your auth token:"
     echo "  export BB_TOKEN='your-jwt-token'"

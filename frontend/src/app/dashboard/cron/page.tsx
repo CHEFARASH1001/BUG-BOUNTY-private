@@ -21,6 +21,8 @@ import {
   FileText,
   X,
   Terminal,
+  Trash2,
+  Activity,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi } from '@/lib/api';
@@ -56,10 +58,10 @@ const jobDescriptions: Record<string, { icon: any; color: string; description: s
     color: 'text-blue-400',
     description: 'Sync bug bounty programs from HackerOne and Bugcrowd',
   },
-  watch_enum_all: {
+  watch_subfinder_all: {
     icon: Zap,
     color: 'text-purple-400',
-    description: 'Enumerate subdomains for all active domains',
+    description: 'Run subfinder for all domains (parallel via workers)',
   },
   watch_ns_all: {
     icon: Clock,
@@ -125,17 +127,28 @@ export default function CronJobsPage() {
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [logsAutoRefresh, setLogsAutoRefresh] = useState(false);
   const [cleaningUp, setCleaningUp] = useState(false);
+  const [subfinderQueueStats, setSubfinderQueueStats] = useState<{
+    messages: number;
+    consumers: number;
+    messagesReady: number;
+    messagesUnacked: number;
+  } | null>(null);
+  const [clearingQueue, setClearingQueue] = useState(false);
 
   const fetchData = async () => {
     try {
-      const [configsRes, executionsRes, runningRes] = await Promise.all([
+      const [configsRes, executionsRes, runningRes, queueStatsRes] = await Promise.all([
         cronApi.getConfigs(),
         cronApi.getExecutions({ limit: 50 }),
         cronApi.getRunningJobs(),
+        cronApi.getSubfinderQueueStats().catch(() => ({ data: null })),
       ]);
       setConfigs(configsRes.data);
       setExecutions(executionsRes.data);
       setRunningJobs(runningRes.data);
+      if (queueStatsRes.data) {
+        setSubfinderQueueStats(queueStatsRes.data);
+      }
     } catch (error) {
       console.error('Failed to fetch cron data:', error);
     } finally {
@@ -207,6 +220,23 @@ export default function CronJobsPage() {
       alert(error.response?.data?.message || 'Failed to cleanup stale jobs');
     } finally {
       setCleaningUp(false);
+    }
+  };
+
+  const handleClearSubfinderQueue = async () => {
+    if (!confirm('Are you sure you want to clear the subfinder queue? This will stop all pending subdomain scans.')) {
+      return;
+    }
+    setClearingQueue(true);
+    try {
+      const res = await cronApi.clearSubfinderQueue();
+      alert(res.data.message || 'Queue cleared');
+      await fetchData();
+    } catch (error: any) {
+      console.error('Failed to clear queue:', error);
+      alert(error.response?.data?.message || 'Failed to clear queue');
+    } finally {
+      setClearingQueue(false);
     }
   };
 

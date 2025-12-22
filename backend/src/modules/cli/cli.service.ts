@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { exec } from 'child_process';
@@ -12,7 +12,8 @@ import { SubdomainsService } from '../subdomains/subdomains.service';
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
 import { Subdomain, SubdomainDocument } from '../../schemas/subdomain.schema';
 import { Live, LiveDocument } from '../../schemas/live.schema';
-import { HttpService, HttpServiceDocument } from '../../schemas/http-service.schema';
+import { Program, ProgramDocument } from '../../schemas/program.schema';
+import { Scope, ScopeDocument, ScopeStatus } from '../../schemas/scope.schema';
 
 const execAsync = promisify(exec);
 
@@ -26,6 +27,51 @@ export interface WatchResult {
   timestamp: Date;
 }
 
+// Watchtower CLI interfaces
+export interface CLIQueryOptions {
+  format: 'json' | 'table';
+  compare?: boolean;
+  filter?: Record<string, any>;
+}
+
+export interface SingleTargetResult {
+  program: string;
+  programId: string;
+  domains: string[];
+  subdomainCount: number;
+  liveCount: number;
+  lastScanAt: Date | null;
+  scope: {
+    inScope: string[];
+    outOfScope: string[];
+  };
+}
+
+export interface HTTPQueryResult {
+  url: string;
+  status: number;
+  title: string;
+  technologies: string[];
+  changed: boolean;
+  changeDetails?: {
+    statusChanged: boolean;
+    titleChanged: boolean;
+    techChanged: boolean;
+    previousStatus?: number;
+    previousTitle?: string;
+  };
+}
+
+export interface LivesQueryResult {
+  subdomain: string;
+  ip: string[];
+  status: number | null;
+  title: string | null;
+  discoveredAt: Date;
+  isNew: boolean;
+  hasChanged: boolean;
+}
+
 @Injectable()
 export class CliService {
   private readonly logger = new Logger(CliService.name);
@@ -35,7 +81,8 @@ export class CliService {
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     @InjectModel(Subdomain.name) private subdomainModel: Model<SubdomainDocument>,
     @InjectModel(Live.name) private liveModel: Model<LiveDocument>,
-    @InjectModel(HttpService.name) private httpServiceModel: Model<HttpServiceDocument>,
+    @InjectModel(Program.name) private programModel: Model<ProgramDocument>,
+    @InjectModel(Scope.name) private scopeModel: Model<ScopeDocument>,
     private reconService: ReconService,
     private domainsService: DomainsService,
     private subdomainsService: SubdomainsService,
@@ -476,31 +523,43 @@ export class CliService {
         isAlive: true,
       });
 
+      // Create map for quick lookup
+      const subdomainToId = new Map<string, any>();
+      for (const sub of aliveSubdomains) {
+        subdomainToId.set(sub.subdomain.toLowerCase(), sub._id);
+      }
+
       const hosts = aliveSubdomains.map(s => s.subdomain);
       const probeResults = await this.reconService.probeHttp(hosts);
 
       let probed = 0;
       for (const result of probeResults) {
         try {
-          await this.httpServiceModel.updateOne(
-            { url: result.url },
-            {
-              $set: {
-                url: result.url,
-                subdomain: result.subdomain,
-                statusCode: result.statusCode,
-                title: result.title,
-                technologies: result.technologies || [],
-                contentLength: result.contentLength,
-                isFresh: true,
-                scannedAt: new Date(),
+          const subdomainLower = result.subdomain.toLowerCase();
+          const subdomainId = subdomainToId.get(subdomainLower);
+          
+          // Update subdomain document with HTTP data
+          if (subdomainId) {
+            await this.subdomainModel.updateOne(
+              { _id: subdomainId },
+              {
+                $set: {
+                  httpStatus: result.statusCode,
+                  title: result.title,
+                  technologies: result.technologies || [],
+                  contentLength: result.contentLength,
+                  contentType: result.contentType,
+                  headers: result.headers,
+                  webServer: result.webServer,
+                  faviconHash: result.faviconHash,
+                  lastSeen: new Date(),
+                },
               },
-            },
-            { upsert: true },
-          );
-          probed++;
+            );
+            probed++;
+          }
         } catch (e: any) {
-          this.logger.warn(`Failed to save HTTP result for ${result.url}: ${e.message}`);
+          this.logger.warn(`Failed to update subdomain ${result.subdomain}: ${e.message}`);
         }
       }
 
@@ -510,7 +569,7 @@ export class CliService {
         command: 'watch_http',
         domain,
         success: true,
-        message: `HTTP probing complete: ${probed} services discovered`,
+        message: `HTTP probing complete: ${probed} subdomains updated`,
         results: {
           total: hosts.length,
           probed,
@@ -526,67 +585,6 @@ export class CliService {
         domain,
         success: false,
         message: `HTTP probing failed: ${error.message}`,
-        duration,
-        timestamp: new Date(),
-      };
-    }
-  }
-
-  /**
-   * Run all enumeration for all domains
-   * Equivalent to: watch_enum_all
-   */
-  async watchEnumAll(): Promise<WatchResult> {
-    const startTime = Date.now();
-    this.logger.log('Starting enumeration for all domains...');
-
-    try {
-      const domainsResult = await this.domainsService.findAll({ limit: 100 });
-      const domains = domainsResult.data;
-
-      if (domains.length === 0) {
-        return {
-          command: 'watch_enum_all',
-          success: false,
-          message: 'No domains found in database',
-          duration: Date.now() - startTime,
-          timestamp: new Date(),
-        };
-      }
-
-      let totalSubdomains = 0;
-      const results: any[] = [];
-
-      for (const domain of domains.slice(0, 10)) { // Limit to 10 for safety
-        const result = await this.watchSubfinder(domain.domain);
-        results.push({
-          domain: domain.domain,
-          subdomains: result.results?.total || 0,
-          success: result.success,
-        });
-        totalSubdomains += result.results?.total || 0;
-      }
-
-      const duration = Date.now() - startTime;
-      
-      return {
-        command: 'watch_enum_all',
-        success: true,
-        message: `Enumeration complete: ${totalSubdomains} total subdomains from ${results.length} domains`,
-        results: {
-          domainsProcessed: results.length,
-          totalSubdomains,
-          details: results,
-        },
-        duration,
-        timestamp: new Date(),
-      };
-    } catch (error: any) {
-      const duration = Date.now() - startTime;
-      return {
-        command: 'watch_enum_all',
-        success: false,
-        message: `Enumeration failed: ${error.message}`,
         duration,
         timestamp: new Date(),
       };
@@ -990,7 +988,7 @@ export class CliService {
         return {
           command: 'watch_live_all',
           success: false,
-          message: 'No subdomains found in database. Run enumeration first (watch_subfinder_all or watch_enum_all).',
+          message: 'No subdomains found in database. Run watch_subfinder_all first.',
           duration: Date.now() - startTime,
           timestamp: new Date(),
         };
@@ -1063,13 +1061,16 @@ export class CliService {
   /**
    * Run HTTP probing for all alive hosts
    * Equivalent to: watch_http_all
+   * Updates the subdomains collection with HTTP response data
    */
   async watchHttpAll(): Promise<WatchResult> {
     const startTime = Date.now();
     this.logger.log('Starting HTTP probing for all alive hosts...');
 
     try {
-      const aliveSubdomains = await this.subdomainModel.find({ isAlive: true }).limit(500);
+      const aliveSubdomains = await this.subdomainModel.find({ isAlive: true })
+        .populate('domainId', 'domain')
+        .limit(500);
       
       if (aliveSubdomains.length === 0) {
         return {
@@ -1081,28 +1082,41 @@ export class CliService {
         };
       }
 
+      // Create maps for quick lookup
+      const subdomainToId = new Map<string, any>();
+      for (const sub of aliveSubdomains) {
+        subdomainToId.set(sub.subdomain.toLowerCase(), sub._id);
+      }
+
       const hosts = aliveSubdomains.map(s => s.subdomain);
       const probeResults = await this.reconService.probeHttp(hosts);
 
       let probed = 0;
       for (const result of probeResults) {
         try {
-          await this.httpServiceModel.updateOne(
-            { url: result.url },
-            {
-              $set: {
-                url: result.url,
-                subdomain: result.subdomain,
-                statusCode: result.statusCode,
-                title: result.title,
-                technologies: result.technologies || [],
-                isFresh: true,
-                scannedAt: new Date(),
+          const subdomainLower = result.subdomain.toLowerCase();
+          const subdomainId = subdomainToId.get(subdomainLower);
+          
+          // Update subdomain document with HTTP data
+          if (subdomainId) {
+            await this.subdomainModel.updateOne(
+              { _id: subdomainId },
+              {
+                $set: {
+                  httpStatus: result.statusCode,
+                  title: result.title,
+                  technologies: result.technologies || [],
+                  contentLength: result.contentLength,
+                  contentType: result.contentType,
+                  headers: result.headers,
+                  webServer: result.webServer,
+                  faviconHash: result.faviconHash,
+                  lastSeen: new Date(),
+                },
               },
-            },
-            { upsert: true },
-          );
-          probed++;
+            );
+            probed++;
+          }
         } catch (e) {
           // Ignore errors
         }
@@ -1113,10 +1127,10 @@ export class CliService {
       return {
         command: 'watch_http_all',
         success: true,
-        message: `HTTP probing complete: ${probed} services from ${hosts.length} hosts`,
+        message: `HTTP probing complete: ${probed} subdomains updated from ${hosts.length} hosts`,
         results: {
           hostsChecked: hosts.length,
-          servicesFound: probed,
+          subdomainsUpdated: probed,
         },
         duration,
         timestamp: new Date(),
@@ -1415,5 +1429,399 @@ export class CliService {
     }
 
     return results;
+  }
+
+  // ==================== Watchtower CLI Methods ====================
+
+  /**
+   * Get single target information for a program
+   * Equivalent to: watchtower get single target <program>
+   * Requirements: 15.1, 15.2
+   */
+  async getSingleTarget(programName: string, options: CLIQueryOptions = { format: 'json' }): Promise<SingleTargetResult> {
+    this.logger.log(`Getting single target info for program: ${programName}`);
+
+    // Find program by name or handle (case-insensitive)
+    const program = await this.programModel.findOne({
+      $or: [
+        { name: { $regex: new RegExp(`^${programName}$`, 'i') } },
+        { handle: { $regex: new RegExp(`^${programName}$`, 'i') } },
+      ],
+    });
+
+    if (!program) {
+      throw new NotFoundException(`Program not found: ${programName}`);
+    }
+
+    const programId = program._id;
+
+    // Get all domains for this program
+    const domains = await this.domainModel.find({ programId });
+    const domainNames = domains.map(d => d.domain);
+    const domainIds = domains.map(d => d._id);
+
+    // Get subdomain count
+    const subdomainCount = await this.subdomainModel.countDocuments({
+      domainId: { $in: domainIds },
+    });
+
+    // Get live count
+    const liveCount = await this.liveModel.countDocuments({
+      programId,
+    });
+
+    // Get scope information
+    const scopes = await this.scopeModel.find({ programId });
+    const inScope = scopes
+      .filter(s => s.status === ScopeStatus.IN_SCOPE)
+      .map(s => s.target);
+    const outOfScope = scopes
+      .filter(s => s.status === ScopeStatus.OUT_OF_SCOPE)
+      .map(s => s.target);
+
+    // Get last scan timestamp
+    const lastScannedDomain = await this.domainModel
+      .findOne({ programId, lastScan: { $exists: true } })
+      .sort({ lastScan: -1 });
+
+    return {
+      program: program.name,
+      programId: programId.toString(),
+      domains: domainNames,
+      subdomainCount,
+      liveCount,
+      lastScanAt: lastScannedDomain?.lastScan || program.lastScannedAt || null,
+      scope: {
+        inScope,
+        outOfScope,
+      },
+    };
+  }
+
+  /**
+   * Get all HTTP services with optional filters
+   * Equivalent to: watchtower get http all [--compare list]
+   * Requirements: 16.1
+   */
+  async getHTTPAll(options: CLIQueryOptions = { format: 'json' }): Promise<HTTPQueryResult[]> {
+    this.logger.log('Getting all HTTP services');
+
+    const query: any = { isAlive: true };
+
+    // Apply filters if provided
+    if (options.filter) {
+      if (options.filter.statusCode) {
+        query.httpStatus = parseInt(options.filter.statusCode, 10);
+      }
+      if (options.filter.technology) {
+        query.technologies = { $in: [options.filter.technology] };
+      }
+      if (options.filter.statusChanged !== undefined) {
+        query.statusCodeChanged = options.filter.statusChanged;
+      }
+      if (options.filter.titleChanged !== undefined) {
+        query.titleChanged = options.filter.titleChanged;
+      }
+      if (options.filter.techChanged !== undefined) {
+        query.techChanged = options.filter.techChanged;
+      }
+    }
+
+    const subdomains = await this.subdomainModel
+      .find(query)
+      .select('subdomain httpStatus title technologies statusCodeChanged titleChanged techChanged previousScan')
+      .limit(1000)
+      .exec();
+
+    return subdomains.map(sub => {
+      const hasChanges = !!(sub as any).statusCodeChanged || 
+                         !!(sub as any).titleChanged || 
+                         !!(sub as any).techChanged;
+
+      const result: HTTPQueryResult = {
+        url: `https://${sub.subdomain}`,
+        status: sub.httpStatus || 0,
+        title: sub.title || '',
+        technologies: sub.technologies || [],
+        changed: options.compare ? hasChanges : false,
+      };
+
+      // Include change details if compare mode is enabled and there are changes
+      if (options.compare && hasChanges) {
+        const previousScan = (sub as any).previousScan || {};
+        result.changeDetails = {
+          statusChanged: !!(sub as any).statusCodeChanged,
+          titleChanged: !!(sub as any).titleChanged,
+          techChanged: !!(sub as any).techChanged,
+          previousStatus: previousScan.httpStatus,
+          previousTitle: previousScan.title,
+        };
+      }
+
+      return result;
+    });
+  }
+
+  /**
+   * Get HTTP services for a specific program
+   * Requirements: 16.1
+   */
+  async getHTTPByProgram(programName: string, options: CLIQueryOptions = { format: 'json' }): Promise<HTTPQueryResult[]> {
+    this.logger.log(`Getting HTTP services for program: ${programName}`);
+
+    // Find program
+    const program = await this.programModel.findOne({
+      $or: [
+        { name: { $regex: new RegExp(`^${programName}$`, 'i') } },
+        { handle: { $regex: new RegExp(`^${programName}$`, 'i') } },
+      ],
+    });
+
+    if (!program) {
+      throw new NotFoundException(`Program not found: ${programName}`);
+    }
+
+    // Get domains for this program
+    const domains = await this.domainModel.find({ programId: program._id });
+    const domainIds = domains.map(d => d._id);
+
+    const query: any = { 
+      domainId: { $in: domainIds },
+      isAlive: true,
+    };
+
+    // Apply filters if provided
+    if (options.filter) {
+      if (options.filter.statusCode) {
+        query.httpStatus = parseInt(options.filter.statusCode, 10);
+      }
+      if (options.filter.technology) {
+        query.technologies = { $in: [options.filter.technology] };
+      }
+    }
+
+    const subdomains = await this.subdomainModel
+      .find(query)
+      .select('subdomain httpStatus title technologies statusCodeChanged titleChanged techChanged previousScan')
+      .limit(1000)
+      .exec();
+
+    return subdomains.map(sub => {
+      const hasChanges = !!(sub as any).statusCodeChanged || 
+                         !!(sub as any).titleChanged || 
+                         !!(sub as any).techChanged;
+
+      const result: HTTPQueryResult = {
+        url: `https://${sub.subdomain}`,
+        status: sub.httpStatus || 0,
+        title: sub.title || '',
+        technologies: sub.technologies || [],
+        changed: options.compare ? hasChanges : false,
+      };
+
+      if (options.compare && hasChanges) {
+        const previousScan = (sub as any).previousScan || {};
+        result.changeDetails = {
+          statusChanged: !!(sub as any).statusCodeChanged,
+          titleChanged: !!(sub as any).titleChanged,
+          techChanged: !!(sub as any).techChanged,
+          previousStatus: previousScan.httpStatus,
+          previousTitle: previousScan.title,
+        };
+      }
+
+      return result;
+    });
+  }
+
+  /**
+   * Get live subdomains within scope for a program
+   * Equivalent to: watchtower get lives scope <program> [--compare list]
+   * Requirements: 17.1
+   */
+  async getLivesScope(programName: string, options: CLIQueryOptions = { format: 'json' }): Promise<LivesQueryResult[]> {
+    this.logger.log(`Getting live subdomains in scope for program: ${programName}`);
+
+    // Find program
+    const program = await this.programModel.findOne({
+      $or: [
+        { name: { $regex: new RegExp(`^${programName}$`, 'i') } },
+        { handle: { $regex: new RegExp(`^${programName}$`, 'i') } },
+      ],
+    });
+
+    if (!program) {
+      throw new NotFoundException(`Program not found: ${programName}`);
+    }
+
+    // Get in-scope targets
+    const inScopeTargets = await this.scopeModel.find({
+      programId: program._id,
+      status: ScopeStatus.IN_SCOPE,
+    });
+
+    // Get out-of-scope targets for filtering
+    const outOfScopeTargets = await this.scopeModel.find({
+      programId: program._id,
+      status: ScopeStatus.OUT_OF_SCOPE,
+    });
+
+    // Build scope patterns for matching
+    const inScopePatterns = inScopeTargets.map(s => {
+      // Handle wildcard domains (*.example.com)
+      if (s.target.startsWith('*.')) {
+        const domain = s.target.slice(2);
+        return new RegExp(`\\.${domain.replace(/\./g, '\\.')}$|^${domain.replace(/\./g, '\\.')}$`, 'i');
+      }
+      return new RegExp(`^${s.target.replace(/\./g, '\\.')}$`, 'i');
+    });
+
+    const outOfScopePatterns = outOfScopeTargets.map(s => {
+      if (s.target.startsWith('*.')) {
+        const domain = s.target.slice(2);
+        return new RegExp(`\\.${domain.replace(/\./g, '\\.')}$|^${domain.replace(/\./g, '\\.')}$`, 'i');
+      }
+      return new RegExp(`^${s.target.replace(/\./g, '\\.')}$`, 'i');
+    });
+
+    // Get live subdomains for this program
+    const lives = await this.liveModel.find({ programId: program._id });
+
+    // Filter by scope
+    const inScopeLives = lives.filter(live => {
+      // Check if matches any in-scope pattern
+      const isInScope = inScopePatterns.length === 0 || 
+        inScopePatterns.some(pattern => pattern.test(live.subdomain));
+      
+      // Check if matches any out-of-scope pattern
+      const isOutOfScope = outOfScopePatterns.some(pattern => pattern.test(live.subdomain));
+      
+      return isInScope && !isOutOfScope;
+    });
+
+    // Get corresponding subdomain data for HTTP info
+    const subdomainNames = inScopeLives.map(l => l.subdomain);
+    const subdomains = await this.subdomainModel.find({
+      subdomain: { $in: subdomainNames },
+    });
+
+    const subdomainMap = new Map<string, SubdomainDocument>();
+    subdomains.forEach(s => subdomainMap.set(s.subdomain.toLowerCase(), s));
+
+    // Determine comparison window (24 hours by default)
+    const comparisonWindow = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    // Apply filters if provided
+    let filteredLives = inScopeLives;
+    if (options.filter) {
+      if (options.filter.statusCode) {
+        const statusCode = parseInt(options.filter.statusCode, 10);
+        filteredLives = filteredLives.filter(live => {
+          const sub = subdomainMap.get(live.subdomain.toLowerCase());
+          return sub?.httpStatus === statusCode;
+        });
+      }
+      if (options.filter.technology) {
+        filteredLives = filteredLives.filter(live => {
+          const sub = subdomainMap.get(live.subdomain.toLowerCase());
+          return sub?.technologies?.includes(options.filter!.technology);
+        });
+      }
+    }
+
+    return filteredLives.map(live => {
+      const sub = subdomainMap.get(live.subdomain.toLowerCase());
+      const isNew = live.firstSeen && live.firstSeen > comparisonWindow;
+      const hasChanged = !!(sub as any)?.statusCodeChanged || 
+                         !!(sub as any)?.titleChanged || 
+                         !!(sub as any)?.techChanged;
+
+      return {
+        subdomain: live.subdomain,
+        ip: live.ip || [],
+        status: sub?.httpStatus || null,
+        title: sub?.title || null,
+        discoveredAt: live.firstSeen || live.resolvedAt || new Date(),
+        isNew: options.compare ? isNew : false,
+        hasChanged: options.compare ? hasChanged : false,
+      };
+    });
+  }
+
+  /**
+   * Format output for CLI display
+   * Requirements: 15.4
+   */
+  formatOutput(data: any, format: 'json' | 'table'): string {
+    if (format === 'json') {
+      return JSON.stringify(data, null, 2);
+    }
+
+    // Table format
+    if (Array.isArray(data)) {
+      if (data.length === 0) {
+        return 'No results found.';
+      }
+
+      // Get column headers from first item
+      const headers = Object.keys(data[0]);
+      const columnWidths = headers.map(h => {
+        const maxDataWidth = Math.max(...data.map(row => {
+          const val = row[h];
+          if (Array.isArray(val)) {
+            return val.join(', ').length;
+          }
+          return String(val ?? '').length;
+        }));
+        return Math.max(h.length, maxDataWidth, 10);
+      });
+
+      // Build header row
+      const headerRow = headers.map((h, i) => h.padEnd(columnWidths[i])).join(' | ');
+      const separator = columnWidths.map(w => '-'.repeat(w)).join('-+-');
+
+      // Build data rows
+      const dataRows = data.map(row => {
+        return headers.map((h, i) => {
+          const val = row[h];
+          let strVal: string;
+          if (Array.isArray(val)) {
+            strVal = val.join(', ');
+          } else if (val === null || val === undefined) {
+            strVal = '';
+          } else if (val instanceof Date) {
+            strVal = val.toISOString();
+          } else {
+            strVal = String(val);
+          }
+          return strVal.padEnd(columnWidths[i]);
+        }).join(' | ');
+      });
+
+      return [headerRow, separator, ...dataRows].join('\n');
+    }
+
+    // Single object
+    if (typeof data === 'object' && data !== null) {
+      const lines: string[] = [];
+      for (const [key, value] of Object.entries(data)) {
+        let strVal: string;
+        if (Array.isArray(value)) {
+          strVal = value.length > 0 ? value.join(', ') : '(none)';
+        } else if (value === null || value === undefined) {
+          strVal = '(none)';
+        } else if (value instanceof Date) {
+          strVal = value.toISOString();
+        } else if (typeof value === 'object') {
+          strVal = JSON.stringify(value);
+        } else {
+          strVal = String(value);
+        }
+        lines.push(`${key}: ${strVal}`);
+      }
+      return lines.join('\n');
+    }
+
+    return String(data);
   }
 }

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Layers,
   Search,
@@ -25,7 +25,15 @@ import {
   FileText,
   AlertTriangle,
   Link2,
+  ChevronDown,
+  ChevronUp,
+  Server,
+  Hash,
+  Clock,
+  Sparkles,
+  Eye,
 } from 'lucide-react';
+import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { subdomainsApi } from '@/lib/api';
 import { socketClient } from '@/lib/socket';
@@ -49,15 +57,30 @@ interface Subdomain {
   cdn?: string[];
   isAlive: boolean;
   httpStatus?: number;
+  httpsStatus?: number;
   title?: string;
   technologies?: string[];
-  ports?: { port: number }[];
+  ports?: { port: number; protocol?: string; service?: string }[];
   waf?: string[];
   sources?: string[];
   endpointCount?: number;
   abuseScore?: number;
+  headers?: Record<string, string>;
+  webServer?: string;
+  faviconHash?: string;
+  contentLength?: number;
+  contentType?: string;
+  ssl?: {
+    issuer?: string;
+    validFrom?: string;
+    validTo?: string;
+    isExpired?: boolean;
+    isValid?: boolean;
+  };
+  isNew?: boolean;
   createdAt?: string;
   lastSeen?: string;
+  firstSeen?: string;
 }
 
 interface Pagination {
@@ -119,6 +142,140 @@ function useDebounce<T>(value: T, delay: number): T {
   return debouncedValue;
 }
 
+// Expandable details component for HTTP info
+function SubdomainDetails({ sub }: { sub: Subdomain }) {
+  const hasHeaders = sub.headers && Object.keys(sub.headers).length > 0;
+  const hasPorts = sub.ports && sub.ports.length > 0;
+  const hasSSL = sub.ssl && (sub.ssl.issuer || sub.ssl.validTo);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="px-4 py-4 bg-dark-800/50 border-t border-dark-700"
+    >
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Web Server & Content Info */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Server Info</h4>
+          <div className="space-y-1.5">
+            {sub.webServer && (
+              <div className="flex items-center gap-2">
+                <Server className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300">{sub.webServer}</span>
+              </div>
+            )}
+            {sub.contentType && (
+              <div className="flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300 truncate">{sub.contentType}</span>
+              </div>
+            )}
+            {sub.contentLength !== undefined && (
+              <div className="flex items-center gap-2">
+                <Hash className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300">{sub.contentLength.toLocaleString()} bytes</span>
+              </div>
+            )}
+            {sub.faviconHash && (
+              <div className="flex items-center gap-2">
+                <Globe className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300 font-mono text-xs">{sub.faviconHash}</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Ports */}
+        {hasPorts && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Open Ports</h4>
+            <div className="flex flex-wrap gap-1.5">
+              {sub.ports!.map((port, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 text-xs rounded font-mono"
+                  title={port.service || ''}
+                >
+                  {port.port}{port.service ? `/${port.service}` : ''}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* SSL Info */}
+        {hasSSL && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider">SSL Certificate</h4>
+            <div className="space-y-1.5">
+              {sub.ssl!.issuer && (
+                <div className="text-sm text-slate-300 truncate" title={sub.ssl!.issuer}>
+                  Issuer: {sub.ssl!.issuer}
+                </div>
+              )}
+              {sub.ssl!.validTo && (
+                <div className={cn(
+                  'text-sm',
+                  sub.ssl!.isExpired ? 'text-red-400' : 'text-green-400'
+                )}>
+                  {sub.ssl!.isExpired ? '⚠ Expired' : '✓ Valid'} until {new Date(sub.ssl!.validTo).toLocaleDateString()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Timestamps */}
+        <div className="space-y-2">
+          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Timeline</h4>
+          <div className="space-y-1.5">
+            {sub.firstSeen && (
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300">First: {new Date(sub.firstSeen).toLocaleDateString()}</span>
+              </div>
+            )}
+            {sub.lastSeen && (
+              <div className="flex items-center gap-2">
+                <Clock className="w-3.5 h-3.5 text-slate-500" />
+                <span className="text-sm text-slate-300">Last: {new Date(sub.lastSeen).toLocaleDateString()}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Headers */}
+      {hasHeaders && (
+        <div className="mt-4 pt-4 border-t border-dark-700">
+          <h4 className="text-xs font-medium text-slate-400 uppercase tracking-wider mb-2">Response Headers</h4>
+          <div className="bg-dark-900 rounded-lg p-3 max-h-48 overflow-y-auto">
+            <table className="w-full text-xs font-mono">
+              <tbody>
+                {Object.entries(sub.headers!).slice(0, 15).map(([key, value]) => (
+                  <tr key={key} className="border-b border-dark-800 last:border-0">
+                    <td className="py-1 pr-4 text-cyan-400 whitespace-nowrap">{key}</td>
+                    <td className="py-1 text-slate-300 break-all">{value}</td>
+                  </tr>
+                ))}
+                {Object.keys(sub.headers!).length > 15 && (
+                  <tr>
+                    <td colSpan={2} className="py-1 text-slate-500">
+                      +{Object.keys(sub.headers!).length - 15} more headers
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
 export default function SubdomainsPage() {
   const [subdomains, setSubdomains] = useState<Subdomain[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
@@ -127,23 +284,38 @@ export default function SubdomainsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [filterAlive, setFilterAlive] = useState<string>('');
-  const [showLiveOnly, setShowLiveOnly] = useState(false); // New toggle state for live filter
+  const [showLiveOnly, setShowLiveOnly] = useState(false);
   const [filterProgram, setFilterProgram] = useState<string>('');
   const [filterDomain, setFilterDomain] = useState<string>('');
   const [filterHttpStatus, setFilterHttpStatus] = useState<string>('');
   const [filterCdn, setFilterCdn] = useState<string>('');
   const [filterTechnology, setFilterTechnology] = useState<string>('');
   const [filterSource, setFilterSource] = useState<string>('');
+  const [filterFresh, setFilterFresh] = useState<string>('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [filterOptionsLoaded, setFilterOptionsLoaded] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const toggleRowExpansion = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   // Sync showLiveOnly toggle with filterAlive
   useEffect(() => {
@@ -161,7 +333,6 @@ export default function SubdomainsPage() {
         sub._id === data.subdomain._id ? { ...sub, ...data.subdomain } : sub
       ));
     } else if (data.action === 'created') {
-      // Only add if it matches current filters
       if (!showLiveOnly || data.subdomain.isAlive) {
         setSubdomains(prev => [data.subdomain, ...prev.slice(0, pagination.limit - 1)]);
         setPagination(prev => ({ ...prev, total: prev.total + 1 }));
@@ -172,59 +343,54 @@ export default function SubdomainsPage() {
     }
   }, [showLiveOnly, pagination.limit]);
 
-  // Handle subdomain status change (live/offline)
   const handleSubdomainStatusChange = useCallback((data: { subdomainId: string; isAlive: boolean; httpStatus?: number; title?: string; technologies?: string[] }) => {
     setSubdomains(prev => prev.map(sub => {
       if (sub._id === data.subdomainId) {
-        const updated = { 
+        return { 
           ...sub, 
           isAlive: data.isAlive,
           httpStatus: data.httpStatus ?? sub.httpStatus,
           title: data.title ?? sub.title,
           technologies: data.technologies ?? sub.technologies,
         };
-        return updated;
       }
       return sub;
     }));
     
-    // If showing live only and subdomain went offline, remove it from the list
     if (showLiveOnly && !data.isAlive) {
       setSubdomains(prev => prev.filter(sub => sub._id !== data.subdomainId));
     }
   }, [showLiveOnly]);
 
-  // Connect to WebSocket and subscribe to subdomain events
   useEffect(() => {
     socketClient.connect();
-    
     const unsubscribeUpdate = socketClient.on('subdomain:update', handleSubdomainUpdate);
     const unsubscribeStatus = socketClient.on('subdomain:status', handleSubdomainStatusChange);
-    
     return () => {
       unsubscribeUpdate();
       unsubscribeStatus();
     };
   }, [handleSubdomainUpdate, handleSubdomainStatusChange]);
 
-  // Fetch filter options on mount
   useEffect(() => {
+    if (!showFilters || filterOptionsLoaded) return;
     const fetchFilterOptions = async () => {
       try {
         const response = await subdomainsApi.getFilterOptions();
         setFilterOptions(response.data);
+        setFilterOptionsLoaded(true);
       } catch (err) {
         console.error('Failed to fetch filter options:', err);
       }
     };
     fetchFilterOptions();
-  }, []);
+  }, [showFilters, filterOptionsLoaded]);
 
   const fetchSubdomains = useCallback(async (page = 1) => {
     setLoading(true);
     setError(null);
     try {
-      const params: any = { page, limit: pagination.limit, sortBy, sortOrder };
+      const params: Record<string, any> = { page, limit: pagination.limit, sortBy, sortOrder };
       if (filterAlive) params.isAlive = filterAlive;
       if (filterProgram) params.programId = filterProgram;
       if (filterDomain) params.domainId = filterDomain;
@@ -232,6 +398,7 @@ export default function SubdomainsPage() {
       if (filterCdn) params.cdn = filterCdn;
       if (filterTechnology) params.technology = filterTechnology;
       if (filterSource) params.source = filterSource;
+      if (filterFresh) params.isNew = filterFresh;
       if (debouncedSearch) params.search = debouncedSearch;
 
       const response = await subdomainsApi.getAll(params);
@@ -249,11 +416,11 @@ export default function SubdomainsPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.limit, filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, debouncedSearch, sortBy, sortOrder]);
+  }, [pagination.limit, filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchSubdomains(1);
-  }, [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, debouncedSearch, sortBy, sortOrder]);
+  }, [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, debouncedSearch, sortBy, sortOrder]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -277,13 +444,14 @@ export default function SubdomainsPage() {
     setFilterCdn('');
     setFilterTechnology('');
     setFilterSource('');
+    setFilterFresh('');
   };
 
-  const activeFilterCount = [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource].filter(Boolean).length;
+  const activeFilterCount = [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh].filter(Boolean).length;
 
   const exportSubdomains = async () => {
     try {
-      const params: any = { limit: 10000 };
+      const params: Record<string, any> = { limit: 10000 };
       if (filterAlive) params.isAlive = filterAlive;
       if (filterProgram) params.programId = filterProgram;
       if (filterDomain) params.domainId = filterDomain;
@@ -291,6 +459,7 @@ export default function SubdomainsPage() {
       if (filterCdn) params.cdn = filterCdn;
       if (filterTechnology) params.technology = filterTechnology;
       if (filterSource) params.source = filterSource;
+      if (filterFresh) params.isNew = filterFresh;
       if (debouncedSearch) params.search = debouncedSearch;
 
       const response = await subdomainsApi.getAll(params);
@@ -326,7 +495,6 @@ export default function SubdomainsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {/* Live Filter Toggle Button */}
           <button
             onClick={() => setShowLiveOnly(!showLiveOnly)}
             className={cn(
@@ -459,104 +627,124 @@ export default function SubdomainsPage() {
           exit={{ opacity: 0, height: 0 }}
           className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Status</label>
-              <select
-                value={filterAlive}
-                onChange={(e) => setFilterAlive(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All</option>
-                <option value="true">Alive</option>
-                <option value="false">Dead</option>
-              </select>
+          {!filterOptions ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+              <span className="ml-2 text-sm text-slate-400">Loading filters...</span>
             </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Status</label>
+                <select
+                  value={filterAlive}
+                  onChange={(e) => setFilterAlive(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  <option value="true">Alive</option>
+                  <option value="false">Dead</option>
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Program</label>
-              <select
-                value={filterProgram}
-                onChange={(e) => setFilterProgram(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All Programs</option>
-                {filterOptions?.programs.map((p) => (
-                  <option key={p._id} value={p._id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Program</label>
+                <select
+                  value={filterProgram}
+                  onChange={(e) => setFilterProgram(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All Programs</option>
+                  {filterOptions?.programs.map((p) => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Domain</label>
-              <select
-                value={filterDomain}
-                onChange={(e) => setFilterDomain(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All Domains</option>
-                {filterOptions?.domains.map((d) => (
-                  <option key={d._id} value={d._id}>{d.domain}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Domain</label>
+                <select
+                  value={filterDomain}
+                  onChange={(e) => setFilterDomain(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All Domains</option>
+                  {filterOptions?.domains.map((d) => (
+                    <option key={d._id} value={d._id}>{d.domain}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">HTTP Status</label>
-              <select
-                value={filterHttpStatus}
-                onChange={(e) => setFilterHttpStatus(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All</option>
-                {filterOptions?.httpStatuses.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">HTTP Status</label>
+                <select
+                  value={filterHttpStatus}
+                  onChange={(e) => setFilterHttpStatus(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  {filterOptions?.httpStatuses.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">CDN</label>
-              <select
-                value={filterCdn}
-                onChange={(e) => setFilterCdn(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All</option>
-                {filterOptions?.cdns.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">CDN</label>
+                <select
+                  value={filterCdn}
+                  onChange={(e) => setFilterCdn(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  {filterOptions?.cdns.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Technology</label>
-              <select
-                value={filterTechnology}
-                onChange={(e) => setFilterTechnology(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All</option>
-                {filterOptions?.technologies.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
-            </div>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Technology</label>
+                <select
+                  value={filterTechnology}
+                  onChange={(e) => setFilterTechnology(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  {filterOptions?.technologies.map((t) => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
 
-            <div>
-              <label className="block text-xs text-slate-400 mb-1">Source</label>
-              <select
-                value={filterSource}
-                onChange={(e) => setFilterSource(e.target.value)}
-                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-              >
-                <option value="">All</option>
-                {filterOptions?.sources.map((s) => (
-                  <option key={s} value={s}>{s}</option>
-                ))}
-              </select>
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Source</label>
+                <select
+                  value={filterSource}
+                  onChange={(e) => setFilterSource(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  {filterOptions?.sources.map((s) => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-slate-400 mb-1">Freshness</label>
+                <select
+                  value={filterFresh}
+                  onChange={(e) => setFilterFresh(e.target.value)}
+                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+                >
+                  <option value="">All</option>
+                  <option value="true">Fresh Only</option>
+                  <option value="false">Not Fresh</option>
+                </select>
+              </div>
             </div>
-          </div>
+          )}
         </motion.div>
       )}
 
@@ -575,8 +763,8 @@ export default function SubdomainsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-dark-800">
+                  <th className="w-8 px-2"></th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Subdomain</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Domain</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Program</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
                     <div className="flex items-center gap-1">
@@ -591,24 +779,17 @@ export default function SubdomainsPage() {
                     </div>
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">IP / CNAME</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">CDN</th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Sources</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
+                    <div className="flex items-center gap-1">
+                      <Server className="w-3.5 h-3.5" />
+                      Server
+                    </div>
+                  </th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">CDN / WAF</th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
                     <div className="flex items-center gap-1">
                       <Code className="w-3.5 h-3.5" />
-                      Technologies
-                    </div>
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
-                    <div className="flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      Abuse
-                    </div>
-                  </th>
-                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">
-                    <div className="flex items-center gap-1">
-                      <Link2 className="w-3.5 h-3.5" />
-                      Endpoints
+                      Tech
                     </div>
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Actions</th>
@@ -616,185 +797,185 @@ export default function SubdomainsPage() {
               </thead>
               <tbody>
                 {subdomains.map((sub, index) => (
-                  <motion.tr
-                    key={sub._id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: Math.min(index * 0.01, 0.3) }}
-                    className="border-b border-dark-800/50 hover:bg-dark-800/30 transition-colors"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {sub.isAlive ? (
-                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
-                        ) : (
-                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
-                        )}
-                        <div className="min-w-0">
-                          <div className="font-medium text-white truncate max-w-[250px]">{sub.subdomain}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.domainId?.domain ? (
-                        <span className="text-sm text-slate-300">{sub.domainId.domain}</span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
+                  <>
+                    <motion.tr
+                      key={sub._id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: Math.min(index * 0.01, 0.3) }}
+                      className={cn(
+                        'border-b border-dark-800/50 hover:bg-dark-800/30 transition-colors cursor-pointer',
+                        expandedRows.has(sub._id) && 'bg-dark-800/20'
                       )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.domainId?.programId ? (
-                        <div className="min-w-0">
-                          <div className="text-sm text-white truncate max-w-[150px]">{sub.domainId.programId.name}</div>
-                          {sub.domainId.programId.platform && (
-                            <div className="text-xs text-slate-500">{sub.domainId.programId.platform}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.httpStatus ? (
-                        <span className={cn(
-                          'inline-flex items-center px-2 py-0.5 rounded font-mono text-sm',
-                          getStatusBgColor(sub.httpStatus),
-                          getStatusColor(sub.httpStatus)
-                        )}>
-                          {sub.httpStatus}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.title ? (
-                        <div className="text-sm text-slate-300 truncate max-w-[200px]" title={sub.title}>
-                          {sub.title}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.ip && sub.ip.length > 0 ? (
-                        <div className="space-y-1">
-                          {sub.ip.slice(0, 2).map((ip) => (
-                            <div key={ip} className="font-mono text-sm text-slate-300">{ip}</div>
-                          ))}
-                          {sub.ip.length > 2 && (
-                            <div className="text-xs text-slate-500">+{sub.ip.length - 2} more</div>
-                          )}
-                          {sub.cname && sub.cname.length > 0 && (
-                            <div className="text-xs text-cyan-400 truncate max-w-[150px]" title={sub.cname[0]}>
-                              → {sub.cname[0]}
-                            </div>
-                          )}
-                        </div>
-                      ) : sub.cname && sub.cname.length > 0 ? (
-                        <div className="text-xs text-cyan-400 truncate max-w-[150px]" title={sub.cname[0]}>
-                          → {sub.cname[0]}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.cdn && sub.cdn.length > 0 ? (
-                        <span className="px-1.5 py-0.5 bg-orange-500/20 text-xs text-orange-400 rounded">
-                          {sub.cdn[0]}
-                        </span>
-                      ) : sub.waf && sub.waf.length > 0 ? (
-                        <span className="flex items-center gap-1 text-yellow-400 text-sm">
-                          <Shield className="w-3 h-3" />
-                          {sub.waf[0]}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.sources && sub.sources.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {sub.sources.map((source) => (
-                            <span key={source} className="px-1.5 py-0.5 bg-blue-500/20 text-xs text-blue-400 rounded">
-                              {source}
-                            </span>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.technologies && sub.technologies.length > 0 ? (
-                        <div className="flex flex-wrap gap-1">
-                          {sub.technologies.slice(0, 3).map((tech) => (
-                            <span key={tech} className="px-1.5 py-0.5 bg-primary-500/20 text-xs text-primary-400 rounded">
-                              {tech}
-                            </span>
-                          ))}
-                          {sub.technologies.length > 3 && (
-                            <span className="px-1.5 py-0.5 bg-slate-500/20 text-xs text-slate-400 rounded" title={sub.technologies.slice(3).join(', ')}>
-                              +{sub.technologies.length - 3}
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.abuseScore !== undefined && sub.abuseScore !== null ? (
-                        <span className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium',
-                          getAbuseScoreBgColor(sub.abuseScore),
-                          getAbuseScoreColor(sub.abuseScore)
-                        )}>
-                          <AlertTriangle className="w-3 h-3" />
-                          {sub.abuseScore}%
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {sub.endpointCount && sub.endpointCount > 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs font-medium">
-                          <Link2 className="w-3 h-3" />
-                          {sub.endpointCount}
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => copyToClipboard(sub.subdomain, sub._id)}
-                          className="p-1.5 text-slate-400 hover:text-white transition-colors"
-                          title="Copy"
-                        >
-                          {copiedId === sub._id ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
+                      onClick={() => toggleRowExpansion(sub._id)}
+                    >
+                      <td className="px-2 py-3">
+                        <button className="p-1 text-slate-500 hover:text-white transition-colors">
+                          {expandedRows.has(sub._id) ? (
+                            <ChevronUp className="w-4 h-4" />
                           ) : (
-                            <Copy className="w-4 h-4" />
+                            <ChevronDown className="w-4 h-4" />
                           )}
                         </button>
-                        {sub.isAlive && (
-                          <a
-                            href={`https://${sub.subdomain}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-1.5 text-slate-400 hover:text-white transition-colors"
-                            title="Open"
-                          >
-                            <ExternalLink className="w-4 h-4" />
-                          </a>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          {sub.isAlive ? (
+                            <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                          ) : (
+                            <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-medium text-white truncate max-w-[200px]">{sub.subdomain}</span>
+                              {sub.isNew && (
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs rounded-full" title="Fresh discovery">
+                                  <Sparkles className="w-3 h-3" />
+                                  New
+                                </span>
+                              )}
+                            </div>
+                            {sub.domainId?.domain && (
+                              <div className="text-xs text-slate-500">{sub.domainId.domain}</div>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.domainId?.programId ? (
+                          <div className="min-w-0">
+                            <div className="text-sm text-white truncate max-w-[120px]">{sub.domainId.programId.name}</div>
+                            {sub.domainId.programId.platform && (
+                              <div className="text-xs text-slate-500">{sub.domainId.programId.platform}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
                         )}
-                      </div>
-                    </td>
-                  </motion.tr>
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.httpStatus ? (
+                          <span className={cn(
+                            'inline-flex items-center px-2 py-0.5 rounded font-mono text-sm',
+                            getStatusBgColor(sub.httpStatus),
+                            getStatusColor(sub.httpStatus)
+                          )}>
+                            {sub.httpStatus}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.title ? (
+                          <div className="text-sm text-slate-300 truncate max-w-[180px]" title={sub.title}>
+                            {sub.title}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.ip && sub.ip.length > 0 ? (
+                          <div className="space-y-0.5">
+                            <div className="font-mono text-sm text-slate-300">{sub.ip[0]}</div>
+                            {sub.ip.length > 1 && (
+                              <div className="text-xs text-slate-500">+{sub.ip.length - 1} more</div>
+                            )}
+                          </div>
+                        ) : sub.cname && sub.cname.length > 0 ? (
+                          <div className="text-xs text-cyan-400 truncate max-w-[120px]" title={sub.cname[0]}>
+                            → {sub.cname[0]}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.webServer ? (
+                          <span className="text-sm text-slate-300 truncate max-w-[100px]" title={sub.webServer}>
+                            {sub.webServer.split('/')[0]}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.cdn && sub.cdn.length > 0 ? (
+                          <span className="px-1.5 py-0.5 bg-orange-500/20 text-xs text-orange-400 rounded">
+                            {sub.cdn[0]}
+                          </span>
+                        ) : sub.waf && sub.waf.length > 0 ? (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-yellow-500/20 text-xs text-yellow-400 rounded">
+                            <Shield className="w-3 h-3" />
+                            {sub.waf[0]}
+                          </span>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        {sub.technologies && sub.technologies.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {sub.technologies.slice(0, 2).map((tech) => (
+                              <span key={tech} className="px-1.5 py-0.5 bg-primary-500/20 text-xs text-primary-400 rounded">
+                                {tech}
+                              </span>
+                            ))}
+                            {sub.technologies.length > 2 && (
+                              <span className="px-1.5 py-0.5 bg-slate-500/20 text-xs text-slate-400 rounded">
+                                +{sub.technologies.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1">
+                          <Link
+                            href={`/dashboard/subdomains/${sub._id}`}
+                            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                          <button
+                            onClick={() => copyToClipboard(sub.subdomain, sub._id)}
+                            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                            title="Copy"
+                          >
+                            {copiedId === sub._id ? (
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                            ) : (
+                              <Copy className="w-4 h-4" />
+                            )}
+                          </button>
+                          {sub.isAlive && (
+                            <a
+                              href={`https://${sub.subdomain}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                              title="Open"
+                            >
+                              <ExternalLink className="w-4 h-4" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                    <AnimatePresence>
+                      {expandedRows.has(sub._id) && (
+                        <tr key={`${sub._id}-details`}>
+                          <td colSpan={10} className="p-0">
+                            <SubdomainDetails sub={sub} />
+                          </td>
+                        </tr>
+                      )}
+                    </AnimatePresence>
+                  </>
                 ))}
               </tbody>
             </table>
@@ -812,7 +993,6 @@ export default function SubdomainsPage() {
                 onClick={() => handlePageChange(1)}
                 disabled={!pagination.hasPrev}
                 className="p-2 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="First page"
               >
                 <ChevronsLeft className="w-4 h-4" />
               </button>
@@ -820,7 +1000,6 @@ export default function SubdomainsPage() {
                 onClick={() => handlePageChange(pagination.page - 1)}
                 disabled={!pagination.hasPrev}
                 className="p-2 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
@@ -846,7 +1025,6 @@ export default function SubdomainsPage() {
                     }
                   }}
                   className="w-16 px-2 py-1 bg-dark-800 border border-dark-700 rounded text-sm text-white text-center focus:outline-none focus:border-primary-500/50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  title="Go to page"
                 />
                 <span className="text-sm text-slate-400">/ {pagination.totalPages}</span>
               </div>
@@ -854,7 +1032,6 @@ export default function SubdomainsPage() {
                 onClick={() => handlePageChange(pagination.page + 1)}
                 disabled={!pagination.hasNext}
                 className="p-2 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -862,7 +1039,6 @@ export default function SubdomainsPage() {
                 onClick={() => handlePageChange(pagination.totalPages)}
                 disabled={!pagination.hasNext}
                 className="p-2 text-slate-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                title="Last page"
               >
                 <ChevronsRight className="w-4 h-4" />
               </button>

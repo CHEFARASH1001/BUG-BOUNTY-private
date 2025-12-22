@@ -70,6 +70,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
     ports:
       - "4000:4000"
     volumes:

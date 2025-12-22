@@ -7,7 +7,6 @@ import { Program, ProgramSchema } from '../../schemas/program.schema';
 import { Domain, DomainSchema } from '../../schemas/domain.schema';
 import { Subdomain, SubdomainSchema } from '../../schemas/subdomain.schema';
 import { Live, LiveSchema } from '../../schemas/live.schema';
-import { HttpService, HttpServiceSchema } from '../../schemas/http-service.schema';
 import { Vulnerability, VulnerabilitySchema } from '../../schemas/vulnerability.schema';
 import { Scope, ScopeSchema } from '../../schemas/scope.schema';
 
@@ -19,7 +18,6 @@ import { Scope, ScopeSchema } from '../../schemas/scope.schema';
       { name: Domain.name, schema: DomainSchema },
       { name: Subdomain.name, schema: SubdomainSchema },
       { name: Live.name, schema: LiveSchema },
-      { name: HttpService.name, schema: HttpServiceSchema },
       { name: Vulnerability.name, schema: VulnerabilitySchema },
       { name: Scope.name, schema: ScopeSchema },
     ]),

@@ -88,6 +88,7 @@ export const subdomainsApi = {
     cdn?: string;
     technology?: string;
     source?: string;
+    isNew?: string | boolean;
     search?: string;
     page?: number;
     limit?: number;
@@ -172,6 +173,9 @@ export const cronApi = {
   getExecutionLogs: (executionId: string) => api.get(`/cron/executions/${executionId}/logs`),
   cleanupStaleJobs: (maxAgeHours?: number) => api.post('/cron/cleanup/stale', undefined, { params: maxAgeHours ? { maxAgeHours } : {} }),
   cancelJob: (executionId: string) => api.post(`/cron/executions/${executionId}/cancel`),
+  // Subfinder queue management
+  getSubfinderQueueStats: () => api.get('/cron/queue/subfinder/stats'),
+  clearSubfinderQueue: () => api.post('/cron/queue/subfinder/clear'),
 };
 
 // Platform Sync API
@@ -196,38 +200,10 @@ export const livesApi = {
     api.get('/lives/stats', { params: filters }),
 };
 
-// HTTP Services API
-export const httpServicesApi = {
-  getAll: (filters?: { 
-    domain?: string; 
-    programId?: string;
-    tech?: string; 
-    title?: string; 
-    statusCode?: number;
-    provider?: string;
-    isCdn?: boolean;
-    isFresh?: boolean;
-    statusCodeChanged?: boolean;
-    titleChanged?: boolean;
-    techChanged?: boolean;
-    headerRegex?: string;
-    limit?: number;
-    offset?: number;
-  }) =>
-    api.get('/http/all', { params: filters }),
-  getFresh: (filters?: { domain?: string; limit?: number }) =>
-    api.get('/http/fresh', { params: filters }),
-  getSingle: (domain: string) => api.get(`/http/single/${domain}`),
-  getChanges: (filters?: { domain?: string; statusCode?: boolean; title?: boolean; tech?: boolean }) =>
-    api.get('/http/changes', { params: filters }),
-  getStats: (filters?: { domain?: string; programId?: string }) =>
-    api.get('/http/stats', { params: filters }),
-};
-
 // Technologies API
 export const technologiesApi = {
   getList: (filters?: { domain?: string; limit?: number }) =>
-    api.get('/technologies/list', { params: filters }),
+    api.get('/subdomains/technologies', { params: filters }),
 };
 
 // Scores API - Enhanced scoring system
@@ -280,7 +256,6 @@ export const cliApi = {
   watchHttp: (domain: string) => api.post(`/cli/watch/http/${domain}`),
   
   // Bulk commands
-  watchEnumAll: () => api.post('/cli/watch/enum-all'),
   watchNsAll: () => api.post('/cli/watch/ns-all'),
   watchHttpAll: () => api.post('/cli/watch/http-all'),
   
@@ -289,6 +264,38 @@ export const cliApi = {
   
   // Get available commands
   getCommands: () => api.get('/cli/commands'),
+  
+  // Watchtower CLI query methods
+  // Get single target info for a program (Requirements: 15.1)
+  getSingleTarget: (program: string, options?: { format?: 'json' | 'table' }) =>
+    api.get(`/cli/target/${program}`, { params: options }),
+  
+  // Get all HTTP services with filters (Requirements: 16.1)
+  getHTTPServices: (options?: {
+    format?: 'json' | 'table';
+    compare?: boolean;
+    statusCode?: number;
+    technology?: string;
+    statusChanged?: boolean;
+    titleChanged?: boolean;
+    techChanged?: boolean;
+  }) => api.get('/cli/http', { params: options }),
+  
+  // Get HTTP services for a specific program
+  getHTTPByProgram: (program: string, options?: {
+    format?: 'json' | 'table';
+    compare?: boolean;
+    statusCode?: number;
+    technology?: string;
+  }) => api.get(`/cli/http/${program}`, { params: options }),
+  
+  // Get live subdomains by scope for a program (Requirements: 17.1)
+  getLivesScope: (program: string, options?: {
+    format?: 'json' | 'table';
+    compare?: boolean;
+    statusCode?: number;
+    technology?: string;
+  }) => api.get(`/cli/lives/${program}`, { params: options }),
 };
 
 // Fuzz API - Web fuzzing with FFUF
@@ -397,6 +404,52 @@ export const waybackApi = {
     api.get(`/recon/wayback/${domain}/endpoints`),
 };
 
+// DNS Brute API - DNS brute forcing
+export const dnsBruteApi = {
+  // Start a new DNS brute job
+  start: (config: {
+    domain: string;
+    mode: 'static' | 'dynamic';
+    wordlistConfig?: {
+      sources: {
+        bestDns?: boolean;
+        twoMillionSubdomains?: boolean;
+        crunch?: boolean;
+        custom?: string[];
+      };
+      crunchConfig?: {
+        minLength: number;
+        maxLength: number;
+        charset: string;
+      };
+    };
+    threads?: number;
+    resolvers?: string;
+    programId?: string;
+  }) => api.post('/dns-brute', config),
+  
+  // Get job status and results
+  getJob: (id: string) => api.get(`/dns-brute/${id}`),
+  
+  // Cancel a running job
+  cancel: (id: string) => api.delete(`/dns-brute/${id}`),
+  
+  // Get job history
+  getHistory: (limit?: number) => api.get('/dns-brute/history', { params: { limit } }),
+};
+
+// Wordlists API - Wordlist management
+export const wordlistsApi = {
+  // Get available wordlists
+  getAll: () => api.get('/wordlists'),
+  
+  // Download a wordlist
+  download: (url: string, name: string) => api.post('/wordlists/download', { url, name }),
+  
+  // Get wordlist statistics
+  getStats: (name: string) => api.get(`/wordlists/${name}/stats`),
+};
+
 // Nuclei API - Vulnerability scanning
 export const nucleiApi = {
   // Run a scan on targets
@@ -432,4 +485,39 @@ export const nucleiApi = {
   
   // Update nuclei templates
   updateTemplates: () => api.post('/scanner/nuclei/templates/update'),
+};
+
+// Chaos API - ProjectDiscovery Chaos subdomain dataset
+export const chaosApi = {
+  // Get available Chaos programs
+  getPrograms: (search?: string) => 
+    api.get('/chaos/programs', { params: search ? { search } : {} }),
+  
+  // Start syncing a Chaos program
+  sync: (data: { programName: string; existingSubdomains?: string[] }) => 
+    api.post('/chaos/sync', data),
+  
+  // Get sync job status
+  getSyncStatus: (id: string) => api.get(`/chaos/sync/${id}`),
+  
+  // Enable/disable watching for a program
+  setWatch: (programId: string, data: { enabled: boolean }) => 
+    api.put(`/chaos/watch/${programId}`, data),
+  
+  // Get all watched programs
+  getWatched: () => api.get('/chaos/watched'),
+};
+
+// GAU API - GetAllUrls for historical URL discovery
+export const gauApi = {
+  // Start GAU enumeration for a domain
+  start: (config: {
+    domain: string;
+    providers?: ('wayback' | 'commoncrawl' | 'otx' | 'urlscan')[];
+    blacklist?: string[];
+    threads?: number;
+  }) => api.post('/gau', config),
+  
+  // Get GAU job status and results
+  getResults: (id: string) => api.get(`/gau/${id}`),
 };

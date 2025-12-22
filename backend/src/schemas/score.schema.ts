@@ -188,7 +188,6 @@ export class Score {
   dataAvailability: {
     hasVulnerabilityData: boolean;
     hasSubdomainData: boolean;
-    hasHttpServiceData: boolean;
     hasTechnologyData: boolean;
     hasBountyData: boolean;
     hasHistoricalData: boolean;

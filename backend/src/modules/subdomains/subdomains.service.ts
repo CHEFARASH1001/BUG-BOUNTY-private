@@ -95,6 +95,7 @@ export class SubdomainsService {
     cdn?: string;
     technology?: string;
     source?: string;
+    isNew?: boolean;
     search?: string;
     page?: number;
     limit?: number;
@@ -158,6 +159,9 @@ export class SubdomainsService {
     }
     if (filters?.search) {
       query.subdomain = { $regex: filters.search, $options: 'i' };
+    }
+    if (filters?.isNew !== undefined) {
+      query.isNew = filters.isNew;
     }
 
     const [data, total] = await Promise.all([
@@ -310,6 +314,13 @@ export class SubdomainsService {
     };
   }
 
+  // Cache for filter options (5 minute TTL)
+  private filterOptionsCache: {
+    data: any;
+    timestamp: number;
+  } | null = null;
+  private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
   async getFilterOptions(): Promise<{
     technologies: string[];
     sources: string[];
@@ -318,12 +329,26 @@ export class SubdomainsService {
     domains: { _id: string; domain: string }[];
     programs: { _id: string; name: string }[];
   }> {
+    // Return cached data if still valid
+    if (
+      this.filterOptionsCache &&
+      Date.now() - this.filterOptionsCache.timestamp < this.CACHE_TTL
+    ) {
+      return this.filterOptionsCache.data;
+    }
+
+    // Use aggregation pipeline for better performance - limit results
     const [technologies, sources, cdns, httpStatuses, domains] = await Promise.all([
-      this.subdomainModel.distinct('technologies'),
-      this.subdomainModel.distinct('sources'),
-      this.subdomainModel.distinct('cdn'),
-      this.subdomainModel.distinct('httpStatus'),
-      this.domainModel.find().select('_id domain programId').populate('programId', 'name').lean(),
+      this.subdomainModel.distinct('technologies').then((t) => t.slice(0, 100)),
+      this.subdomainModel.distinct('sources').then((s) => s.slice(0, 50)),
+      this.subdomainModel.distinct('cdn').then((c) => c.slice(0, 50)),
+      this.subdomainModel.distinct('httpStatus').then((h) => h.slice(0, 20)),
+      this.domainModel
+        .find()
+        .select('_id domain programId')
+        .populate('programId', 'name')
+        .limit(500)
+        .lean(),
     ]);
 
     // Extract unique programs from domains
@@ -333,16 +358,64 @@ export class SubdomainsService {
         programMap.set(d.programId._id.toString(), d.programId.name);
       }
     });
-    const programs = Array.from(programMap.entries()).map(([_id, name]) => ({ _id, name }));
+    const programs = Array.from(programMap.entries()).map(([_id, name]) => ({
+      _id,
+      name,
+    }));
 
-    return {
+    const result = {
       technologies: technologies.filter(Boolean).sort(),
       sources: sources.filter(Boolean).sort(),
       cdns: cdns.filter(Boolean).sort(),
       httpStatuses: httpStatuses.filter(Boolean).sort((a, b) => a - b),
-      domains: domains.map((d: any) => ({ _id: d._id.toString(), domain: d.domain })),
+      domains: domains.map((d: any) => ({
+        _id: d._id.toString(),
+        domain: d.domain,
+      })),
       programs: programs.sort((a, b) => a.name.localeCompare(b.name)),
     };
+
+    // Cache the result
+    this.filterOptionsCache = {
+      data: result,
+      timestamp: Date.now(),
+    };
+
+    return result;
+  }
+
+  async getTechnologies(filters?: {
+    domain?: string;
+    programId?: string;
+    limit?: number;
+  }): Promise<{ technology: string; count: number }[]> {
+    const matchStage: any = {};
+
+    if (filters?.domain) {
+      const domain = await this.domainModel.findOne({ domain: filters.domain.toLowerCase() });
+      if (domain) {
+        matchStage.domainId = domain._id;
+      }
+    }
+
+    if (filters?.programId) {
+      const domains = await this.domainModel.find({ programId: new Types.ObjectId(filters.programId) }).select('_id');
+      matchStage.domainId = { $in: domains.map(d => d._id) };
+    }
+
+    const pipeline: any[] = [
+      { $match: { technologies: { $exists: true, $ne: [] }, ...matchStage } },
+      { $unwind: '$technologies' },
+      { $group: { _id: '$technologies', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+    ];
+
+    if (filters?.limit) {
+      pipeline.push({ $limit: filters.limit });
+    }
+
+    const results = await this.subdomainModel.aggregate(pipeline);
+    return results.map(r => ({ technology: r._id, count: r.count }));
   }
 
   private async updateDomainCount(domainId: string): Promise<void> {

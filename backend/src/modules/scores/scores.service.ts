@@ -18,7 +18,6 @@ import { Program, ProgramDocument } from '../../schemas/program.schema';
 import { Domain, DomainDocument } from '../../schemas/domain.schema';
 import { Subdomain, SubdomainDocument } from '../../schemas/subdomain.schema';
 import { Live, LiveDocument } from '../../schemas/live.schema';
-import { HttpService, HttpServiceDocument } from '../../schemas/http-service.schema';
 import { Vulnerability, VulnerabilityDocument, Severity } from '../../schemas/vulnerability.schema';
 import { Scope, ScopeDocument } from '../../schemas/scope.schema';
 
@@ -41,7 +40,6 @@ export interface ScoreCalculationResult {
   dataAvailability: {
     hasVulnerabilityData: boolean;
     hasSubdomainData: boolean;
-    hasHttpServiceData: boolean;
     hasTechnologyData: boolean;
     hasBountyData: boolean;
     hasHistoricalData: boolean;
@@ -127,7 +125,6 @@ export class ScoresService {
     @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     @InjectModel(Subdomain.name) private subdomainModel: Model<SubdomainDocument>,
     @InjectModel(Live.name) private liveModel: Model<LiveDocument>,
-    @InjectModel(HttpService.name) private httpServiceModel: Model<HttpServiceDocument>,
     @InjectModel(Vulnerability.name) private vulnModel: Model<VulnerabilityDocument>,
     @InjectModel(Scope.name) private scopeModel: Model<ScopeDocument>,
   ) {}
@@ -192,13 +189,11 @@ export class ScoresService {
     const [
       subdomains,
       liveHosts,
-      httpServices,
       vulnerabilities,
       recentVulns,
     ] = await Promise.all([
       this.subdomainModel.find({ domainId: { $in: domainIds } }),
       this.liveModel.find({ domain: { $in: domainNames } }),
-      this.httpServiceModel.find({ domain: { $in: domainNames } }),
       this.vulnModel.find({ programId: new Types.ObjectId(programId) }),
       this.vulnModel.find({
         programId: new Types.ObjectId(programId),
@@ -213,7 +208,6 @@ export class ScoresService {
       scopes,
       subdomains,
       liveHosts,
-      httpServices,
       vulnerabilities,
       recentVulns,
     });
@@ -239,11 +233,10 @@ export class ScoresService {
       : null;
 
     // Get all data for this domain
-    const [subdomains, liveHosts, httpServices, vulnerabilities, recentVulns] =
+    const [subdomains, liveHosts, vulnerabilities, recentVulns] =
       await Promise.all([
         this.subdomainModel.find({ domainId: new Types.ObjectId(domainId) }),
         this.liveModel.find({ domain: domain.domain }),
-        this.httpServiceModel.find({ domain: domain.domain }),
         this.vulnModel.find({ targetId: new Types.ObjectId(domainId) }),
         this.vulnModel.find({
           targetId: new Types.ObjectId(domainId),
@@ -258,7 +251,6 @@ export class ScoresService {
       scopes: [],
       subdomains,
       liveHosts,
-      httpServices,
       vulnerabilities,
       recentVulns,
     });
@@ -277,20 +269,19 @@ export class ScoresService {
     scopes: ScopeDocument[];
     subdomains: SubdomainDocument[];
     liveHosts: LiveDocument[];
-    httpServices: HttpServiceDocument[];
     vulnerabilities: VulnerabilityDocument[];
     recentVulns: VulnerabilityDocument[];
   }): ScoreCalculationResult {
-    // Extract all technologies
-    const allTechnologies = this.extractTechnologies(data.httpServices);
+    // Extract all technologies from subdomains
+    const allTechnologies = this.extractTechnologies(data.subdomains);
 
     // Calculate individual score components
-    const exploitability = this.calculateExploitability(allTechnologies, data.httpServices);
+    const exploitability = this.calculateExploitability(allTechnologies, data.subdomains);
     const historical = this.calculateHistorical(data.vulnerabilities, data.recentVulns, data.program);
     const programQuality = this.calculateProgramQuality(data.program, data.scopes, data.domains);
     const competition = this.calculateCompetition(data.subdomains, data.liveHosts, data.domains);
-    const attackSurface = this.calculateAttackSurface(data.subdomains, data.liveHosts, data.httpServices, data.program);
-    const penetration = this.calculatePenetration(allTechnologies, data.httpServices, data.vulnerabilities);
+    const attackSurface = this.calculateAttackSurface(data.subdomains, data.liveHosts, data.program);
+    const penetration = this.calculatePenetration(allTechnologies, data.subdomains, data.vulnerabilities);
 
     // Build full breakdown
     const breakdown: FullScoreBreakdown = {
@@ -304,7 +295,7 @@ export class ScoresService {
 
     // Calculate weighted total score
     // Adjust weights based on data availability - give more weight to categories we have data for
-    const hasReconData = data.subdomains.length > 0 || data.httpServices.length > 0;
+    const hasReconData = data.subdomains.length > 0;
     
     let totalScore: number;
     if (hasReconData) {
@@ -341,7 +332,6 @@ export class ScoresService {
     const dataAvailability = {
       hasVulnerabilityData: data.vulnerabilities.length > 0,
       hasSubdomainData: data.subdomains.length > 0,
-      hasHttpServiceData: data.httpServices.length > 0,
       hasTechnologyData: allTechnologies.size > 0,
       hasBountyData: !!(data.program?.bountyTable?.critical?.max || data.program?.bountyRange?.max),
       hasHistoricalData: data.vulnerabilities.length >= 3,
@@ -394,11 +384,11 @@ export class ScoresService {
     };
   }
 
-  private extractTechnologies(httpServices: HttpServiceDocument[]): Set<string> {
+  private extractTechnologies(subdomains: SubdomainDocument[]): Set<string> {
     const technologies = new Set<string>();
-    for (const service of httpServices) {
-      if (service.technologies && Array.isArray(service.technologies)) {
-        for (const tech of service.technologies) {
+    for (const subdomain of subdomains) {
+      if (subdomain.technologies && Array.isArray(subdomain.technologies)) {
+        for (const tech of subdomain.technologies) {
           technologies.add(tech.toLowerCase());
         }
       }
@@ -408,7 +398,7 @@ export class ScoresService {
 
   private calculateExploitability(
     technologies: Set<string>,
-    httpServices: HttpServiceDocument[],
+    subdomains: SubdomainDocument[],
   ): ExploitabilityBreakdown {
     let cveCount = 0;
     let publicExploits = 0;
@@ -456,9 +446,9 @@ export class ScoresService {
     }
     techStackAge = Math.min(100, techStackAge);
 
-    // Auth bypass potential
-    for (const service of httpServices) {
-      if (service.statusCode === 401 || service.statusCode === 403) {
+    // Auth bypass potential - check subdomains with 401/403 status
+    for (const subdomain of subdomains) {
+      if (subdomain.httpStatus === 401 || subdomain.httpStatus === 403) {
         authBypass += 10;
       }
     }
@@ -835,7 +825,6 @@ export class ScoresService {
   private calculateAttackSurface(
     subdomains: SubdomainDocument[],
     liveHosts: LiveDocument[],
-    httpServices: HttpServiceDocument[],
     program: ProgramDocument | null,
   ): AttackSurfaceBreakdown {
     let subdomainCount = 0;
@@ -885,29 +874,32 @@ export class ScoresService {
     }
     
     liveHostCount = Math.min(100, (liveHosts.length / 100) * 100);
-    httpServiceCount = Math.min(100, (httpServices.length / 50) * 100);
+    
+    // Count alive subdomains as HTTP services
+    const aliveSubdomains = subdomains.filter(s => s.isAlive);
+    httpServiceCount = Math.min(100, (aliveSubdomains.length / 50) * 100);
 
-    // Analyze HTTP services for interesting endpoints
-    for (const service of httpServices) {
-      const url = (service.url || '').toLowerCase();
-      const title = (service.title || '').toLowerCase();
+    // Analyze subdomains for interesting endpoints based on title
+    for (const subdomain of aliveSubdomains) {
+      const url = (subdomain.subdomain || '').toLowerCase();
+      const title = (subdomain.title || '').toLowerCase();
 
-      if (url.includes('/api') || url.includes('/v1') || url.includes('/v2') || 
-          url.includes('/graphql') || url.includes('/rest')) {
+      if (url.includes('api') || url.includes('v1') || url.includes('v2') || 
+          url.includes('graphql') || url.includes('rest')) {
         apiEndpoints += 10;
       }
 
-      if (url.includes('/admin') || url.includes('/manager') || url.includes('/dashboard') ||
+      if (url.includes('admin') || url.includes('manager') || url.includes('dashboard') ||
           title.includes('admin') || title.includes('dashboard') || title.includes('control panel')) {
         adminPanels += 15;
       }
 
-      if (url.includes('/login') || url.includes('/signin') || url.includes('/auth') ||
+      if (url.includes('login') || url.includes('signin') || url.includes('auth') ||
           title.includes('login') || title.includes('sign in')) {
         loginPages += 10;
       }
 
-      if (url.includes('/upload') || url.includes('/import') || title.includes('upload')) {
+      if (url.includes('upload') || url.includes('import') || title.includes('upload')) {
         fileUploads += 20;
       }
     }
@@ -943,7 +935,7 @@ export class ScoresService {
 
   private calculatePenetration(
     technologies: Set<string>,
-    httpServices: HttpServiceDocument[],
+    subdomains: SubdomainDocument[],
     vulnerabilities: VulnerabilityDocument[],
   ): PenetrationBreakdown {
     const techArray = Array.from(technologies);
@@ -971,13 +963,12 @@ export class ScoresService {
     // Known vulns
     const knownVulns = Math.min(100, vulnerabilities.length * 8);
 
-    // Misconfigurations (based on status codes and headers)
+    // Misconfigurations (based on status codes)
     let misconfigurations = 0;
-    for (const service of httpServices) {
-      if ([403, 401, 500, 502, 503].includes(service.statusCode)) {
+    for (const subdomain of subdomains) {
+      if ([403, 401, 500, 502, 503].includes(subdomain.httpStatus || 0)) {
         misconfigurations += 5;
       }
-      // Would check headers for security misconfigs here
     }
     misconfigurations = Math.min(100, misconfigurations);
 
@@ -991,13 +982,14 @@ export class ScoresService {
     }
     authMechanisms = Math.min(100, authMechanisms);
 
-    // Sensitive exposure
+    // Sensitive exposure - check subdomain names for sensitive patterns
     let sensitiveExposure = 0;
-    for (const service of httpServices) {
-      const url = (service.url || '').toLowerCase();
-      if (url.includes('.git') || url.includes('.env') || url.includes('.bak') ||
-          url.includes('backup') || url.includes('config') || url.includes('.sql')) {
-        sensitiveExposure += 25;
+    for (const subdomain of subdomains) {
+      const url = (subdomain.subdomain || '').toLowerCase();
+      if (url.includes('git') || url.includes('env') || url.includes('bak') ||
+          url.includes('backup') || url.includes('config') || url.includes('sql') ||
+          url.includes('dev') || url.includes('staging') || url.includes('test')) {
+        sensitiveExposure += 15;
       }
     }
     sensitiveExposure = Math.min(100, sensitiveExposure);
@@ -1036,7 +1028,6 @@ export class ScoresService {
   private calculateConfidence(dataAvailability: {
     hasVulnerabilityData: boolean;
     hasSubdomainData: boolean;
-    hasHttpServiceData: boolean;
     hasTechnologyData: boolean;
     hasBountyData: boolean;
     hasHistoricalData: boolean;
@@ -1049,11 +1040,10 @@ export class ScoresService {
     let confidence = 0;
     
     // Base data availability (60% weight)
-    if (dataAvailability.hasVulnerabilityData) confidence += 12;
-    if (dataAvailability.hasSubdomainData) confidence += 12;
-    if (dataAvailability.hasHttpServiceData) confidence += 12;
-    if (dataAvailability.hasTechnologyData) confidence += 12;
-    if (dataAvailability.hasBountyData) confidence += 6;
+    if (dataAvailability.hasVulnerabilityData) confidence += 15;
+    if (dataAvailability.hasSubdomainData) confidence += 15;
+    if (dataAvailability.hasTechnologyData) confidence += 15;
+    if (dataAvailability.hasBountyData) confidence += 9;
     if (dataAvailability.hasHistoricalData) confidence += 6;
     
     // Enriched data availability (40% weight) - Requirements 5.4

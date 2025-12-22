@@ -8,14 +8,23 @@ This feature implements an Advanced Reconnaissance and Monitoring System for the
 
 - **AbuseIPDB**: An IP address abuse reporting and lookup service for identifying malicious IPs
 - **Waybackurls**: A tool that fetches URLs from the Wayback Machine for historical URL discovery
+- **GAU (GetAllUrls)**: A tool that fetches known URLs from AlienVault OTX, Wayback Machine, and Common Crawl
 - **Nuclei**: A fast vulnerability scanner based on customizable templates
 - **Certificate Transparency (cert_trans)**: Public logs of SSL/TLS certificates for discovering subdomains
+- **Chaos**: ProjectDiscovery's dataset of subdomains collected from various sources
 - **Watchtower**: A monitoring component that tracks changes in HTTP services over time
+- **Watchtower CLI**: Command-line interface for querying targets, HTTP services, and live hosts
 - **FFUF**: A fast web fuzzer used for directory and file discovery
+- **ShuffleDNS**: A wrapper around massdns for high-speed DNS resolution and brute forcing
+- **DNSGen**: A tool that generates domain name permutations based on wordlists
+- **AltDNS**: A tool for generating subdomain permutations and alterations
+- **Crunch**: A wordlist generator that creates custom character combinations
 - **HTTP Probing**: The process of checking HTTP services for status, title, technologies, and other metadata
 - **Fresh Service**: An HTTP service that was recently discovered or scanned
 - **Change Detection**: The process of comparing current scan results with previous results to identify modifications
 - **Favicon Hash**: A hash of a website's favicon used for fingerprinting and tracking changes
+- **Static Brute**: DNS brute forcing using pre-built wordlists without permutations
+- **Dynamic Brute**: DNS brute forcing using generated permutations from discovered subdomains
 
 ## Requirements
 
@@ -132,3 +141,105 @@ This feature implements an Advanced Reconnaissance and Monitoring System for the
 3. WHEN an alert condition is met THEN the Notification Service SHALL send alerts to all configured channels (Discord, Slack, Telegram, Email)
 4. WHEN configuring alerts THEN the Frontend SHALL allow specifying severity levels and notification channels
 
+
+### Requirement 11
+
+**User Story:** As a bug bounty hunter, I want to perform DNS brute forcing with static wordlists, so that I can discover subdomains not found through passive reconnaissance.
+
+#### Acceptance Criteria
+
+1. WHEN a user initiates static DNS brute forcing for a domain THEN the Recon Service SHALL download and merge wordlists from Assetnote (best-dns-wordlist, 2m-subdomains)
+2. WHEN preparing static wordlists THEN the Recon Service SHALL generate short character combinations using crunch (1-4 characters, alphanumeric)
+3. WHEN wordlists are prepared THEN the Recon Service SHALL merge, deduplicate, and append the target domain to each entry
+4. WHEN executing DNS brute forcing THEN the Recon Service SHALL use shuffledns with massdns backend and 200 threads
+5. WHEN DNS brute forcing discovers new subdomains THEN the Subdomain Service SHALL store them with source set to dns_brute
+
+### Requirement 12
+
+**User Story:** As a bug bounty hunter, I want to perform dynamic DNS brute forcing with permutations, so that I can discover variations of known subdomains.
+
+#### Acceptance Criteria
+
+1. WHEN a user initiates dynamic DNS brute forcing THEN the Recon Service SHALL download dnsgen and altdns wordlists
+2. WHEN preparing dynamic wordlists THEN the Recon Service SHALL merge dnsgen and altdns word files and deduplicate
+3. WHEN generating permutations THEN the Recon Service SHALL run dnsgen against discovered subdomains with the merged wordlist
+4. WHEN permutations are generated THEN the Recon Service SHALL resolve them using dnsx
+5. WHEN dynamic brute forcing discovers new subdomains THEN the Subdomain Service SHALL store them with source set to dns_gen
+
+### Requirement 13
+
+**User Story:** As a bug bounty hunter, I want to discover URLs using GAU (GetAllUrls), so that I can find endpoints from multiple sources including AlienVault and Common Crawl.
+
+#### Acceptance Criteria
+
+1. WHEN a user requests GAU enumeration for a domain THEN the Recon Service SHALL execute gau with all providers enabled
+2. WHEN GAU returns URLs THEN the Recon Service SHALL extract unique domains and endpoints
+3. WHEN new domains are discovered from GAU THEN the Subdomain Service SHALL add them with source set to gau
+4. WHEN GAU discovers new endpoints THEN the Endpoint Service SHALL store them with source attribution
+
+### Requirement 14
+
+**User Story:** As a bug bounty hunter, I want to sync subdomain data from ProjectDiscovery Chaos, so that I can leverage their comprehensive subdomain dataset.
+
+#### Acceptance Criteria
+
+1. WHEN a user initiates Chaos sync THEN the Recon Service SHALL fetch the Chaos index from chaos-data.projectdiscovery.io
+2. WHEN downloading Chaos data THEN the Recon Service SHALL download and extract ZIP files for matching programs
+3. WHEN Chaos data is extracted THEN the Subdomain Service SHALL import subdomains with source set to chaos
+4. WHEN Chaos sync completes THEN the Recon Service SHALL report the count of new subdomains discovered
+5. WHEN a user enables Chaos watching for a program THEN the Cron Service SHALL periodically sync Chaos data
+
+### Requirement 15
+
+**User Story:** As a bug bounty hunter, I want to query single targets using the Watchtower CLI, so that I can quickly get information about specific programs or domains.
+
+#### Acceptance Criteria
+
+1. WHEN a user executes watchtower get single target with a program name THEN the CLI SHALL return all domains and subdomains for that program
+2. WHEN querying a single target THEN the CLI SHALL display subdomain count, live count, and last scan timestamp
+3. WHEN the target has scope information THEN the CLI SHALL display in-scope and out-of-scope domains
+4. WHEN outputting results THEN the CLI SHALL support JSON and table formats
+
+### Requirement 16
+
+**User Story:** As a bug bounty hunter, I want to query HTTP services using the Watchtower CLI with comparison options, so that I can identify changes across scans.
+
+#### Acceptance Criteria
+
+1. WHEN a user executes watchtower get http all THEN the CLI SHALL return all HTTP services with their metadata
+2. WHEN using the compare list flag THEN the CLI SHALL show services with detected changes highlighted
+3. WHEN filtering HTTP services THEN the CLI SHALL support status code, technology, and change type filters
+4. WHEN outputting HTTP results THEN the CLI SHALL display URL, status, title, technologies, and change indicators
+
+### Requirement 17
+
+**User Story:** As a bug bounty hunter, I want to query live hosts by scope using the Watchtower CLI, so that I can focus on active in-scope targets.
+
+#### Acceptance Criteria
+
+1. WHEN a user executes watchtower get lives scope with a program name THEN the CLI SHALL return only live subdomains within scope
+2. WHEN using the compare list flag THEN the CLI SHALL highlight newly discovered or changed live hosts
+3. WHEN filtering lives THEN the CLI SHALL support filtering by status code range and technology
+4. WHEN outputting live results THEN the CLI SHALL display subdomain, IP, status, title, and discovery timestamp
+
+### Requirement 18
+
+**User Story:** As a bug bounty hunter, I want to manage DNS brute forcing wordlists through the UI, so that I can customize and monitor wordlist preparation.
+
+#### Acceptance Criteria
+
+1. WHEN a user accesses the DNS brute page THEN the Frontend SHALL display available wordlist sources and their status
+2. WHEN a user initiates wordlist download THEN the Backend SHALL download and store wordlists with progress indication
+3. WHEN wordlists are ready THEN the Frontend SHALL display wordlist statistics (line count, size, last updated)
+4. WHEN configuring DNS brute THEN the Frontend SHALL allow selecting wordlist combinations and thread count
+
+### Requirement 19
+
+**User Story:** As a bug bounty hunter, I want to view DNS brute forcing progress and results in the UI, so that I can monitor long-running enumeration jobs.
+
+#### Acceptance Criteria
+
+1. WHEN a DNS brute job is running THEN the Frontend SHALL display progress percentage and discovered count
+2. WHEN new subdomains are discovered THEN the Frontend SHALL update the results list in real-time via WebSocket
+3. WHEN a DNS brute job completes THEN the Frontend SHALL display summary statistics and allow exporting results
+4. WHEN viewing DNS brute history THEN the Frontend SHALL show past jobs with their configurations and results

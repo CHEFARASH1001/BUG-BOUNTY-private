@@ -11,19 +11,49 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiParam } from '@nestjs/swagger';
+import { IsString, IsOptional, IsArray, IsNumber, IsMongoId } from 'class-validator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FuzzService, FuzzConfig } from './services/fuzz.service';
 
 class CreateFuzzJobDto {
+  @IsString()
   url: string;
+
+  @IsString()
   wordlist: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
   extensions?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsNumber({}, { each: true })
   matchCodes?: number[];
+
+  @IsOptional()
+  @IsNumber()
   filterWords?: number;
+
+  @IsOptional()
+  @IsNumber()
   filterLines?: number;
+
+  @IsOptional()
+  @IsNumber()
   filterSize?: number;
+
+  @IsOptional()
+  @IsNumber()
   threads?: number;
+
+  @IsOptional()
+  @IsNumber()
   timeout?: number;
+
+  @IsOptional()
+  @IsMongoId()
   programId?: string;
 }
 

@@ -10,7 +10,8 @@ import { QueueModule } from '../queue/queue.module';
 import { Domain, DomainSchema } from '../../schemas/domain.schema';
 import { Subdomain, SubdomainSchema } from '../../schemas/subdomain.schema';
 import { Live, LiveSchema } from '../../schemas/live.schema';
-import { HttpService, HttpServiceSchema } from '../../schemas/http-service.schema';
+import { Program, ProgramSchema } from '../../schemas/program.schema';
+import { Scope, ScopeSchema } from '../../schemas/scope.schema';
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { HttpService, HttpServiceSchema } from '../../schemas/http-service.schem
       { name: Domain.name, schema: DomainSchema },
       { name: Subdomain.name, schema: SubdomainSchema },
       { name: Live.name, schema: LiveSchema },
-      { name: HttpService.name, schema: HttpServiceSchema },
+      { name: Program.name, schema: ProgramSchema },
+      { name: Scope.name, schema: ScopeSchema },
     ]),
     ReconModule,
     DomainsModule,

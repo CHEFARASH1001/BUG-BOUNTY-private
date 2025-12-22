@@ -172,9 +172,6 @@ subfinder:
 recon:
 	@./cli/bb recon $(filter-out $@,$(MAKECMDGOALS))
 
-enum-all:
-	@./cli/bb enum-all
-
 ns-all:
 	@./cli/bb ns-all
 

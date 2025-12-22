@@ -40,6 +40,7 @@ export class SubdomainsController {
   @ApiQuery({ name: 'cdn', required: false })
   @ApiQuery({ name: 'technology', required: false })
   @ApiQuery({ name: 'source', required: false })
+  @ApiQuery({ name: 'isNew', required: false, type: Boolean })
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -55,6 +56,7 @@ export class SubdomainsController {
     @Query('cdn') cdn?: string,
     @Query('technology') technology?: string,
     @Query('source') source?: string,
+    @Query('isNew') isNew?: string,
     @Query('search') search?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -71,6 +73,7 @@ export class SubdomainsController {
       cdn,
       technology,
       source,
+      isNew: isNew === undefined ? undefined : isNew === 'true',
       search,
       page: page ? parseInt(page, 10) : undefined,
       limit: limit ? parseInt(limit, 10) : undefined,
@@ -91,6 +94,24 @@ export class SubdomainsController {
   @ApiOperation({ summary: 'Get available filter options' })
   async getFilterOptions() {
     return this.subdomainsService.getFilterOptions();
+  }
+
+  @Get('technologies')
+  @Public()
+  @ApiOperation({ summary: 'Get all detected technologies with counts' })
+  @ApiQuery({ name: 'domain', required: false })
+  @ApiQuery({ name: 'programId', required: false })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getTechnologies(
+    @Query('domain') domain?: string,
+    @Query('programId') programId?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.subdomainsService.getTechnologies({
+      domain,
+      programId,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':id')

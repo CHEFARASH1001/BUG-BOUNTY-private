@@ -60,6 +60,7 @@ services:
       JWT_SECRET: dev-jwt-secret-key
       HACKERONE_API_TOKEN: ${HACKERONE_API_TOKEN:-}
       BUGCROWD_API_TOKEN: ${BUGCROWD_API_TOKEN:-}
+      ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
     ports:
       - "4000:4000"
     volumes:
@@ -126,6 +127,18 @@ services:
     networks:
       - bb-network
 
+  # Nuclei - Vulnerability Scanner
+  nuclei:
+    image: projectdiscovery/nuclei:latest
+    container_name: bb-nuclei
+    restart: unless-stopped
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - nuclei_templates:/root/nuclei-templates
+      - scan_results:/results
+    networks:
+      - bb-network
+
   # Next.js Frontend - Development Mode
   frontend:
     build:
@@ -153,6 +166,7 @@ volumes:
   mongodb_data:
   rabbitmq_data:
   scan_results:
+  nuclei_templates:
 
 networks:
   bb-network:

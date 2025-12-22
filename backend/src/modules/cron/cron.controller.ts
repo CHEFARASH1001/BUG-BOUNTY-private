@@ -134,4 +134,20 @@ export class CronController {
       execution,
     };
   }
+
+  @Get('queue/subfinder/stats')
+  @Public()
+  @ApiOperation({ summary: 'Get subfinder queue statistics' })
+  @ApiResponse({ status: 200, description: 'Queue statistics' })
+  async getSubfinderQueueStats() {
+    return this.cronService.getSubfinderQueueStats();
+  }
+
+  @Post('queue/subfinder/clear')
+  @Public()
+  @ApiOperation({ summary: 'Clear the subfinder queue (stop all pending jobs)' })
+  @ApiResponse({ status: 200, description: 'Queue cleared' })
+  async clearSubfinderQueue() {
+    return this.cronService.clearSubfinderQueue();
+  }
 }

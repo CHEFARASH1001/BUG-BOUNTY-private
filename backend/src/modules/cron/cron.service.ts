@@ -7,18 +7,21 @@ import { CronConfig, CronConfigDocument } from './schemas/cron-config.schema';
 import { QueueService } from '../queue/queue.service';
 import { PlatformSyncService } from '../platforms/platform-sync.service';
 import { LivesService } from '../lives/lives.service';
-import { HttpServicesService } from '../http-services/http-services.service';
+
 import { ScoresService } from '../scores/scores.service';
 import { DomainsService } from '../domains/domains.service';
 import { SubdomainsService } from '../subdomains/subdomains.service';
 import { ReconService } from '../recon/recon.service';
 import { CliService } from '../cli/cli.service';
-import { HttpMonitorService } from '../http-services/http-monitor.service';
+
 import { AbuseIPDBService } from '../external-apis/services/abuseipdb.service';
 import { CTService } from '../recon/services/ct.service';
 import { AlertService } from '../alerts/alert.service';
 import { WaybackService } from '../recon/services/wayback.service';
 import { EndpointsService } from '../endpoints/endpoints.service';
+import { NucleiService } from '../scanner/services/nuclei.service';
+import { ChaosService } from '../recon/services/chaos.service';
+import { DNSBruteService } from '../recon/services/dns-brute.service';
 
 export interface JobDefinition {
   name: string;
@@ -40,12 +43,7 @@ export class CronService implements OnModuleInit {
     {
       name: 'watch_subfinder_all',
       schedule: '0 */8 * * *',
-      description: 'Run subfinder for all domains',
-    },
-    {
-      name: 'watch_enum_all',
-      schedule: '0 */12 * * *',
-      description: 'Full subdomain enumeration for all domains',
+      description: 'Run subfinder for all domains (parallel)',
     },
     {
       name: 'watch_ns_all',
@@ -77,11 +75,7 @@ export class CronService implements OnModuleInit {
       schedule: '0 2 * * *',
       description: 'Recalculate all scores',
     },
-    {
-      name: 'watch_http_monitor',
-      schedule: '0 */1 * * *',
-      description: 'HTTP monitoring with change detection and alerts',
-    },
+
     {
       name: 'watch_abuseipdb',
       schedule: '0 */6 * * *',
@@ -97,6 +91,16 @@ export class CronService implements OnModuleInit {
       schedule: '0 */8 * * *',
       description: 'Waybackurls endpoint discovery for alive subdomains',
     },
+    {
+      name: 'watch_chaos_sync',
+      schedule: '0 */12 * * *',
+      description: 'Chaos sync for watched programs',
+    },
+    {
+      name: 'watch_dns_brute',
+      schedule: '0 0 * * *',
+      description: 'DNS brute forcing for watched domains',
+    },
   ];
 
   constructor(
@@ -105,18 +109,21 @@ export class CronService implements OnModuleInit {
     private queueService: QueueService,
     @Inject(forwardRef(() => PlatformSyncService)) private platformSyncService: PlatformSyncService,
     @Inject(forwardRef(() => LivesService)) private livesService: LivesService,
-    @Inject(forwardRef(() => HttpServicesService)) private httpServicesService: HttpServicesService,
+
     @Inject(forwardRef(() => ScoresService)) private scoresService: ScoresService,
     @Inject(forwardRef(() => DomainsService)) private domainsService: DomainsService,
     @Inject(forwardRef(() => SubdomainsService)) private subdomainsService: SubdomainsService,
     @Inject(forwardRef(() => ReconService)) private reconService: ReconService,
     @Inject(forwardRef(() => CliService)) private cliService: CliService,
-    @Inject(forwardRef(() => HttpMonitorService)) private httpMonitorService: HttpMonitorService,
+
     @Inject(forwardRef(() => AbuseIPDBService)) private abuseIPDBService: AbuseIPDBService,
     @Inject(forwardRef(() => CTService)) private ctService: CTService,
     @Inject(forwardRef(() => AlertService)) private alertService: AlertService,
     @Inject(forwardRef(() => WaybackService)) private waybackService: WaybackService,
     @Inject(forwardRef(() => EndpointsService)) private endpointsService: EndpointsService,
+    @Inject(forwardRef(() => NucleiService)) private nucleiService: NucleiService,
+    @Inject(forwardRef(() => ChaosService)) private chaosService: ChaosService,
+    @Inject(forwardRef(() => DNSBruteService)) private dnsBruteService: DNSBruteService,
   ) {}
 
   async onModuleInit() {
@@ -155,11 +162,6 @@ export class CronService implements OnModuleInit {
     await this.runJobIfEnabled('watch_subfinder_all', (log) => this.runSubfinderAll(log));
   }
 
-  @Cron('0 */12 * * *') // Every 12 hours
-  async scheduledEnumAll() {
-    await this.runJobIfEnabled('watch_enum_all', (log) => this.runEnumAll(log));
-  }
-
   @Cron(CronExpression.EVERY_4_HOURS)
   async scheduledDnsAll() {
     await this.runJobIfEnabled('watch_ns_all', (log) => this.runDnsAll(log));
@@ -190,11 +192,6 @@ export class CronService implements OnModuleInit {
     await this.runJobIfEnabled('score_calculation', (log) => this.runScoreCalculation(log));
   }
 
-  @Cron(CronExpression.EVERY_HOUR)
-  async scheduledHttpMonitor() {
-    await this.runJobIfEnabled('watch_http_monitor', (log) => this.runHttpMonitor(log));
-  }
-
   @Cron(CronExpression.EVERY_6_HOURS)
   async scheduledAbuseIPDBWatch() {
     await this.runJobIfEnabled('watch_abuseipdb', (log) => this.runAbuseIPDBWatch(log));
@@ -208,6 +205,16 @@ export class CronService implements OnModuleInit {
   @Cron('0 */8 * * *') // Every 8 hours
   async scheduledWaybackWatch() {
     await this.runJobIfEnabled('watch_wayback', (log) => this.runWaybackWatch(log));
+  }
+
+  @Cron('0 */12 * * *') // Every 12 hours
+  async scheduledChaosSyncWatch() {
+    await this.runJobIfEnabled('watch_chaos_sync', (log) => this.runChaosSyncWatch(log));
+  }
+
+  @Cron(CronExpression.EVERY_DAY_AT_1AM) // Daily at 1 AM
+  async scheduledDNSBruteWatch() {
+    await this.runJobIfEnabled('watch_dns_brute', (log) => this.runDNSBruteWatch(log));
   }
 
   private async runJobIfEnabled(
@@ -339,17 +346,17 @@ export class CronService implements OnModuleInit {
     const handlers: Record<string, (log: LogFn) => Promise<any>> = {
       watch_sync_programs: (log) => this.runProgramSync(log),
       watch_subfinder_all: (log) => this.runSubfinderAll(log),
-      watch_enum_all: (log) => this.runEnumAll(log),
       watch_ns_all: (log) => this.runDnsAll(log),
       watch_live_all: (log) => this.runLiveAll(log),
       watch_http_all: (log) => this.runHttpAll(log),
       watch_nuclei_all: (log) => this.runNucleiAll(log),
       fresh_detection: (log) => this.runFreshDetection(log),
       score_calculation: (log) => this.runScoreCalculation(log),
-      watch_http_monitor: (log) => this.runHttpMonitor(log),
       watch_abuseipdb: (log) => this.runAbuseIPDBWatch(log),
       watch_ct_logs: (log) => this.runCTMonitor(log),
       watch_wayback: (log) => this.runWaybackWatch(log),
+      watch_chaos_sync: (log) => this.runChaosSyncWatch(log),
+      watch_dns_brute: (log) => this.runDNSBruteWatch(log),
     };
 
     const handler = handlers[jobName];
@@ -426,6 +433,88 @@ export class CronService implements OnModuleInit {
     return execution;
   }
 
+  /**
+   * Get subfinder queue statistics from RabbitMQ
+   */
+  async getSubfinderQueueStats(): Promise<{
+    messages: number;
+    consumers: number;
+    messagesReady: number;
+    messagesUnacked: number;
+  }> {
+    try {
+      const response = await fetch(
+        'http://rabbitmq:15672/api/queues/watchtower/watchtower.subfinder',
+        {
+          headers: {
+            Authorization: 'Basic ' + Buffer.from('bugbounty:bugbounty2024').toString('base64'),
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`RabbitMQ API error: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return {
+        messages: data.messages || 0,
+        consumers: data.consumers || 0,
+        messagesReady: data.messages_ready || 0,
+        messagesUnacked: data.messages_unacknowledged || 0,
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to get queue stats: ${error.message}`);
+      return {
+        messages: 0,
+        consumers: 0,
+        messagesReady: 0,
+        messagesUnacked: 0,
+      };
+    }
+  }
+
+  /**
+   * Clear the subfinder queue (purge all pending messages)
+   */
+  async clearSubfinderQueue(): Promise<{ success: boolean; messagesCleared: number; message: string }> {
+    try {
+      // First get current message count
+      const stats = await this.getSubfinderQueueStats();
+      const messageCount = stats.messages;
+
+      // Purge the queue via RabbitMQ API
+      const response = await fetch(
+        'http://rabbitmq:15672/api/queues/watchtower/watchtower.subfinder/contents',
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: 'Basic ' + Buffer.from('bugbounty:bugbounty2024').toString('base64'),
+          },
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`RabbitMQ API error: ${response.status}`);
+      }
+      
+      this.logger.log(`Cleared subfinder queue: ${messageCount} messages purged`);
+      
+      return {
+        success: true,
+        messagesCleared: messageCount,
+        message: `Cleared ${messageCount} pending jobs from subfinder queue`,
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to clear queue: ${error.message}`);
+      return {
+        success: false,
+        messagesCleared: 0,
+        message: `Failed to clear queue: ${error.message}`,
+      };
+    }
+  }
+
   // Job handlers
   private async runProgramSync(log: LogFn): Promise<any> {
     await log('Starting platform synchronization...');
@@ -446,21 +535,58 @@ export class CronService implements OnModuleInit {
     
     // Get all domains from database
     const domainsResult = await this.domainsService.findAll({ limit: 10000 });
-    const domains = domainsResult.data;
-    await log(`Found ${domains.length} domains to scan with subfinder`);
+    const allDomains = domainsResult.data;
+    await log(`Found ${allDomains.length} total domain entries`);
     
-    if (domains.length === 0) {
+    if (allDomains.length === 0) {
       await log('No domains found. Add domains first.');
       return { message: 'No domains to scan', scanned: 0 };
+    }
+
+    // Filter to only scan root domains and wildcards (not subdomains)
+    // Root domain pattern: domain.tld or *.domain.tld
+    const rootDomainPattern = /^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
+    
+    const domainsToScan = allDomains.filter(d => {
+      const domain = d.domain;
+      // Skip if it's clearly a subdomain (has more than 2 dots and doesn't start with *)
+      const dotCount = (domain.match(/\./g) || []).length;
+      
+      // Handle wildcards - extract the base domain
+      if (domain.startsWith('*.')) {
+        return true; // Wildcards are good to scan
+      }
+      
+      // Skip subdomains like mail.notion.so, staging.hosted.mender.io
+      // Keep root domains like stripchat.com, notion.so
+      if (dotCount > 1) {
+        // Check if it's a known TLD pattern (co.uk, com.au, etc.)
+        const knownMultiPartTlds = ['.co.uk', '.com.au', '.co.nz', '.co.jp', '.com.br', '.co.in'];
+        const hasMultiPartTld = knownMultiPartTlds.some(tld => domain.endsWith(tld));
+        if (hasMultiPartTld && dotCount === 2) {
+          return true; // e.g., example.co.uk
+        }
+        return false; // Skip subdomains
+      }
+      
+      return true; // Root domains with 1 dot
+    });
+
+    await log(`Filtered to ${domainsToScan.length} root domains (skipped ${allDomains.length - domainsToScan.length} subdomains)`);
+
+    if (domainsToScan.length === 0) {
+      await log('No root domains found to scan.');
+      return { message: 'No root domains to scan', scanned: 0 };
     }
 
     // Generate batch ID for tracking
     const batchId = `subfinder-${Date.now()}`;
     await log(`Batch ID: ${batchId}`);
     
-    // Publish all domains to the queue for parallel processing
-    const domainJobs = domains.map(d => ({
-      domain: d.domain,
+    // Publish domains to the queue for parallel processing
+    // For wildcards, remove the *. prefix
+    const domainJobs = domainsToScan.map(d => ({
+      domain: d.domain.startsWith('*.') ? d.domain.substring(2) : d.domain,
       domainId: d._id.toString(),
     }));
     
@@ -473,60 +599,11 @@ export class CronService implements OnModuleInit {
     return {
       message: 'Subfinder jobs queued for parallel processing',
       batchId,
-      domainsTotal: domains.length,
+      domainsTotal: allDomains.length,
+      rootDomainsFiltered: domainsToScan.length,
       domainsQueued: published,
       note: 'Jobs are being processed by workers in parallel. Check RabbitMQ for progress.',
     };
-  }
-
-  private async runEnumAll(log: LogFn): Promise<any> {
-    await log('Starting subdomain enumeration for all domains...');
-    
-    // Get all domains from database
-    const domainsResult = await this.domainsService.findAll({ limit: 1000 });
-    const domains = domainsResult.data;
-    await log(`Found ${domains.length} domains to enumerate`);
-    
-    if (domains.length === 0) {
-      await log('No domains found. Run program sync first.');
-      return { message: 'No domains to enumerate', enumerated: 0 };
-    }
-
-    let totalSubdomains = 0;
-    let processed = 0;
-    const maxDomains = 10; // Limit for dev mode
-
-    for (const domain of domains.slice(0, maxDomains)) {
-      try {
-        await log(`Enumerating subdomains for: ${domain.domain}`);
-        const subdomains = await this.reconService.enumerateSubdomains(domain.domain);
-        await log(`Found ${subdomains.length} subdomains for ${domain.domain}`);
-        
-        // Save subdomains to database
-        for (const subdomain of subdomains) {
-          try {
-            await this.subdomainsService.create({
-              subdomain,
-              domainId: domain._id.toString(),
-              isAlive: false, // Will be resolved later
-            });
-          } catch (e: any) {
-            // Ignore duplicates
-            if (!e.message?.includes('duplicate')) {
-              this.logger.warn(`Failed to save subdomain ${subdomain}: ${e.message}`);
-            }
-          }
-        }
-        
-        totalSubdomains += subdomains.length;
-        processed++;
-      } catch (error: any) {
-        await log(`Error enumerating ${domain.domain}: ${error.message}`);
-      }
-    }
-
-    await log(`Enumeration complete: ${totalSubdomains} subdomains found across ${processed} domains`);
-    return { message: 'Enumeration completed', totalSubdomains, domainsProcessed: processed };
   }
 
   private async runDnsAll(log: LogFn): Promise<any> {
@@ -690,56 +767,24 @@ export class CronService implements OnModuleInit {
 
   private async runHttpAll(log: LogFn): Promise<any> {
     await log('Starting HTTP probing for all live hosts...');
-    
-    const subdomainsResult = await this.subdomainsService.findAll({ isAlive: true, limit: 500 });
-    const subdomains = subdomainsResult.data;
-    await log(`Found ${subdomains.length} alive subdomains to probe`);
-    
-    if (subdomains.length === 0) {
-      await log('No alive subdomains found. Run DNS resolution first.');
-      return { message: 'No subdomains to probe', probed: 0 };
+
+    const result = await this.cliService.watchHttpAll();
+
+    if (result.success) {
+      const results = result.results as
+        | { hostsChecked?: number; subdomainsUpdated?: number }
+        | undefined;
+      await log(
+        `Found ${results?.hostsChecked || 0} alive subdomains to probe`,
+      );
+      await log(
+        `HTTP probing complete: ${results?.subdomainsUpdated || 0} subdomains updated`,
+      );
+    } else {
+      await log(result.message);
     }
 
-    let probed = 0;
-    const maxSubdomains = 50; // Limit for dev mode
-    const axios = require('axios');
-
-    for (const sub of subdomains.slice(0, maxSubdomains)) {
-      try {
-        const response = await axios.get(`https://${sub.subdomain}`, {
-          timeout: 5000,
-          validateStatus: () => true,
-          maxRedirects: 3,
-        });
-        
-        await this.subdomainsService.update(sub._id.toString(), {
-          httpStatus: response.status,
-          title: this.extractTitle(response.data),
-        });
-        probed++;
-        await log(`Probed ${sub.subdomain}: HTTP ${response.status}`);
-      } catch (error: any) {
-        // Try HTTP fallback
-        try {
-          const response = await axios.get(`http://${sub.subdomain}`, {
-            timeout: 5000,
-            validateStatus: () => true,
-            maxRedirects: 3,
-          });
-          
-          await this.subdomainsService.update(sub._id.toString(), {
-            httpStatus: response.status,
-            title: this.extractTitle(response.data),
-          });
-          probed++;
-        } catch {
-          // Host not responding
-        }
-      }
-    }
-
-    await log(`HTTP probing complete: ${probed} hosts probed`);
-    return { message: 'HTTP probing completed', probed };
+    return result;
   }
 
   private extractTitle(html: string): string | undefined {
@@ -749,37 +794,98 @@ export class CronService implements OnModuleInit {
 
   private async runNucleiAll(log: LogFn): Promise<any> {
     await log('Starting Nuclei vulnerability scanning...');
-    await log('Note: Nuclei requires external tool installation');
     
     const subdomainsResult = await this.subdomainsService.findAll({ isAlive: true, limit: 1000 });
     const subdomains = subdomainsResult.data;
     await log(`Found ${subdomains.length} alive subdomains for scanning`);
     
-    // In dev mode, just log the targets
-    await log('Nuclei scanning requires the nuclei binary. Skipping in dev mode.');
-    
-    return { 
-      message: 'Nuclei scan skipped (dev mode)', 
-      targets: subdomains.length,
-      note: 'Install nuclei binary for production scanning' 
-    };
+    if (subdomains.length === 0) {
+      await log('No alive subdomains found. Run DNS resolution first.');
+      return { message: 'No targets to scan', scanned: 0 };
+    }
+
+    // Build target URLs (prefer HTTP URLs if available, otherwise use subdomain)
+    const targets = subdomains.map(sub => {
+      if (sub.httpStatus && sub.httpStatus >= 200 && sub.httpStatus < 400) {
+        return `https://${sub.subdomain}`;
+      }
+      return `http://${sub.subdomain}`;
+    });
+
+    await log(`Scanning ${targets.length} targets with Nuclei...`);
+
+    try {
+      // Run nuclei scan using the NucleiService
+      const results = await this.nucleiService.scan(targets);
+      
+      await log(`Nuclei scan complete: ${results.length} findings`);
+
+      // Group findings by severity
+      const bySeverity = {
+        critical: results.filter(r => r.severity === 'critical').length,
+        high: results.filter(r => r.severity === 'high').length,
+        medium: results.filter(r => r.severity === 'medium').length,
+        low: results.filter(r => r.severity === 'low').length,
+        info: results.filter(r => r.severity === 'info').length,
+      };
+
+      await log(`Findings by severity: Critical=${bySeverity.critical}, High=${bySeverity.high}, Medium=${bySeverity.medium}, Low=${bySeverity.low}, Info=${bySeverity.info}`);
+
+      // Send notification for critical/high findings
+      const criticalHighFindings = results.filter(r => r.severity === 'critical' || r.severity === 'high');
+      if (criticalHighFindings.length > 0) {
+        await log(`⚠️ ${criticalHighFindings.length} critical/high severity findings!`);
+        try {
+          await this.queueService.publishNotification({
+            type: 'vulnerability',
+            data: {
+              count: criticalHighFindings.length,
+              findings: criticalHighFindings.slice(0, 10).map(f => ({
+                template: f.templateName,
+                severity: f.severity,
+                host: f.host,
+                matched: f.matchedAt,
+              })),
+              timestamp: new Date(),
+              source: 'nuclei_scan',
+            },
+            channels: ['discord', 'telegram'],
+          });
+          await log('Notification sent for critical/high findings');
+        } catch (e: any) {
+          await log(`Failed to send notification: ${e.message}`);
+        }
+      }
+
+      return {
+        message: 'Nuclei scan completed',
+        targets: targets.length,
+        findings: results.length,
+        bySeverity,
+        criticalHigh: criticalHighFindings.length,
+      };
+    } catch (error: any) {
+      await log(`Nuclei scan error: ${error.message}`);
+      
+      // Check if it's a Docker/nuclei availability issue
+      if (error.message.includes('docker') || error.message.includes('nuclei')) {
+        await log('Note: Ensure the nuclei container is running (bb-nuclei)');
+      }
+      
+      throw error;
+    }
   }
 
   private async runFreshDetection(log: LogFn): Promise<any> {
     await log('Starting fresh detection...');
     await log('Marking stale live hosts (older than 24h)...');
     
-    const [livesMarked, httpMarked] = await Promise.all([
-      this.livesService.markAsNotFresh(24),
-      this.httpServicesService.markAsNotFresh(24),
-    ]);
+    const livesMarked = await this.livesService.markAsNotFresh(24);
 
     await log(`Marked ${livesMarked} live hosts as not fresh`);
-    await log(`Marked ${httpMarked} HTTP services as not fresh`);
 
     return {
       livesMarked,
-      httpMarked,
     };
   }
 
@@ -788,70 +894,6 @@ export class CronService implements OnModuleInit {
     const result = await this.scoresService.calculateAllScores();
     await log(`Score calculation completed`);
     return result;
-  }
-
-  /**
-   * HTTP Monitoring with change detection and alerts
-   * Probes all HTTP services and detects changes in status code, title, technologies, favicon
-   * Triggers alerts for detected changes based on configured alert rules
-   * Requirements: 8.1, 8.2, 8.3
-   */
-  private async runHttpMonitor(log: LogFn): Promise<any> {
-    await log('Starting HTTP monitoring with change detection...');
-
-    try {
-      // Watch all HTTP services for changes
-      const result = await this.httpMonitorService.watchAll();
-      
-      await log(`Probed ${result.probed} HTTP services`);
-      await log(`Created ${result.created} new services, updated ${result.updated} existing`);
-      await log(`Detected ${result.changes.length} changes`);
-
-      // Process each change event through the alert service
-      if (result.changes.length > 0) {
-        await log('Processing change events for alerts...');
-        
-        for (const change of result.changes) {
-          try {
-            await this.alertService.processHTTPChangeEvent(change);
-            await log(`Processed alert for ${change.changeType} change on ${change.url}`);
-          } catch (error: any) {
-            await log(`Failed to process alert for ${change.url}: ${error.message}`);
-          }
-        }
-
-        // Send summary notification
-        try {
-          await this.queueService.publishNotification({
-            type: 'status_change',
-            data: {
-              totalChanges: result.changes.length,
-              statusCodeChanges: result.changes.filter(c => c.changeType === 'status_code').length,
-              titleChanges: result.changes.filter(c => c.changeType === 'title').length,
-              techChanges: result.changes.filter(c => c.changeType === 'technology').length,
-              faviconChanges: result.changes.filter(c => c.changeType === 'favicon').length,
-              changes: result.changes.slice(0, 10), // First 10 changes for notification
-              timestamp: new Date(),
-            },
-            channels: ['discord', 'telegram'],
-          });
-          await log('Summary notification sent');
-        } catch (e: any) {
-          await log(`Failed to send summary notification: ${e.message}`);
-        }
-      }
-
-      return {
-        message: 'HTTP monitoring completed',
-        probed: result.probed,
-        created: result.created,
-        updated: result.updated,
-        changesDetected: result.changes.length,
-      };
-    } catch (error: any) {
-      await log(`HTTP monitoring error: ${error.message}`);
-      throw error;
-    }
   }
 
   /**
@@ -1153,6 +1195,248 @@ export class CronService implements OnModuleInit {
       };
     } catch (error: any) {
       await log(`Wayback watch error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Chaos sync for watched programs
+   * Periodically syncs subdomain data from ProjectDiscovery Chaos for watched programs
+   * Triggers alerts for new subdomain discoveries
+   * Requirements: 14.5
+   */
+  private async runChaosSyncWatch(log: LogFn): Promise<any> {
+    await log('Starting Chaos sync for watched programs...');
+
+    try {
+      // Get all programs with watching enabled
+      const watchedPrograms = await this.chaosService.getWatchedPrograms();
+      await log(`Found ${watchedPrograms.length} watched programs`);
+
+      if (watchedPrograms.length === 0) {
+        await log('No programs are being watched. Enable watching for programs first.');
+        return { message: 'No watched programs', synced: 0 };
+      }
+
+      let totalSynced = 0;
+      let totalNew = 0;
+      const results: { program: string; imported: number; new: number }[] = [];
+
+      for (const watchedProgram of watchedPrograms) {
+        try {
+          await log(`Syncing Chaos data for: ${watchedProgram.programName}`);
+
+          // Get existing subdomains for this program to calculate new count
+          const existingSubdomains: string[] = [];
+          
+          // Sync the program
+          const syncResult = await this.chaosService.syncProgram(
+            watchedProgram.programName,
+            existingSubdomains,
+          );
+
+          await log(`Synced ${syncResult.subdomainsImported} subdomains, ${syncResult.newSubdomains} new for ${watchedProgram.programName}`);
+
+          totalSynced += syncResult.subdomainsImported;
+          totalNew += syncResult.newSubdomains;
+          results.push({
+            program: watchedProgram.programName,
+            imported: syncResult.subdomainsImported,
+            new: syncResult.newSubdomains,
+          });
+
+          // If new subdomains were discovered, store them and send notification
+          if (syncResult.newSubdomains > 0) {
+            await log(`🆕 ${syncResult.newSubdomains} new subdomains discovered for ${watchedProgram.programName}`);
+
+            // Send notification for new Chaos discoveries
+            try {
+              await this.queueService.publishNotification({
+                type: 'new_subdomain',
+                data: {
+                  program: watchedProgram.programName,
+                  source: 'chaos',
+                  count: syncResult.newSubdomains,
+                  timestamp: new Date(),
+                },
+                channels: ['discord', 'telegram'],
+              });
+              await log('Notification sent for new Chaos discoveries');
+            } catch (notifyError: any) {
+              await log(`Failed to send Chaos notification: ${notifyError.message}`);
+            }
+          }
+
+          // Rate limiting - wait between syncs
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        } catch (error: any) {
+          await log(`Error syncing ${watchedProgram.programName}: ${error.message}`);
+        }
+      }
+
+      await log(`Chaos sync complete: ${totalSynced} subdomains synced, ${totalNew} new`);
+
+      return {
+        message: 'Chaos sync completed',
+        programsSynced: watchedPrograms.length,
+        totalSubdomains: totalSynced,
+        newSubdomains: totalNew,
+        results,
+      };
+    } catch (error: any) {
+      await log(`Chaos sync error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * DNS brute forcing for watched domains
+   * Periodically runs DNS brute forcing for domains with watching enabled
+   * Stores new discoveries with appropriate source (dns_brute or dns_gen)
+   * Requirements: 11.5, 12.5
+   */
+  private async runDNSBruteWatch(log: LogFn): Promise<any> {
+    await log('Starting DNS brute forcing for watched domains...');
+
+    try {
+      // Get domains to brute force (limit to avoid long execution)
+      const domainsResult = await this.domainsService.findAll({ limit: 10 });
+      const domains = domainsResult.data;
+      await log(`Found ${domains.length} domains for DNS brute forcing`);
+
+      if (domains.length === 0) {
+        await log('No domains found. Add domains first.');
+        return { message: 'No domains to brute force', discovered: 0 };
+      }
+
+      let totalDiscovered = 0;
+      let totalNew = 0;
+      const results: { domain: string; discovered: number; new: number }[] = [];
+
+      // Default wordlist config for static brute forcing
+      const defaultWordlistConfig = {
+        sources: {
+          bestDns: true,
+          twoMillionSubdomains: false, // Skip large wordlist for cron job
+          crunch: true,
+          custom: [],
+        },
+        crunchConfig: {
+          minLength: 1,
+          maxLength: 3, // Shorter for cron job
+          charset: 'abcdefghijklmnopqrstuvwxyz0123456789',
+        },
+      };
+
+      for (const domain of domains) {
+        try {
+          // Skip wildcard domains
+          if (domain.domain.startsWith('*.')) {
+            await log(`Skipping wildcard domain: ${domain.domain}`);
+            continue;
+          }
+
+          await log(`Running DNS brute for: ${domain.domain}`);
+
+          // Get existing subdomains for this domain
+          const existingSubdomainsResult = await this.subdomainsService.findAll({
+            domainId: domain._id.toString(),
+            limit: 10000,
+          });
+          const existingSubdomains = existingSubdomainsResult.data.map(s => s.subdomain);
+          const existingSet = new Set(existingSubdomains.map(s => s.toLowerCase()));
+
+          await log(`Found ${existingSubdomains.length} existing subdomains for ${domain.domain}`);
+
+          // Run static DNS brute forcing
+          const config = {
+            domain: domain.domain,
+            wordlistConfig: defaultWordlistConfig,
+            threads: 100, // Reduced for cron job
+            mode: 'static' as const,
+          };
+
+          const discoveredSubdomains: string[] = [];
+          const newSubdomains: string[] = [];
+
+          try {
+            for await (const subdomain of this.dnsBruteService.runStaticBrute(config)) {
+              discoveredSubdomains.push(subdomain);
+              
+              if (!existingSet.has(subdomain.toLowerCase())) {
+                newSubdomains.push(subdomain);
+                existingSet.add(subdomain.toLowerCase());
+
+                // Store new subdomain with dns_brute source
+                try {
+                  await this.subdomainsService.create({
+                    subdomain: subdomain,
+                    domainId: domain._id.toString(),
+                    sources: ['dns_brute'],
+                    isAlive: true, // Resolved by shuffledns
+                  });
+                } catch (e: any) {
+                  // Ignore duplicates
+                  if (!e.message?.includes('duplicate')) {
+                    this.logger.warn(`Failed to save DNS brute subdomain ${subdomain}: ${e.message}`);
+                  }
+                }
+              }
+            }
+          } catch (bruteError: any) {
+            await log(`DNS brute error for ${domain.domain}: ${bruteError.message}`);
+          }
+
+          await log(`DNS brute for ${domain.domain}: ${discoveredSubdomains.length} discovered, ${newSubdomains.length} new`);
+
+          totalDiscovered += discoveredSubdomains.length;
+          totalNew += newSubdomains.length;
+          results.push({
+            domain: domain.domain,
+            discovered: discoveredSubdomains.length,
+            new: newSubdomains.length,
+          });
+
+          // Send notification for new discoveries
+          if (newSubdomains.length > 0) {
+            await log(`🆕 ${newSubdomains.length} new subdomains discovered for ${domain.domain}`);
+
+            try {
+              await this.queueService.publishNotification({
+                type: 'new_subdomain',
+                data: {
+                  domain: domain.domain,
+                  source: 'dns_brute',
+                  count: newSubdomains.length,
+                  subdomains: newSubdomains.slice(0, 20),
+                  timestamp: new Date(),
+                },
+                channels: ['discord', 'telegram'],
+              });
+              await log('Notification sent for new DNS brute discoveries');
+            } catch (notifyError: any) {
+              await log(`Failed to send DNS brute notification: ${notifyError.message}`);
+            }
+          }
+
+          // Rate limiting between domains
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        } catch (error: any) {
+          await log(`Error brute forcing ${domain.domain}: ${error.message}`);
+        }
+      }
+
+      await log(`DNS brute watch complete: ${totalDiscovered} discovered, ${totalNew} new`);
+
+      return {
+        message: 'DNS brute watch completed',
+        domainsProcessed: domains.length,
+        totalDiscovered,
+        newSubdomains: totalNew,
+        results,
+      };
+    } catch (error: any) {
+      await log(`DNS brute watch error: ${error.message}`);
       throw error;
     }
   }

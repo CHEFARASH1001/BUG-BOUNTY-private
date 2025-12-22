@@ -270,3 +270,253 @@
 
 - [x] 18. Final Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 19. Set up new schemas for DNS brute, Wordlist, and Chaos
+  - [x] 19.1 Create DNSBruteJob schema in backend/src/schemas/dns-brute-job.schema.ts
+    - Define schema with domain, mode, wordlistConfig, threads, status, progress, results
+    - Add indexes for status, programId, userId
+    - _Requirements: 11.1, 11.4, 12.1_
+  - [x] 19.2 Create Wordlist schema in backend/src/schemas/wordlist.schema.ts
+    - Define schema with name, path, sourceUrl, lineCount, sizeBytes, source
+    - Add unique index on name
+    - _Requirements: 18.2, 18.3_
+  - [x] 19.3 Create ChaosSync schema in backend/src/schemas/chaos-sync.schema.ts
+    - Define schema with programName, chaosUrl, subdomainsImported, newSubdomains, watchEnabled
+    - Add indexes for programName, programId
+    - _Requirements: 14.1, 14.3, 14.5_
+  - [x] 19.4 Update schema index file to export new schemas
+    - Add exports for DNSBruteJob, Wordlist, ChaosSync
+    - _Requirements: 11.1, 14.1, 18.2_
+
+- [x] 20. Implement Wordlist service
+  - [x] 20.1 Create Wordlist service in backend/src/modules/recon/services/wordlist.service.ts
+    - Implement downloadWordlist method for fetching remote wordlists
+    - Implement generateCrunch for character combination generation
+    - Implement mergeWordlists for combining and deduplicating
+    - Implement appendDomain for adding domain suffix to entries
+    - _Requirements: 11.1, 11.2, 11.3, 18.2_
+  - [ ]* 20.2 Write property test for static wordlist merge
+    - **Property 23: Static Wordlist Merge**
+    - **Validates: Requirements 11.1, 11.3**
+  - [ ]* 20.3 Write property test for crunch command construction
+    - **Property 24: Crunch Command Construction**
+    - **Validates: Requirements 11.2**
+  - [ ]* 20.4 Write property test for domain appending
+    - **Property 25: Domain Appending to Wordlist**
+    - **Validates: Requirements 11.3**
+  - [ ]* 20.5 Write property test for wordlist statistics
+    - **Property 43: Wordlist Statistics**
+    - **Validates: Requirements 18.3**
+  - [x] 20.6 Add Wordlist service to recon module
+    - Register service in module providers
+    - _Requirements: 11.1_
+
+- [x] 21. Implement DNS Brute service
+  - [x] 21.1 Create DNS Brute service in backend/src/modules/recon/services/dns-brute.service.ts
+    - Implement prepareStaticWordlist for downloading and merging wordlists
+    - Implement prepareDynamicWordlist for dnsgen/altdns setup
+    - Implement runStaticBrute using shuffledns
+    - Implement runDynamicBrute using dnsgen and dnsx
+    - _Requirements: 11.1, 11.4, 12.1, 12.3, 12.4_
+  - [ ]* 21.2 Write property test for shuffledns command construction
+    - **Property 26: ShuffleDNS Command Construction**
+    - **Validates: Requirements 11.4**
+  - [ ]* 21.3 Write property test for DNS brute source attribution
+    - **Property 27: DNS Brute Source Attribution**
+    - **Validates: Requirements 11.5**
+  - [ ]* 21.4 Write property test for dnsgen command construction
+    - **Property 28: DNSGen Command Construction**
+    - **Validates: Requirements 12.3**
+  - [ ]* 21.5 Write property test for dnsx command construction
+    - **Property 29: DNSX Command Construction**
+    - **Validates: Requirements 12.4**
+  - [ ]* 21.6 Write property test for dynamic brute source attribution
+    - **Property 30: Dynamic Brute Source Attribution**
+    - **Validates: Requirements 12.5**
+  - [ ]* 21.7 Write property test for DNS brute progress calculation
+    - **Property 44: DNS Brute Progress Calculation**
+    - **Validates: Requirements 19.1**
+  - [x] 21.8 Add DNS Brute service to recon module
+    - Register service in module providers
+    - _Requirements: 11.1, 12.1_
+
+- [x] 22. Implement GAU service
+  - [x] 22.1 Create GAU service in backend/src/modules/recon/services/gau.service.ts
+    - Implement fetchUrls method to execute gau CLI
+    - Implement extractDomains for domain extraction from URLs
+    - Implement extractEndpoints for endpoint extraction
+    - _Requirements: 13.1, 13.2, 13.3, 13.4_
+  - [ ]* 22.2 Write property test for GAU command construction
+    - **Property 31: GAU Command Construction**
+    - **Validates: Requirements 13.1**
+  - [ ]* 22.3 Write property test for GAU source attribution
+    - **Property 32: GAU Source Attribution**
+    - **Validates: Requirements 13.3**
+  - [x] 22.4 Add GAU service to recon module
+    - Register service in module providers
+    - _Requirements: 13.1_
+
+- [x] 23. Implement Chaos service
+  - [x] 23.1 Create Chaos service in backend/src/modules/recon/services/chaos.service.ts
+    - Implement fetchIndex to get Chaos program list
+    - Implement syncProgram to download and extract ZIP for a program
+    - Implement syncAll for batch syncing
+    - Implement findMatchingPrograms for program search
+    - _Requirements: 14.1, 14.2, 14.3, 14.4_
+  - [ ]* 23.2 Write property test for Chaos index parsing
+    - **Property 33: Chaos Index Parsing**
+    - **Validates: Requirements 14.1**
+  - [ ]* 23.3 Write property test for Chaos ZIP extraction
+    - **Property 34: Chaos ZIP Extraction**
+    - **Validates: Requirements 14.2**
+  - [ ]* 23.4 Write property test for Chaos source attribution
+    - **Property 35: Chaos Source Attribution**
+    - **Validates: Requirements 14.3**
+  - [ ]* 23.5 Write property test for Chaos sync count accuracy
+    - **Property 36: Chaos Sync Count Accuracy**
+    - **Validates: Requirements 14.4**
+  - [x] 23.6 Add Chaos service to recon module
+    - Register service in module providers
+    - _Requirements: 14.1_
+
+- [x] 24. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 25. Implement DNS Brute API endpoints
+  - [x] 25.1 Create DNS Brute controller in backend/src/modules/recon/dns-brute.controller.ts
+    - POST /api/v1/dns-brute - Start DNS brute job
+    - GET /api/v1/dns-brute/:id - Get job status and results
+    - DELETE /api/v1/dns-brute/:id - Cancel job
+    - GET /api/v1/dns-brute/history - List past jobs
+    - _Requirements: 11.1, 19.1, 19.4_
+  - [ ]* 25.2 Write property test for DNS brute job history
+    - **Property 45: DNS Brute Job History**
+    - **Validates: Requirements 19.4**
+  - [x] 25.3 Create Wordlist controller in backend/src/modules/recon/wordlist.controller.ts
+    - GET /api/v1/wordlists - List available wordlists
+    - POST /api/v1/wordlists/download - Download a wordlist
+    - GET /api/v1/wordlists/:name/stats - Get wordlist statistics
+    - _Requirements: 18.1, 18.2, 18.3_
+
+- [x] 26. Implement GAU and Chaos API endpoints
+  - [x] 26.1 Create GAU controller in backend/src/modules/recon/gau.controller.ts
+    - POST /api/v1/gau - Start GAU enumeration
+    - GET /api/v1/gau/:id - Get enumeration results
+    - _Requirements: 13.1, 13.2_
+  - [x] 26.2 Create Chaos controller in backend/src/modules/recon/chaos.controller.ts
+    - GET /api/v1/chaos/programs - List available Chaos programs
+    - POST /api/v1/chaos/sync - Sync a program
+    - GET /api/v1/chaos/sync/:id - Get sync status
+    - PUT /api/v1/chaos/watch/:programId - Enable/disable watching
+    - _Requirements: 14.1, 14.2, 14.5_
+
+- [x] 27. Implement Watchtower CLI service
+  - [x] 27.1 Create CLI service in backend/src/modules/cli/cli.service.ts
+    - Implement getSingleTarget for program queries
+    - Implement getHTTPAll for HTTP service queries
+    - Implement getLivesScope for live subdomain queries
+    - Implement formatOutput for JSON/table formatting
+    - _Requirements: 15.1, 15.2, 16.1, 17.1_
+  - [ ]* 27.2 Write property test for CLI single target query
+    - **Property 37: CLI Single Target Query**
+    - **Validates: Requirements 15.1, 15.2**
+  - [ ]* 27.3 Write property test for CLI output format
+    - **Property 38: CLI Output Format**
+    - **Validates: Requirements 15.4**
+  - [ ]* 27.4 Write property test for CLI HTTP query
+    - **Property 39: CLI HTTP Query**
+    - **Validates: Requirements 16.1**
+  - [ ]* 27.5 Write property test for CLI compare flag
+    - **Property 40: CLI Compare Flag**
+    - **Validates: Requirements 16.2**
+  - [ ]* 27.6 Write property test for CLI lives scope query
+    - **Property 41: CLI Lives Scope Query**
+    - **Validates: Requirements 17.1**
+  - [ ]* 27.7 Write property test for CLI lives compare
+    - **Property 42: CLI Lives Compare**
+    - **Validates: Requirements 17.2**
+  - [x] 27.8 Create CLI controller in backend/src/modules/cli/cli.controller.ts
+    - GET /api/v1/cli/target/:program - Get single target info
+    - GET /api/v1/cli/http - Get HTTP services with filters
+    - GET /api/v1/cli/lives/:program - Get live subdomains by scope
+    - _Requirements: 15.1, 16.1, 17.1_
+
+- [x] 28. Implement CLI tool (watchtower command)
+  - [x] 28.1 Update CLI tool in cli/bb-cli.ts
+    - Add "get single target <program>" command
+    - Add "get http all [--compare list]" command
+    - Add "get lives scope <program> [--compare list]" command
+    - Add --format option for json/table output
+    - _Requirements: 15.1, 15.4, 16.1, 16.2, 17.1, 17.2_
+  - [x] 28.2 Implement CLI output formatters
+    - Implement JSON formatter
+    - Implement table formatter with colors
+    - Implement change highlighting for compare mode
+    - _Requirements: 15.4, 16.2, 17.2_
+
+- [x] 29. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 30. Implement cron jobs for new features
+  - [x] 30.1 Add Chaos sync cron job
+    - Schedule periodic Chaos sync for watched programs
+    - Trigger alerts for new subdomain discoveries
+    - _Requirements: 14.5_
+  - [x] 30.2 Add DNS brute watching cron job
+    - Schedule periodic DNS brute for watched domains
+    - Store new discoveries with appropriate source
+    - _Requirements: 11.5, 12.5_
+  - [x] 30.3 Update cron module with new jobs
+    - Register Chaos sync and DNS brute cron jobs
+    - _Requirements: 14.5_
+
+- [x] 31. Implement frontend DNS brute page
+  - [x] 31.1 Create DNS brute page at frontend/src/app/dashboard/dns-brute/page.tsx
+    - Create form with domain input, wordlist selection, mode toggle (static/dynamic)
+    - Add thread count configuration
+    - Display available wordlists with status
+    - _Requirements: 18.1, 18.4_
+  - [x] 31.2 Implement DNS brute job submission and progress display
+    - Submit job to backend API
+    - Display progress bar and discovered count
+    - Stream results via WebSocket
+    - _Requirements: 19.1, 19.2_
+  - [x] 31.3 Implement DNS brute history view
+    - List past jobs with configurations
+    - Show results and allow export
+    - _Requirements: 19.3, 19.4_
+  - [x] 31.4 Add DNS brute page to dashboard navigation
+    - Add menu item in dashboard layout
+    - _Requirements: 18.1_
+
+- [x] 32. Implement frontend Chaos sync page
+  - [x] 32.1 Create Chaos page at frontend/src/app/dashboard/chaos/page.tsx
+    - Display available Chaos programs with search
+    - Show sync status and subdomain counts
+    - Enable/disable watching toggle
+    - _Requirements: 14.1, 14.5_
+  - [x] 32.2 Implement Chaos sync functionality
+    - Trigger sync for selected programs
+    - Display sync progress and results
+    - _Requirements: 14.2, 14.4_
+  - [x] 32.3 Add Chaos page to dashboard navigation
+    - Add menu item in dashboard layout
+    - _Requirements: 14.1_
+
+- [x] 33. Update frontend API client for new features
+  - [x] 33.1 Add DNS brute API methods
+    - Add startDNSBrute, getDNSBruteStatus, cancelDNSBrute, getDNSBruteHistory
+    - Add getWordlists, downloadWordlist, getWordlistStats
+    - _Requirements: 11.1, 18.2, 19.1_
+  - [x] 33.2 Add GAU API methods
+    - Add startGAU, getGAUResults
+    - _Requirements: 13.1_
+  - [x] 33.3 Add Chaos API methods
+    - Add getChaosPrograms, syncChaos, getSyncStatus, toggleChaosWatch
+    - _Requirements: 14.1, 14.2, 14.5_
+  - [x] 33.4 Add CLI query API methods
+    - Add getSingleTarget, getHTTPServices, getLivesScope
+    - _Requirements: 15.1, 16.1, 17.1_
+
+- [x] 34. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.

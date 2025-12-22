@@ -26,7 +26,6 @@ import { RabbitMQWrapperModule } from './modules/queue/rabbitmq.module';
 import { QueueModule } from './modules/queue/queue.module';
 import { PlatformsModule } from './modules/platforms/platforms.module';
 import { LivesModule } from './modules/lives/lives.module';
-import { HttpServicesModule } from './modules/http-services/http-services.module';
 import { ScoresModule } from './modules/scores/scores.module';
 import { CronModule } from './modules/cron/cron.module';
 import { DocumentationModule } from './modules/documentation/documentation.module';
@@ -86,7 +85,6 @@ import { CliModule } from './modules/cli/cli.module';
     ScannerModule,
     PlatformsModule,
     LivesModule,
-    HttpServicesModule,
     ScoresModule,
     CronModule,
     DocumentationModule,

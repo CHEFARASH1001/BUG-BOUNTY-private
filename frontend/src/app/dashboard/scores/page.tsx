@@ -120,14 +120,14 @@ const sortOptions = [
   { value: 'pentestScore', label: 'Penetration' },
 ];
 
-function ScoreBar({ value, label, color = 'bg-cyan-500' }: { value: number; label: string; color?: string }) {
+function ScoreBar({ value, label, color = 'bg-primary-500' }: { value: number; label: string; color?: string }) {
   return (
     <div className="space-y-1">
       <div className="flex justify-between text-xs">
-        <span className="text-gray-400">{label}</span>
+        <span className="text-slate-400">{label}</span>
         <span className="text-white font-mono">{value}</span>
       </div>
-      <div className="h-2 bg-gray-700/50 rounded-full overflow-hidden">
+      <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${value}%` }}
@@ -163,141 +163,144 @@ function ScoreCard({ score, rank }: { score: Score; rank: number }) {
       layout
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: rank * 0.05 }}
-      className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-xl overflow-hidden hover:border-cyan-500/30 transition-all"
+      transition={{ delay: Math.min(rank * 0.02, 0.5) }}
+      className="group relative"
     >
-      <div
-        className="p-4 cursor-pointer"
-        onClick={() => setExpanded(!expanded)}
-      >
-        <div className="flex items-center gap-4">
-          {/* Rank */}
-          <div className="text-2xl font-bold text-gray-500 w-8 text-center">
-            #{rank}
-          </div>
+      <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
+      <div className="relative bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors overflow-hidden">
+        <div
+          className="p-4 cursor-pointer"
+          onClick={() => setExpanded(!expanded)}
+        >
+          <div className="flex items-center gap-4">
+            {/* Rank */}
+            <div className="text-2xl font-bold text-slate-500 w-8 text-center">
+              #{rank}
+            </div>
 
-          {/* Tier Badge */}
-          <TierBadge tier={score.tier} />
+            {/* Tier Badge */}
+            <TierBadge tier={score.tier} />
 
-          {/* Info */}
-          <div className="flex-1 min-w-0">
-            <Link
-              href={`/dashboard/programs/${score.targetId}`}
-              className="text-lg font-semibold text-white hover:text-cyan-400 transition-colors truncate block"
-              onClick={(e) => e.stopPropagation()}
+            {/* Info */}
+            <div className="flex-1 min-w-0">
+              <Link
+                href={`/dashboard/programs/${score.targetId}`}
+                className="text-lg font-semibold text-white hover:text-primary-400 transition-colors truncate block"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {score.targetName}
+              </Link>
+              <div className="flex items-center gap-4 text-sm text-slate-400 mt-1">
+                <span className="flex items-center gap-1">
+                  <span className="text-primary-400">●</span>
+                  Total: {score.totalScore}
+                </span>
+                <span>Confidence: {score.confidence}%</span>
+              </div>
+            </div>
+
+            {/* Score Rings */}
+            <div className="hidden md:flex items-center gap-2">
+              <ScoreRing value={score.exploitabilityScore} label="EXP" color="#f59e0b" />
+              <ScoreRing value={score.historicalScore} label="HIS" color="#10b981" />
+              <ScoreRing value={score.programQualityScore} label="PRG" color="#3b82f6" />
+              <ScoreRing value={score.competitionScore} label="CMP" color="#a855f7" />
+              <ScoreRing value={score.attackSurfaceScore} label="ATK" color="#06b6d4" />
+              <ScoreRing value={score.pentestScore} label="PEN" color="#ef4444" />
+            </div>
+
+            {/* Expand Icon */}
+            <motion.div
+              animate={{ rotate: expanded ? 180 : 0 }}
+              className="text-slate-400"
             >
-              {score.targetName}
-            </Link>
-            <div className="flex items-center gap-4 text-sm text-gray-400 mt-1">
-              <span className="flex items-center gap-1">
-                <span className="text-cyan-400">●</span>
-                Total: {score.totalScore}
-              </span>
-              <span>Confidence: {score.confidence}%</span>
-            </div>
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </motion.div>
           </div>
-
-          {/* Score Rings */}
-          <div className="hidden md:flex items-center gap-2">
-            <ScoreRing value={score.exploitabilityScore} label="EXP" color="#f59e0b" />
-            <ScoreRing value={score.historicalScore} label="HIS" color="#10b981" />
-            <ScoreRing value={score.programQualityScore} label="PRG" color="#3b82f6" />
-            <ScoreRing value={score.competitionScore} label="CMP" color="#a855f7" />
-            <ScoreRing value={score.attackSurfaceScore} label="ATK" color="#06b6d4" />
-            <ScoreRing value={score.pentestScore} label="PEN" color="#ef4444" />
-          </div>
-
-          {/* Expand Icon */}
-          <motion.div
-            animate={{ rotate: expanded ? 180 : 0 }}
-            className="text-gray-400"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-            </svg>
-          </motion.div>
         </div>
+
+        {/* Expanded Details */}
+        <AnimatePresence>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-dark-800"
+            >
+              <div className="p-4 space-y-4">
+                {/* Score Bars */}
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <ScoreBar value={score.exploitabilityScore} label="Exploitability" color="bg-amber-500" />
+                  <ScoreBar value={score.historicalScore} label="Historical" color="bg-emerald-500" />
+                  <ScoreBar value={score.programQualityScore} label="Program Quality" color="bg-blue-500" />
+                  <ScoreBar value={score.competitionScore} label="Competition" color="bg-purple-500" />
+                  <ScoreBar value={score.attackSurfaceScore} label="Attack Surface" color="bg-cyan-500" />
+                  <ScoreBar value={score.pentestScore} label="Penetration" color="bg-red-500" />
+                </div>
+
+                {/* Recommendations & Insights */}
+                <div className="grid md:grid-cols-3 gap-4">
+                  {score.strengths?.length > 0 && (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
+                      <h4 className="text-emerald-400 font-semibold text-sm mb-2">💪 Strengths</h4>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {score.strengths.slice(0, 3).map((s, i) => (
+                          <li key={i}>• {s}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {score.weaknesses?.length > 0 && (
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+                      <h4 className="text-red-400 font-semibold text-sm mb-2">⚠️ Weaknesses</h4>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {score.weaknesses.slice(0, 3).map((w, i) => (
+                          <li key={i}>• {w}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {score.recommendations?.length > 0 && (
+                    <div className="bg-primary-500/10 border border-primary-500/20 rounded-lg p-3">
+                      <h4 className="text-primary-400 font-semibold text-sm mb-2">💡 Recommendations</h4>
+                      <ul className="text-xs text-slate-300 space-y-1">
+                        {score.recommendations.slice(0, 3).map((r, i) => (
+                          <li key={i}>• {r}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-2">
+                  <Link
+                    href={`/dashboard/programs/${score.targetId}`}
+                    className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-lg text-sm transition-colors"
+                  >
+                    View Program
+                  </Link>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      await scoresApi.calculateProgram(score.targetId);
+                      window.location.reload();
+                    }}
+                    className="px-4 py-2 bg-dark-800 hover:bg-dark-700 text-slate-300 rounded-lg text-sm transition-colors border border-dark-700"
+                  >
+                    Recalculate
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
-
-      {/* Expanded Details */}
-      <AnimatePresence>
-        {expanded && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="border-t border-gray-700/50"
-          >
-            <div className="p-4 space-y-4">
-              {/* Score Bars */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <ScoreBar value={score.exploitabilityScore} label="Exploitability" color="bg-amber-500" />
-                <ScoreBar value={score.historicalScore} label="Historical" color="bg-emerald-500" />
-                <ScoreBar value={score.programQualityScore} label="Program Quality" color="bg-blue-500" />
-                <ScoreBar value={score.competitionScore} label="Competition" color="bg-purple-500" />
-                <ScoreBar value={score.attackSurfaceScore} label="Attack Surface" color="bg-cyan-500" />
-                <ScoreBar value={score.pentestScore} label="Penetration" color="bg-red-500" />
-              </div>
-
-              {/* Recommendations & Insights */}
-              <div className="grid md:grid-cols-3 gap-4">
-                {score.strengths?.length > 0 && (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-3">
-                    <h4 className="text-emerald-400 font-semibold text-sm mb-2">💪 Strengths</h4>
-                    <ul className="text-xs text-gray-300 space-y-1">
-                      {score.strengths.slice(0, 3).map((s, i) => (
-                        <li key={i}>• {s}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {score.weaknesses?.length > 0 && (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3">
-                    <h4 className="text-red-400 font-semibold text-sm mb-2">⚠️ Weaknesses</h4>
-                    <ul className="text-xs text-gray-300 space-y-1">
-                      {score.weaknesses.slice(0, 3).map((w, i) => (
-                        <li key={i}>• {w}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {score.recommendations?.length > 0 && (
-                  <div className="bg-cyan-500/10 border border-cyan-500/20 rounded-lg p-3">
-                    <h4 className="text-cyan-400 font-semibold text-sm mb-2">💡 Recommendations</h4>
-                    <ul className="text-xs text-gray-300 space-y-1">
-                      {score.recommendations.slice(0, 3).map((r, i) => (
-                        <li key={i}>• {r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Link
-                  href={`/dashboard/programs/${score.targetId}`}
-                  className="px-4 py-2 bg-cyan-500/20 text-cyan-400 rounded-lg text-sm hover:bg-cyan-500/30 transition-colors"
-                >
-                  View Program
-                </Link>
-                <button
-                  onClick={async (e) => {
-                    e.stopPropagation();
-                    await scoresApi.calculateProgram(score.targetId);
-                    window.location.reload();
-                  }}
-                  className="px-4 py-2 bg-gray-700/50 text-gray-300 rounded-lg text-sm hover:bg-gray-700 transition-colors"
-                >
-                  Recalculate
-                </button>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 }
@@ -316,7 +319,7 @@ function ScoreRing({ value, label, color }: { value: number; label: string; colo
           r={radius}
           strokeWidth="4"
           fill="none"
-          stroke="#374151"
+          className="stroke-dark-700"
         />
         <motion.circle
           cx="24"
@@ -334,7 +337,7 @@ function ScoreRing({ value, label, color }: { value: number; label: string; colo
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="text-[10px] font-bold text-white">{value}</span>
-        <span className="text-[8px] text-gray-400">{label}</span>
+        <span className="text-[8px] text-slate-400">{label}</span>
       </div>
     </div>
   );
@@ -400,186 +403,185 @@ export default function ScoresPage() {
     : scores;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-6">
-      <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-              <span className="text-4xl">🎯</span>
-              Program Scores
-            </h1>
-            <p className="text-gray-400 mt-1">
-              AI-powered program scoring based on exploitability, history, and attack surface
-            </p>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleSyncPlatforms}
-              disabled={syncing || calculating}
-              className="px-6 py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-semibold rounded-xl hover:from-purple-600 hover:to-pink-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {syncing ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Syncing...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-                  </svg>
-                  Sync Platforms
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleCalculateAll}
-              disabled={calculating || syncing}
-              className="px-6 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-semibold rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-            >
-              {calculating ? (
-                <>
-                  <svg className="animate-spin w-5 h-5" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>
-                  Calculating...
-                </>
-              ) : (
-                <>
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                  </svg>
-                  Recalculate All
-                </>
-              )}
-            </button>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
+            <span className="text-3xl">🎯</span>
+            Program Scores
+          </h1>
+          <p className="text-slate-400 mt-1">
+            AI-powered program scoring based on exploitability, history, and attack surface
+          </p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSyncPlatforms}
+            disabled={syncing || calculating}
+            className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {syncing ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Syncing...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                </svg>
+                Sync Platforms
+              </>
+            )}
+          </button>
+          <button
+            onClick={handleCalculateAll}
+            disabled={calculating || syncing}
+            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {calculating ? (
+              <>
+                <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+                Calculating...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Recalculate All
+              </>
+            )}
+          </button>
+        </div>
+      </div>
 
-        {/* Stats Cards */}
-        {stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4"
-            >
-              <div className="text-3xl font-bold text-white">{stats.totalPrograms}</div>
-              <div className="text-gray-400 text-sm">Scored Programs</div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1 }}
-              className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4"
-            >
-              <div className="text-3xl font-bold text-white">{stats.totalDomains}</div>
-              <div className="text-gray-400 text-sm">Scored Domains</div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4"
-            >
-              <div className="text-3xl font-bold text-cyan-400">{stats.avgScore}</div>
-              <div className="text-gray-400 text-sm">Average Score</div>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.3 }}
-              className="bg-gray-800/60 backdrop-blur-sm border border-gray-700/50 rounded-xl p-4"
-            >
-              <div className="flex gap-2">
-                {['S', 'A', 'B', 'C', 'D', 'F'].map(tier => (
-                  <div key={tier} className="text-center">
-                    <div className={`text-lg font-bold ${tierTextColors[tier]}`}>
-                      {stats.tierDistribution[tier] || 0}
-                    </div>
-                    <div className="text-xs text-gray-500">{tier}</div>
-                  </div>
-                ))}
-              </div>
-              <div className="text-gray-400 text-sm mt-1">Tier Distribution</div>
-            </motion.div>
-          </div>
-        )}
-
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Sort By */}
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400 text-sm">Sort by:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-            >
-              {sortOptions.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tier Filter */}
-          <div className="flex items-center gap-2">
-            <span className="text-gray-400 text-sm">Tier:</span>
-            <div className="flex gap-1">
-              <button
-                onClick={() => setSelectedTier(null)}
-                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                  selectedTier === null
-                    ? 'bg-cyan-500 text-white'
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                All
-              </button>
+      {/* Stats Cards */}
+      {stats && (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+          >
+            <p className="text-slate-400 text-sm">Scored Programs</p>
+            <p className="text-2xl font-bold text-white mt-1">{stats.totalPrograms}</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+          >
+            <p className="text-slate-400 text-sm">Scored Domains</p>
+            <p className="text-2xl font-bold text-white mt-1">{stats.totalDomains}</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+          >
+            <p className="text-slate-400 text-sm">Average Score</p>
+            <p className="text-2xl font-bold text-primary-400 mt-1">{stats.avgScore}</p>
+          </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+          >
+            <div className="flex gap-2">
               {['S', 'A', 'B', 'C', 'D', 'F'].map(tier => (
-                <button
-                  key={tier}
-                  onClick={() => setSelectedTier(tier)}
-                  className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
-                    selectedTier === tier
-                      ? `bg-gradient-to-br ${tierColors[tier]} text-white`
-                      : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                  }`}
-                >
-                  {tier}
-                </button>
+                <div key={tier} className="text-center">
+                  <div className={`text-lg font-bold ${tierTextColors[tier]}`}>
+                    {stats.tierDistribution[tier] || 0}
+                  </div>
+                  <div className="text-xs text-slate-500">{tier}</div>
+                </div>
               ))}
             </div>
-          </div>
+            <p className="text-slate-400 text-sm mt-1">Tier Distribution</p>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Sort By */}
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-sm">Sort by:</span>
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+          >
+            {sortOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
         </div>
 
-        {/* Loading State */}
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-cyan-500"></div>
-          </div>
-        ) : filteredScores.length === 0 ? (
-          <div className="text-center py-20">
-            <div className="text-6xl mb-4">📊</div>
-            <h3 className="text-xl font-semibold text-white mb-2">No Scores Yet</h3>
-            <p className="text-gray-400 mb-4">
-              Click "Recalculate All" to generate scores for your programs
-            </p>
-          </div>
-        ) : (
-          /* Score Cards */
-          <div className="space-y-3">
-            {filteredScores.map((score, index) => (
-              <ScoreCard key={score._id} score={score} rank={index + 1} />
+        {/* Tier Filter */}
+        <div className="flex items-center gap-2">
+          <span className="text-slate-400 text-sm">Tier:</span>
+          <div className="flex gap-1">
+            <button
+              onClick={() => setSelectedTier(null)}
+              className={`px-3 py-1 rounded-lg text-sm transition-colors ${
+                selectedTier === null
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+              }`}
+            >
+              All
+            </button>
+            {['S', 'A', 'B', 'C', 'D', 'F'].map(tier => (
+              <button
+                key={tier}
+                onClick={() => setSelectedTier(tier)}
+                className={`w-8 h-8 rounded-lg text-sm font-bold transition-colors ${
+                  selectedTier === tier
+                    ? `bg-gradient-to-br ${tierColors[tier]} text-white`
+                    : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+                }`}
+              >
+                {tier}
+              </button>
             ))}
           </div>
-        )}
+        </div>
       </div>
+
+      {/* Loading State */}
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-400"></div>
+          <span className="ml-3 text-slate-400">Loading scores...</span>
+        </div>
+      ) : filteredScores.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-5xl mb-4">📊</div>
+          <h3 className="text-lg font-medium text-white mb-2">No Scores Yet</h3>
+          <p className="text-slate-400 mb-4">
+            Click "Recalculate All" to generate scores for your programs
+          </p>
+        </div>
+      ) : (
+        /* Score Cards */
+        <div className="space-y-4">
+          {filteredScores.map((score, index) => (
+            <ScoreCard key={score._id} score={score} rank={index + 1} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

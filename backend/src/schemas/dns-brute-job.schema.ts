@@ -61,6 +61,9 @@ export class DNSBruteJob {
   @Prop({ type: [String], default: [] })
   results: string[];
 
+  @Prop({ type: [String], default: [] })
+  logs: string[];
+
   @Prop()
   startedAt: Date;
 

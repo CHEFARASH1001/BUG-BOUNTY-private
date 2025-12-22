@@ -61,6 +61,7 @@ interface DNSBruteJob {
   progress: number;
   discoveredCount: number;
   results: string[];
+  logs: string[];
   error?: string;
   startedAt?: string;
   completedAt?: string;
@@ -821,15 +822,31 @@ function JobDetailsPanel({
       )}
 
       {/* Running State */}
-      {['running', 'preparing'].includes(job.status) && (!job.results || job.results.length === 0) && (
-        <div className="flex flex-col items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 text-primary-400 animate-spin mb-4" />
-          <p className="text-slate-400">
-            {job.status === 'preparing' ? 'Preparing wordlists...' : 'DNS brute forcing in progress...'}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            {job.discoveredCount || 0} subdomains discovered so far
-          </p>
+      {['running', 'preparing'].includes(job.status) && (
+        <div className="mb-4">
+          <div className="flex flex-col items-center justify-center py-6">
+            <Loader2 className="w-8 h-8 text-primary-400 animate-spin mb-4" />
+            <p className="text-slate-400">
+              {job.status === 'preparing' ? 'Preparing wordlists...' : 'DNS brute forcing in progress...'}
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              {job.discoveredCount || 0} subdomains discovered so far
+            </p>
+          </div>
+          
+          {/* Logs Section */}
+          {job.logs && job.logs.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-xs font-medium text-slate-400 mb-2">Execution Logs</h4>
+              <div className="max-h-[200px] overflow-y-auto bg-dark-800/50 rounded-lg p-3 font-mono text-xs">
+                {job.logs.map((log, index) => (
+                  <div key={index} className="text-slate-300 py-0.5">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -838,6 +855,20 @@ function JobDetailsPanel({
         <div className="text-center py-12">
           <Globe className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <p className="text-slate-400">No subdomains discovered</p>
+          
+          {/* Show logs even when completed with no results */}
+          {job.logs && job.logs.length > 0 && (
+            <div className="mt-4 text-left">
+              <h4 className="text-xs font-medium text-slate-400 mb-2">Execution Logs</h4>
+              <div className="max-h-[200px] overflow-y-auto bg-dark-800/50 rounded-lg p-3 font-mono text-xs">
+                {job.logs.map((log, index) => (
+                  <div key={index} className="text-slate-300 py-0.5">
+                    {log}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -845,6 +876,20 @@ function JobDetailsPanel({
       {job.error && (
         <div className="mt-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
           <p className="text-sm text-red-400">{job.error}</p>
+        </div>
+      )}
+
+      {/* Logs for failed/completed jobs */}
+      {['failed', 'completed', 'cancelled'].includes(job.status) && job.logs && job.logs.length > 0 && job.results && job.results.length > 0 && (
+        <div className="mt-4">
+          <h4 className="text-xs font-medium text-slate-400 mb-2">Execution Logs</h4>
+          <div className="max-h-[150px] overflow-y-auto bg-dark-800/50 rounded-lg p-3 font-mono text-xs">
+            {job.logs.map((log, index) => (
+              <div key={index} className="text-slate-300 py-0.5">
+                {log}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </motion.div>

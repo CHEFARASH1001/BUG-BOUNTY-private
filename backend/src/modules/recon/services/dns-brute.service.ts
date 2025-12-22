@@ -98,6 +98,8 @@ export class DNSBruteService {
     // Generate crunch wordlist if enabled
     if (config.sources.crunch && config.crunchConfig) {
       try {
+        // Check if crunch is available
+        await execAsync('which crunch');
         const crunchPath = await this.wordlistService.generateCrunch(
           config.crunchConfig.minLength,
           config.crunchConfig.maxLength,
@@ -106,7 +108,7 @@ export class DNSBruteService {
         wordlistPaths.push(crunchPath);
         this.logger.log(`Generated crunch wordlist`);
       } catch (error) {
-        this.logger.warn(`Failed to generate crunch wordlist: ${error}`);
+        this.logger.warn(`Crunch not available or failed: ${error}. Skipping character combination generation.`);
       }
     }
 
@@ -246,6 +248,20 @@ export class DNSBruteService {
     const outputPath = path.join(this.workDir, `output_${config.domain}_${timestamp}.txt`);
     const resolversPath = config.resolvers || this.defaultResolvers;
 
+    // Check if shuffledns is available
+    try {
+      await execAsync('which shuffledns');
+    } catch {
+      throw new Error('shuffledns is not installed. Please install it with: go install github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest');
+    }
+
+    // Check if massdns is available
+    try {
+      await execAsync('which massdns');
+    } catch {
+      throw new Error('massdns is not installed. Please install it from: https://github.com/blechschmidt/massdns');
+    }
+
     // Prepare wordlist
     const wordlistPath = await this.prepareStaticWordlist(config.wordlistConfig, config.domain);
 
@@ -260,6 +276,16 @@ export class DNSBruteService {
     this.logger.log(`Starting shuffledns with args: ${args.join(' ')}`);
 
     const shuffledns = spawn('shuffledns', args);
+    
+    // Handle spawn errors
+    shuffledns.on('error', (err) => {
+      this.logger.error(`shuffledns spawn error: ${err.message}`);
+    });
+
+    // Log stderr for debugging
+    shuffledns.stderr.on('data', (data) => {
+      this.logger.warn(`shuffledns stderr: ${data.toString()}`);
+    });
 
     let buffer = '';
 
@@ -318,6 +344,24 @@ export class DNSBruteService {
   ): AsyncGenerator<string> {
     const timestamp = Date.now();
     const resolvers = resolversPath || this.defaultResolvers;
+
+    // Check if dnsgen is available
+    try {
+      await execAsync('which dnsgen');
+    } catch {
+      throw new Error(
+        'dnsgen is not installed. Please install it with: pip3 install dnsgen',
+      );
+    }
+
+    // Check if dnsx is available
+    try {
+      await execAsync('which dnsx');
+    } catch {
+      throw new Error(
+        'dnsx is not installed. Please install it from: https://github.com/projectdiscovery/dnsx',
+      );
+    }
 
     // Write existing subdomains to file
     const subdomainsPath = path.join(this.workDir, `subdomains_${timestamp}.txt`);
@@ -413,11 +457,24 @@ export class DNSBruteService {
       throw new Error(`Job ${jobId} not found`);
     }
 
+    const addLog = async (message: string) => {
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] ${message}`;
+      this.logger.log(`Job ${jobId}: ${message}`);
+      await this.dnsBruteJobModel.findByIdAndUpdate(jobId, {
+        $push: { logs: logEntry },
+      });
+    };
+
     try {
       // Update status to preparing
       job.status = DNSBruteJobStatus.PREPARING;
       job.startedAt = new Date();
+      job.logs = [];
       await job.save();
+
+      await addLog(`Starting DNS brute force for ${config.domain} in ${config.mode} mode`);
+      await addLog(`Configuration: ${config.threads} threads`);
 
       const results: string[] = [];
       const seenSubdomains = new Set<string>();
@@ -426,7 +483,11 @@ export class DNSBruteService {
       job.status = DNSBruteJobStatus.RUNNING;
       await job.save();
 
+      await addLog('Preparing wordlists...');
+
       if (config.mode === DNSBruteMode.STATIC) {
+        await addLog('Starting static brute force with shuffledns...');
+        
         for await (const subdomain of this.runStaticBrute(config)) {
           if (!seenSubdomains.has(subdomain)) {
             seenSubdomains.add(subdomain);
@@ -434,6 +495,7 @@ export class DNSBruteService {
 
             // Update progress periodically
             if (results.length % 100 === 0) {
+              await addLog(`Discovered ${results.length} subdomains so far...`);
               await this.dnsBruteJobModel.findByIdAndUpdate(jobId, {
                 results,
                 discoveredCount: results.length,
@@ -444,6 +506,7 @@ export class DNSBruteService {
       } else {
         // For dynamic mode, we need existing subdomains
         // This would typically come from the database
+        await addLog('Starting dynamic brute force with dnsgen + dnsx...');
         const existingSubdomains = job.results || [];
         for await (const subdomain of this.runDynamicBrute(
           config.domain,
@@ -455,6 +518,7 @@ export class DNSBruteService {
 
             // Update progress periodically
             if (results.length % 100 === 0) {
+              await addLog(`Discovered ${results.length} subdomains so far...`);
               await this.dnsBruteJobModel.findByIdAndUpdate(jobId, {
                 results,
                 discoveredCount: results.length,
@@ -463,6 +527,8 @@ export class DNSBruteService {
           }
         }
       }
+
+      await addLog(`Completed! Total discovered: ${results.length} subdomains`);
 
       // Update job with final results
       const updatedJob = await this.dnsBruteJobModel.findById(jobId);
@@ -475,10 +541,13 @@ export class DNSBruteService {
         await updatedJob.save();
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      await addLog(`Error: ${errorMessage}`);
+      
       const updatedJob = await this.dnsBruteJobModel.findById(jobId);
       if (updatedJob) {
         updatedJob.status = DNSBruteJobStatus.FAILED;
-        updatedJob.error = error instanceof Error ? error.message : 'Unknown error';
+        updatedJob.error = errorMessage;
         updatedJob.completedAt = new Date();
         await updatedJob.save();
       }

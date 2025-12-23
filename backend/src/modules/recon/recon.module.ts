@@ -23,6 +23,8 @@ import { ExternalApisModule } from '../external-apis/external-apis.module';
 import { Wordlist, WordlistSchema } from '../../schemas/wordlist.schema';
 import { DNSBruteJob, DNSBruteJobSchema } from '../../schemas/dns-brute-job.schema';
 import { ChaosSync, ChaosSyncSchema } from '../../schemas/chaos-sync.schema';
+import { Subdomain, SubdomainSchema } from '../../schemas/subdomain.schema';
+import { Domain, DomainSchema } from '../../schemas/domain.schema';
 
 @Module({
   imports: [
@@ -31,6 +33,8 @@ import { ChaosSync, ChaosSyncSchema } from '../../schemas/chaos-sync.schema';
       { name: Wordlist.name, schema: WordlistSchema },
       { name: DNSBruteJob.name, schema: DNSBruteJobSchema },
       { name: ChaosSync.name, schema: ChaosSyncSchema },
+      { name: Subdomain.name, schema: SubdomainSchema },
+      { name: Domain.name, schema: DomainSchema },
     ]),
     forwardRef(() => ExternalApisModule),
   ],

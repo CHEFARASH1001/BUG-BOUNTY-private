@@ -521,3 +521,91 @@ export const gauApi = {
   // Get GAU job status and results
   getResults: (id: string) => api.get(`/gau/${id}`),
 };
+
+// Tools API - Security Tools Registry
+export const toolsApi = {
+  // Get all tools with optional filters
+  getAll: (filters?: { 
+    search?: string; 
+    category?: string; 
+    installedOnly?: boolean;
+  }) => api.get('/tools', { params: filters }),
+  
+  // Get single tool by ID
+  getById: (id: string) => api.get(`/tools/${id}`),
+  
+  // Create a new tool
+  create: (data: {
+    name: string;
+    displayName: string;
+    description: string;
+    githubUrl: string;
+    categories: string[];
+    binaryName: string;
+    configOptions?: Array<{
+      name: string;
+      flag: string;
+      type: 'string' | 'number' | 'boolean' | 'file';
+      description: string;
+      required: boolean;
+      default?: any;
+    }>;
+  }) => api.post('/tools', data),
+  
+  // Update a tool
+  update: (id: string, data: {
+    name?: string;
+    displayName?: string;
+    description?: string;
+    githubUrl?: string;
+    categories?: string[];
+    binaryName?: string;
+    configOptions?: Array<{
+      name: string;
+      flag: string;
+      type: 'string' | 'number' | 'boolean' | 'file';
+      description: string;
+      required: boolean;
+      default?: any;
+    }>;
+    userConfig?: Record<string, any>;
+    isActive?: boolean;
+  }) => api.put(`/tools/${id}`, data),
+  
+  // Delete a tool
+  delete: (id: string) => api.delete(`/tools/${id}`),
+  
+  // Execute a tool
+  execute: (id: string, data: {
+    arguments: string[];
+    config?: Record<string, any>;
+    timeout?: number;
+  }) => api.post(`/tools/${id}/execute`, data),
+  
+  // Get execution history for a tool
+  getExecutions: (id: string, filters?: {
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    status?: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  }) => api.get(`/tools/${id}/executions`, { params: filters }),
+  
+  // Get installation status for a tool
+  getStatus: (id: string) => api.get(`/tools/${id}/status`),
+  
+  // Bulk import predefined tools
+  bulkImport: () => api.post('/tools/bulk-import'),
+
+  // Sync existing tools with latest predefined data
+  sync: () => api.post('/tools/sync'),
+  
+  // Re-validate a tool's GitHub metrics
+  validate: (id: string) => api.post(`/tools/${id}/validate`),
+
+  // Install a tool
+  install: (id: string, method?: string) => 
+    api.post(`/tools/${id}/install${method ? `?method=${method}` : ''}`),
+  
+  // Get available installation methods for a tool
+  getInstallMethods: (id: string) => api.get(`/tools/${id}/install-methods`),
+};

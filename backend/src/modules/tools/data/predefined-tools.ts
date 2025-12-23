@@ -1,0 +1,387 @@
+import { ToolCategory } from '../../../schemas/tool.schema';
+
+/**
+ * Installation method types
+ */
+export type InstallMethod = 'go' | 'pip' | 'apt' | 'brew' | 'cargo' | 'npm' | 'git' | 'manual';
+
+/**
+ * Installation command for a specific method
+ */
+export interface InstallCommand {
+  method: InstallMethod;
+  command: string;
+  // Some tools need post-install steps
+  postInstall?: string;
+}
+
+/**
+ * Predefined tool data structure for bulk import
+ */
+export interface PredefinedTool {
+  name: string;
+  displayName: string;
+  description: string;
+  githubUrl: string;
+  categories: ToolCategory[];
+  binaryName: string;
+  installCommands?: InstallCommand[];
+}
+
+/**
+ * Predefined list of security tools for bulk import
+ * Requirements: 7.1
+ * 
+ * This list contains 29 well-known security reconnaissance and scanning tools
+ * that are commonly used in bug bounty and security research workflows.
+ */
+export const PREDEFINED_TOOLS: PredefinedTool[] = [
+  {
+    name: 'sqlmap',
+    displayName: 'SQLMap',
+    description: 'Automatic SQL injection and database takeover tool',
+    githubUrl: 'https://github.com/sqlmapproject/sqlmap',
+    categories: [ToolCategory.EXPLOITATION],
+    binaryName: 'sqlmap',
+    installCommands: [
+      { method: 'pip', command: 'pip install sqlmap' },
+      { method: 'apt', command: 'sudo apt install -y sqlmap' },
+      { method: 'brew', command: 'brew install sqlmap' },
+      { method: 'git', command: 'git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap && ln -sf /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap' },
+    ],
+  },
+  {
+    name: 'whois',
+    displayName: 'Whois',
+    description: 'Domain registration information lookup tool',
+    githubUrl: 'https://github.com/rfc1036/whois',
+    categories: [ToolCategory.OSINT],
+    binaryName: 'whois',
+    installCommands: [
+      { method: 'apt', command: 'sudo apt install -y whois' },
+      { method: 'brew', command: 'brew install whois' },
+    ],
+  },
+  {
+    name: 'httpx',
+    displayName: 'httpx',
+    description: 'Fast and multi-purpose HTTP toolkit for probing web servers',
+    githubUrl: 'https://github.com/projectdiscovery/httpx',
+    categories: [ToolCategory.HTTP_PROBING],
+    binaryName: 'httpx',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest' },
+      { method: 'brew', command: 'brew install httpx' },
+      { method: 'apt', command: 'sudo apt install -y httpx-toolkit' },
+    ],
+  },
+  {
+    name: 'dirsearch',
+    displayName: 'Dirsearch',
+    description: 'Web path scanner for discovering hidden directories and files',
+    githubUrl: 'https://github.com/maurosoria/dirsearch',
+    categories: [ToolCategory.DIRECTORY_FUZZING],
+    binaryName: 'dirsearch',
+    installCommands: [
+      { method: 'pip', command: 'pip install dirsearch' },
+      { method: 'apt', command: 'sudo apt install -y dirsearch' },
+      { method: 'git', command: 'git clone https://github.com/maurosoria/dirsearch.git /opt/dirsearch && ln -sf /opt/dirsearch/dirsearch.py /usr/local/bin/dirsearch' },
+    ],
+  },
+  {
+    name: 'katana',
+    displayName: 'Katana',
+    description: 'Next-generation crawling and spidering framework',
+    githubUrl: 'https://github.com/projectdiscovery/katana',
+    categories: [ToolCategory.WEB_CRAWLING, ToolCategory.URL_DISCOVERY],
+    binaryName: 'katana',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/projectdiscovery/katana/cmd/katana@latest' },
+      { method: 'brew', command: 'brew install katana' },
+    ],
+  },
+  {
+    name: 'subfinder',
+    displayName: 'Subfinder',
+    description: 'Fast passive subdomain enumeration tool',
+    githubUrl: 'https://github.com/projectdiscovery/subfinder',
+    categories: [ToolCategory.SUBDOMAIN_ENUMERATION],
+    binaryName: 'subfinder',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest' },
+      { method: 'brew', command: 'brew install subfinder' },
+      { method: 'apt', command: 'sudo apt install -y subfinder' },
+    ],
+  },
+  {
+    name: 'waybackurls',
+    displayName: 'Waybackurls',
+    description: 'Fetch URLs from the Wayback Machine for a domain',
+    githubUrl: 'https://github.com/tomnomnom/waybackurls',
+    categories: [ToolCategory.URL_DISCOVERY],
+    binaryName: 'waybackurls',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/tomnomnom/waybackurls@latest' },
+    ],
+  },
+  {
+    name: 'trufflehog',
+    displayName: 'TruffleHog',
+    description: 'Find and verify credentials in git repositories and other sources',
+    githubUrl: 'https://github.com/trufflesecurity/trufflehog',
+    categories: [ToolCategory.SECRET_DETECTION],
+    binaryName: 'trufflehog',
+    installCommands: [
+      { method: 'brew', command: 'brew install trufflehog' },
+      { method: 'pip', command: 'pip install trufflehog' },
+      { method: 'go', command: 'go install github.com/trufflesecurity/trufflehog/v3@latest' },
+    ],
+  },
+  {
+    name: 'nmap',
+    displayName: 'Nmap',
+    description: 'Network exploration and security auditing tool',
+    githubUrl: 'https://github.com/nmap/nmap',
+    categories: [ToolCategory.PORT_SCANNING],
+    binaryName: 'nmap',
+    installCommands: [
+      { method: 'apt', command: 'sudo apt install -y nmap' },
+      { method: 'brew', command: 'brew install nmap' },
+    ],
+  },
+  {
+    name: 'amass',
+    displayName: 'Amass',
+    description: 'In-depth attack surface mapping and asset discovery',
+    githubUrl: 'https://github.com/owasp-amass/amass',
+    categories: [ToolCategory.SUBDOMAIN_ENUMERATION, ToolCategory.OSINT],
+    binaryName: 'amass',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/owasp-amass/amass/v4/...@master' },
+      { method: 'brew', command: 'brew install amass' },
+      { method: 'apt', command: 'sudo apt install -y amass' },
+    ],
+  },
+  {
+    name: 'findomain',
+    displayName: 'Findomain',
+    description: 'Fast subdomain enumeration tool with multiple sources',
+    githubUrl: 'https://github.com/Findomain/Findomain',
+    categories: [ToolCategory.SUBDOMAIN_ENUMERATION],
+    binaryName: 'findomain',
+    installCommands: [
+      { method: 'cargo', command: 'cargo install findomain' },
+      { method: 'brew', command: 'brew install findomain' },
+    ],
+  },
+  {
+    name: 'dnsx',
+    displayName: 'dnsx',
+    description: 'Fast and multi-purpose DNS toolkit for running DNS queries',
+    githubUrl: 'https://github.com/projectdiscovery/dnsx',
+    categories: [ToolCategory.DNS_TOOLS],
+    binaryName: 'dnsx',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest' },
+      { method: 'brew', command: 'brew install dnsx' },
+    ],
+  },
+  {
+    name: 'shuffledns',
+    displayName: 'ShuffleDNS',
+    description: 'Wrapper around massdns for active bruteforcing and resolution',
+    githubUrl: 'https://github.com/projectdiscovery/shuffledns',
+    categories: [ToolCategory.DNS_TOOLS, ToolCategory.SUBDOMAIN_ENUMERATION],
+    binaryName: 'shuffledns',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest' },
+    ],
+  },
+  {
+    name: 'gau',
+    displayName: 'GAU',
+    description: 'Fetch known URLs from AlienVault OTX, Wayback Machine, and Common Crawl',
+    githubUrl: 'https://github.com/lc/gau',
+    categories: [ToolCategory.URL_DISCOVERY],
+    binaryName: 'gau',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/lc/gau/v2/cmd/gau@latest' },
+    ],
+  },
+  {
+    name: 'hakrawler',
+    displayName: 'Hakrawler',
+    description: 'Simple and fast web crawler for discovering endpoints and assets',
+    githubUrl: 'https://github.com/hakluke/hakrawler',
+    categories: [ToolCategory.WEB_CRAWLING],
+    binaryName: 'hakrawler',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/hakluke/hakrawler@latest' },
+    ],
+  },
+  {
+    name: 'urlfinder',
+    displayName: 'URLFinder',
+    description: 'High-speed passive URL discovery tool',
+    githubUrl: 'https://github.com/projectdiscovery/urlfinder',
+    categories: [ToolCategory.URL_DISCOVERY, ToolCategory.JAVASCRIPT_ANALYSIS],
+    binaryName: 'urlfinder',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest' },
+    ],
+  },
+  {
+    name: 'ffuf',
+    displayName: 'ffuf',
+    description: 'Fast web fuzzer written in Go',
+    githubUrl: 'https://github.com/ffuf/ffuf',
+    categories: [ToolCategory.DIRECTORY_FUZZING, ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'ffuf',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/ffuf/ffuf/v2@latest' },
+      { method: 'brew', command: 'brew install ffuf' },
+      { method: 'apt', command: 'sudo apt install -y ffuf' },
+    ],
+  },
+  {
+    name: 'feroxbuster',
+    displayName: 'Feroxbuster',
+    description: 'Fast, simple, recursive content discovery tool',
+    githubUrl: 'https://github.com/epi052/feroxbuster',
+    categories: [ToolCategory.DIRECTORY_FUZZING],
+    binaryName: 'feroxbuster',
+    installCommands: [
+      { method: 'cargo', command: 'cargo install feroxbuster' },
+      { method: 'brew', command: 'brew install feroxbuster' },
+      { method: 'apt', command: 'sudo apt install -y feroxbuster' },
+    ],
+  },
+  {
+    name: 'arjun',
+    displayName: 'Arjun',
+    description: 'HTTP parameter discovery suite',
+    githubUrl: 'https://github.com/s0md3v/Arjun',
+    categories: [ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'arjun',
+    installCommands: [
+      { method: 'pip', command: 'pip install arjun' },
+    ],
+  },
+  {
+    name: 'linkfinder',
+    displayName: 'LinkFinder',
+    description: 'Python script to find endpoints in JavaScript files',
+    githubUrl: 'https://github.com/GerbenJavado/LinkFinder',
+    categories: [ToolCategory.JAVASCRIPT_ANALYSIS, ToolCategory.URL_DISCOVERY],
+    binaryName: 'linkfinder',
+    installCommands: [
+      { method: 'pip', command: 'pip install linkfinder' },
+      { method: 'git', command: 'git clone https://github.com/GerbenJavado/LinkFinder.git /opt/linkfinder && cd /opt/linkfinder && pip install -r requirements.txt && ln -sf /opt/linkfinder/linkfinder.py /usr/local/bin/linkfinder' },
+    ],
+  },
+  {
+    name: 'secretfinder',
+    displayName: 'SecretFinder',
+    description: 'Python script to find sensitive data in JavaScript files',
+    githubUrl: 'https://github.com/m4ll0k/SecretFinder',
+    categories: [ToolCategory.SECRET_DETECTION, ToolCategory.JAVASCRIPT_ANALYSIS],
+    binaryName: 'secretfinder',
+    installCommands: [
+      { method: 'git', command: 'git clone https://github.com/m4ll0k/SecretFinder.git /opt/secretfinder && cd /opt/secretfinder && pip install -r requirements.txt && ln -sf /opt/secretfinder/SecretFinder.py /usr/local/bin/secretfinder' },
+    ],
+  },
+  {
+    name: 'jsparser',
+    displayName: 'JSParser',
+    description: 'Python script to parse relative URLs from JavaScript files',
+    githubUrl: 'https://github.com/nahamsec/JSParser',
+    categories: [ToolCategory.JAVASCRIPT_ANALYSIS],
+    binaryName: 'jsparser',
+    installCommands: [
+      { method: 'git', command: 'git clone https://github.com/nahamsec/JSParser.git /opt/jsparser && cd /opt/jsparser && pip install -r requirements.txt' },
+    ],
+  },
+  {
+    name: 'mantra',
+    displayName: 'Mantra',
+    description: 'Tool for hunting down API key leaks in JavaScript files',
+    githubUrl: 'https://github.com/MrEmpy/mantra',
+    categories: [ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'mantra',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/MrEmpy/mantra@latest' },
+    ],
+  },
+  {
+    name: 'whatweb',
+    displayName: 'WhatWeb',
+    description: 'Next generation web scanner to identify technologies',
+    githubUrl: 'https://github.com/urbanadventurer/WhatWeb',
+    categories: [ToolCategory.HTTP_PROBING],
+    binaryName: 'whatweb',
+    installCommands: [
+      { method: 'apt', command: 'sudo apt install -y whatweb' },
+      { method: 'brew', command: 'brew install whatweb' },
+      { method: 'git', command: 'git clone https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && cd /opt/whatweb && bundle install && ln -sf /opt/whatweb/whatweb /usr/local/bin/whatweb' },
+    ],
+  },
+  {
+    name: 'assetfinder',
+    displayName: 'Assetfinder',
+    description: 'Find domains and subdomains related to a given domain',
+    githubUrl: 'https://github.com/tomnomnom/assetfinder',
+    categories: [ToolCategory.SUBDOMAIN_ENUMERATION],
+    binaryName: 'assetfinder',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/tomnomnom/assetfinder@latest' },
+    ],
+  },
+  {
+    name: 'nuclei',
+    displayName: 'Nuclei',
+    description: 'Fast and customizable vulnerability scanner based on templates',
+    githubUrl: 'https://github.com/projectdiscovery/nuclei',
+    categories: [ToolCategory.VULNERABILITY_SCANNING],
+    binaryName: 'nuclei',
+    installCommands: [
+      { method: 'go', command: 'go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest' },
+      { method: 'brew', command: 'brew install nuclei' },
+      { method: 'apt', command: 'sudo apt install -y nuclei' },
+    ],
+  },
+  {
+    name: 'wafw00f',
+    displayName: 'wafw00f',
+    description: 'Web Application Firewall fingerprinting tool',
+    githubUrl: 'https://github.com/EnableSecurity/wafw00f',
+    categories: [ToolCategory.WAF_DETECTION],
+    binaryName: 'wafw00f',
+    installCommands: [
+      { method: 'pip', command: 'pip install wafw00f' },
+      { method: 'apt', command: 'sudo apt install -y wafw00f' },
+    ],
+  },
+  {
+    name: 'spyhunt',
+    displayName: 'SpyHunt',
+    description: 'OSINT tool for gathering information about targets',
+    githubUrl: 'https://github.com/spyhunt/spyhunt',
+    categories: [ToolCategory.OSINT],
+    binaryName: 'spyhunt',
+    installCommands: [
+      { method: 'pip', command: 'pip install spyhunt' },
+    ],
+  },
+  {
+    name: 'metasploit',
+    displayName: 'Metasploit Framework',
+    description: 'World-leading penetration testing framework',
+    githubUrl: 'https://github.com/rapid7/metasploit-framework',
+    categories: [ToolCategory.EXPLOITATION],
+    binaryName: 'msfconsole',
+    installCommands: [
+      { method: 'apt', command: 'sudo apt install -y metasploit-framework' },
+      { method: 'brew', command: 'brew install metasploit' },
+    ],
+  },
+];

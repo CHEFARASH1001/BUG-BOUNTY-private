@@ -61,6 +61,26 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
     return { event: 'subscribed', data: { domainId: data.domainId } };
   }
 
+  @SubscribeMessage('subscribe:tool-execution')
+  handleSubscribeToolExecution(
+    @MessageBody() data: { executionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.join(`tool-execution:${data.executionId}`);
+    console.log(`Client ${client.id} subscribed to tool-execution:${data.executionId}`);
+    return { event: 'subscribed', data: { executionId: data.executionId } };
+  }
+
+  @SubscribeMessage('unsubscribe:tool-execution')
+  handleUnsubscribeToolExecution(
+    @MessageBody() data: { executionId: string },
+    @ConnectedSocket() client: Socket,
+  ) {
+    client.leave(`tool-execution:${data.executionId}`);
+    console.log(`Client ${client.id} unsubscribed from tool-execution:${data.executionId}`);
+    return { event: 'unsubscribed', data: { executionId: data.executionId } };
+  }
+
   @SubscribeMessage('ping')
   handlePing(@ConnectedSocket() client: Socket) {
     return { event: 'pong', data: { timestamp: Date.now() } };
@@ -144,6 +164,47 @@ export class WebsocketGateway implements OnGatewayConnection, OnGatewayDisconnec
   broadcast(event: string, data: any) {
     this.server.emit(event, {
       ...data,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Emit tool execution output update
+   */
+  emitToolExecutionOutput(executionId: string, data: {
+    stdout?: string;
+    stderr?: string;
+    status?: string;
+    exitCode?: number;
+    duration?: number;
+    errorMessage?: string;
+  }) {
+    this.server.to(`tool-execution:${executionId}`).emit('tool-execution:output', {
+      executionId,
+      ...data,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Emit tool execution status change
+   */
+  emitToolExecutionStatus(executionId: string, status: string, data?: any) {
+    this.server.to(`tool-execution:${executionId}`).emit('tool-execution:status', {
+      executionId,
+      status,
+      ...data,
+      timestamp: Date.now(),
+    });
+  }
+
+  /**
+   * Emit tool execution complete
+   */
+  emitToolExecutionComplete(executionId: string, result: any) {
+    this.server.to(`tool-execution:${executionId}`).emit('tool-execution:complete', {
+      executionId,
+      ...result,
       timestamp: Date.now(),
     });
   }

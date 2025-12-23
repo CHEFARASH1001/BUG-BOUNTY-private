@@ -42,6 +42,7 @@ const navigation = [
   { name: 'Subdomains', href: '/dashboard/subdomains', icon: Server },
   { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: AlertTriangle },
   { name: 'Scans', href: '/dashboard/scans', icon: Scan },
+  { name: 'Tools', href: '/dashboard/tools', icon: Terminal },
   { name: 'Fuzzing', href: '/dashboard/fuzzing', icon: Zap },
   { name: 'DNS Brute', href: '/dashboard/dns-brute', icon: Database },
   { name: 'Chaos Sync', href: '/dashboard/chaos', icon: Activity },

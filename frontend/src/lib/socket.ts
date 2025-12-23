@@ -57,6 +57,14 @@ class SocketClient {
     this.socket?.emit('subscribe:domain', { domainId });
   }
 
+  subscribeToolExecution(executionId: string) {
+    this.socket?.emit('subscribe:tool-execution', { executionId });
+  }
+
+  unsubscribeToolExecution(executionId: string) {
+    this.socket?.emit('unsubscribe:tool-execution', { executionId });
+  }
+
   on(event: string, callback: (data: any) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());

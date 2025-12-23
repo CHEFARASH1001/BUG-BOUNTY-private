@@ -13,6 +13,8 @@ import {
   DNSBruteMode,
   WordlistConfig,
 } from '../../../schemas/dns-brute-job.schema';
+import { Subdomain, SubdomainDocument } from '../../../schemas/subdomain.schema';
+import { Domain, DomainDocument } from '../../../schemas/domain.schema';
 
 const execAsync = promisify(exec);
 const fsPromises = fs.promises;
@@ -42,6 +44,8 @@ export class DNSBruteService {
 
   constructor(
     @InjectModel(DNSBruteJob.name) private dnsBruteJobModel: Model<DNSBruteJobDocument>,
+    @InjectModel(Subdomain.name) private subdomainModel: Model<SubdomainDocument>,
+    @InjectModel(Domain.name) private domainModel: Model<DomainDocument>,
     private wordlistService: WordlistService,
   ) {
     this.ensureWorkDir();
@@ -504,10 +508,30 @@ export class DNSBruteService {
           }
         }
       } else {
-        // For dynamic mode, we need existing subdomains
-        // This would typically come from the database
+        // For dynamic mode, fetch existing subdomains from the database
         await addLog('Starting dynamic brute force with dnsgen + dnsx...');
-        const existingSubdomains = job.results || [];
+        
+        // Find the domain in the database
+        const domainDoc = await this.domainModel.findOne({ domain: config.domain.toLowerCase() });
+        let existingSubdomains: string[] = [];
+        
+        if (domainDoc) {
+          // Fetch existing subdomains for this domain
+          const subdomainDocs = await this.subdomainModel
+            .find({ domainId: domainDoc._id })
+            .select('subdomain')
+            .limit(10000)
+            .lean();
+          existingSubdomains = subdomainDocs.map((s: any) => s.subdomain);
+          await addLog(`Found ${existingSubdomains.length} existing subdomains for permutation`);
+        }
+        
+        if (existingSubdomains.length === 0) {
+          await addLog('Warning: No existing subdomains found. Dynamic mode requires existing subdomains to generate permutations.');
+          await addLog('Consider running passive enumeration first, or use static mode instead.');
+          throw new Error('Dynamic mode requires existing subdomains. Run passive enumeration first or use static mode.');
+        }
+        
         for await (const subdomain of this.runDynamicBrute(
           config.domain,
           existingSubdomains,

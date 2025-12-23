@@ -16,3 +16,5 @@ export * from './abuseipdb-result.schema';
 export * from './dns-brute-job.schema';
 export * from './wordlist.schema';
 export * from './chaos-sync.schema';
+export * from './tool.schema';
+export * from './tool-execution.schema';

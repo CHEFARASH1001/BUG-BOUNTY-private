@@ -1,0 +1,222 @@
+# Implementation Plan
+
+- [x] 1. Set up database schemas and module structure
+  - [x] 1.1 Create Tool schema with all required fields
+    - Create `backend/src/schemas/tool.schema.ts` with name, displayName, description, githubUrl, categories, validation, installation, configOptions, userConfig, isActive fields
+    - Define ToolCategory enum with all 14 categories
+    - Export schema from `backend/src/schemas/index.ts`
+    - _Requirements: 1.1, 1.4, 5.1, 5.2_
+  - [x] 1.2 Create ToolExecution schema
+    - Create `backend/src/schemas/tool-execution.schema.ts` with tool reference, arguments, config, status, stdout, stderr, exitCode, timestamps, duration, errorMessage
+    - Define ExecutionStatus enum (pending, running, completed, failed, cancelled)
+    - Export schema from `backend/src/schemas/index.ts`
+    - _Requirements: 4.2, 4.3, 8.1_
+  - [x] 1.3 Create Tools module structure
+    - Create `backend/src/modules/tools/tools.module.ts` with MongooseModule imports
+    - Create placeholder files for controller, service, validation service, executor service
+    - Register module in `backend/src/app.module.ts`
+    - _Requirements: 1.1_
+
+- [x] 2. Implement Validation Service
+  - [x] 2.1 Create GitHub URL validation logic
+    - Implement `validateGitHubUrl()` method to parse and validate GitHub URLs
+    - Extract owner and repo from URL
+    - Return validation result with parsed components
+    - _Requirements: 2.1_
+  - [x] 2.2 Write property test for GitHub URL validation
+    - **Property 4: GitHub URL Validation**
+    - **Validates: Requirements 2.1**
+  - [x] 2.3 Implement GitHub API integration for repo metrics
+    - Create `checkRepoMetrics()` method to fetch stars, lastCommit, forks from GitHub API
+    - Handle rate limiting and API errors gracefully
+    - _Requirements: 2.2, 2.3_
+  - [x] 2.4 Implement legitimacy check logic
+    - Create `isLegitimate()` method checking stars >= 100 and lastCommit within 12 months
+    - Return detailed validation result with reason on failure
+    - _Requirements: 2.2, 2.3, 2.4_
+  - [x] 2.5 Write property tests for validation thresholds
+    - **Property 5: Star Threshold Validation**
+    - **Property 6: Activity Threshold Validation**
+    - **Property 7: Validation Rejection Reason**
+    - **Validates: Requirements 2.2, 2.3, 2.4**
+
+- [x] 3. Implement Tools Service core CRUD operations
+  - [x] 3.1 Implement tool creation with validation
+    - Create `create()` method that validates GitHub URL and repo metrics before saving
+    - Store validation results in tool document
+    - Return created tool or validation error
+    - _Requirements: 2.1, 2.4, 2.5_
+  - [x] 3.2 Write property test for valid tool persistence
+    - **Property 8: Valid Tool Persistence**
+    - **Validates: Requirements 2.5**
+  - [x] 3.3 Implement tool retrieval methods
+    - Create `findAll()` with optional category and search filters
+    - Create `findById()` for single tool retrieval
+    - Ensure all required fields are returned
+    - _Requirements: 1.1, 1.2, 1.3_
+  - [x] 3.4 Write property tests for filtering
+    - **Property 1: Tool Data Completeness**
+    - **Property 2: Category Filter Correctness**
+    - **Property 3: Search Filter Correctness**
+    - **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+  - [x] 3.5 Implement tool update and delete
+    - Create `update()` method for modifying tool metadata and config
+    - Create `delete()` method for removing tools
+    - _Requirements: 6.1, 6.2_
+  - [x] 3.6 Write property test for configuration round-trip
+    - **Property 16: Configuration Round-Trip**
+    - **Validates: Requirements 6.1, 6.2**
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 5. Implement Executor Service
+  - [x] 5.1 Implement installation status check
+    - Create `isInstalled()` method to check if tool binary exists in PATH
+    - Create `getVersion()` method to get installed version
+    - Return installation status object
+    - _Requirements: 3.1, 3.2_
+  - [x] 5.2 Write property test for installation status
+    - **Property 9: Installation Status Enum**
+    - **Validates: Requirements 3.1**
+  - [x] 5.3 Implement version comparison logic
+    - Create `compareVersions()` method to compare installed vs latest version
+    - Determine if update is available
+    - _Requirements: 3.3_
+  - [x] 5.4 Write property test for version comparison
+    - **Property 10: Version Comparison**
+    - **Validates: Requirements 3.3**
+  - [x] 5.5 Implement tool execution
+    - Create `execute()` method that spawns tool process with arguments
+    - Capture stdout and stderr streams
+    - Record start time, end time, duration, exit code
+    - Store execution record in database
+    - _Requirements: 4.1, 4.2, 4.3_
+  - [x] 5.6 Write property tests for execution
+    - **Property 11: Execution Precondition**
+    - **Property 12: Execution Result Completeness**
+    - **Property 13: Failed Execution Error Message**
+    - **Property 17: Execution Uses Saved Config**
+    - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 6.3**
+
+- [x] 6. Implement Tools Controller
+  - [x] 6.1 Create DTOs for tool operations
+    - Create `CreateToolDto`, `UpdateToolDto`, `ToolQueryDto`, `ExecuteToolDto`
+    - Add validation decorators using class-validator
+    - _Requirements: 2.1_
+  - [x] 6.2 Implement CRUD endpoints
+    - GET /api/tools - list all tools with filters
+    - GET /api/tools/:id - get single tool
+    - POST /api/tools - create tool with validation
+    - PUT /api/tools/:id - update tool
+    - DELETE /api/tools/:id - delete tool
+    - _Requirements: 1.1, 1.2, 1.3, 2.1_
+  - [x] 6.3 Implement execution endpoints
+    - POST /api/tools/:id/execute - execute tool
+    - GET /api/tools/:id/executions - get execution history
+    - GET /api/tools/:id/status - check installation status
+    - _Requirements: 4.1, 8.1, 3.1_
+  - [x] 6.4 Write property tests for execution history
+    - **Property 19: Execution History Limit**
+    - **Property 20: Execution Detail Completeness**
+    - **Property 21: Execution History Date Filter**
+    - **Validates: Requirements 8.1, 8.2, 8.3**
+
+- [x] 7. Implement bulk import functionality
+  - [x] 7.1 Create predefined tools data file
+    - Create `backend/src/modules/tools/data/predefined-tools.ts` with all 29 tools
+    - Include name, displayName, description, githubUrl, categories, binaryName for each
+    - _Requirements: 7.1_
+  - [x] 7.2 Implement bulk import service method
+    - Create `bulkImport()` method that processes predefined tools list
+    - Validate each tool before adding
+    - Track success and failure counts
+    - Return detailed import result
+    - _Requirements: 7.1, 7.2, 7.3_
+  - [x] 7.3 Write property test for bulk import
+    - **Property 18: Bulk Import Completeness**
+    - **Validates: Requirements 7.1, 7.2, 7.3**
+  - [x] 7.4 Add bulk import endpoint
+    - POST /api/tools/bulk-import - trigger bulk import
+    - Return import results with success/failure counts
+    - _Requirements: 7.3_
+
+- [x] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 9. Implement Frontend - Tools Registry Page
+  - [x] 9.1 Create tools API client
+    - Add tools API methods to `frontend/src/lib/api.ts`
+    - Include getAll, getById, create, update, delete, execute, getExecutions, bulkImport
+    - _Requirements: 1.1_
+  - [x] 9.2 Create Tools Registry page
+    - Create `frontend/src/app/dashboard/tools/page.tsx`
+    - Implement tool list with grid/card layout
+    - Show name, description, category badges, installation status
+    - Add search input and category filter dropdown
+    - _Requirements: 1.1, 1.2, 1.3, 5.3_
+  - [x] 9.3 Add category grouping and filtering UI
+    - Implement category tabs or sidebar for filtering
+    - Show tool count per category
+    - Support multi-category view
+    - _Requirements: 5.3_
+  - [x] 9.4 Write property test for category grouping
+    - **Property 14: Category Enum Validity**
+    - **Property 15: Category Grouping Correctness**
+    - **Validates: Requirements 5.1, 5.3**
+
+- [x] 10. Implement Frontend - Tool Detail Page
+  - [x] 10.1 Create Tool Detail page
+    - Create `frontend/src/app/dashboard/tools/[id]/page.tsx`
+    - Display full tool metadata with GitHub link
+    - Show installation status with visual indicator
+    - Display configuration options form
+    - _Requirements: 1.4, 3.1, 6.1_
+  - [x] 10.2 Implement execution history section
+    - Show last 10 executions in a table
+    - Display timestamp, status, duration for each
+    - Add date range and status filters
+    - Link to execution detail view
+    - _Requirements: 8.1, 8.3_
+  - [x] 10.3 Implement execution detail modal
+    - Show full stdout/stderr output
+    - Display configuration used
+    - Add copy and download buttons
+    - _Requirements: 8.2_
+
+- [x] 11. Implement Frontend - Tool Execution
+  - [x] 11.1 Create execution form component
+    - Build argument input field with command preview
+    - Show configuration options from tool schema
+    - Add execute button with loading state
+    - _Requirements: 4.1, 6.3_
+  - [x] 11.2 Implement real-time output display
+    - Create output terminal component
+    - Stream stdout/stderr as tool runs
+    - Show execution status and duration
+    - Add cancel button for running executions
+    - _Requirements: 4.2_
+  - [x] 11.3 Handle execution errors
+    - Display error messages clearly
+    - Show troubleshooting suggestions
+    - Allow retry with modified arguments
+    - _Requirements: 4.4_
+
+- [x] 12. Add navigation and polish
+  - [x] 12.1 Add Tools to dashboard navigation
+    - Add Tools link to sidebar in `frontend/src/app/dashboard/layout.tsx`
+    - Use appropriate icon (Wrench or Terminal)
+    - _Requirements: 1.1_
+  - [x] 12.2 Add bulk import UI
+    - Add "Import Tools" button on registry page
+    - Show import progress and results
+    - Display success/failure summary
+    - _Requirements: 7.3_
+  - [x] 12.3 Add tool status refresh
+    - Implement refresh button to re-check installation status
+    - Add re-validate button to check GitHub metrics
+    - _Requirements: 3.2_
+
+- [x] 13. Final Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+

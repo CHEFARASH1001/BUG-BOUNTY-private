@@ -275,7 +275,7 @@ export class ExecutorService {
       const childProcess = spawn(binaryName, args, {
         cwd: options?.workingDir,
         env: { ...process.env, ...options?.env },
-        shell: true,
+        shell: '/bin/sh',
       });
 
       let stdout = '';
@@ -488,7 +488,7 @@ export class ExecutorService {
     return new Promise((resolve) => {
       exec(selectedCommand!.command, { 
         timeout: 300000, // 5 minute timeout
-        shell: true, // Use default shell
+        shell: '/bin/sh', // Use sh which is available in Alpine containers
         env: { ...process.env, PATH: `${process.env.HOME}/go/bin:${process.env.PATH}` },
       }, async (error, stdout, stderr) => {
         if (error) {
@@ -508,7 +508,7 @@ export class ExecutorService {
             execSync(selectedCommand!.postInstall, { 
               stdio: 'pipe', 
               timeout: 60000,
-              shell: true,
+              shell: '/bin/sh',
             });
           } catch (postError) {
             this.logger.warn(`Post-install command failed: ${postError}`);

@@ -403,4 +403,49 @@ export class ToolsService {
     this.logger.log(`Sync completed: ${result.updated} updated, ${result.skipped} skipped`);
     return result;
   }
+
+  /**
+   * Refreshes the installation status of all tools by checking which binaries are available.
+   * 
+   * @returns Object with counts of installed and not installed tools
+   */
+  async refreshInstallationStatus(): Promise<{ installed: number; notInstalled: number; tools: Array<{ name: string; isInstalled: boolean; version?: string }> }> {
+    const tools = await this.toolModel.find().exec();
+    const result = { installed: 0, notInstalled: 0, tools: [] as Array<{ name: string; isInstalled: boolean; version?: string }> };
+
+    for (const tool of tools) {
+      try {
+        const binaryName = tool.installation?.binaryName || tool.name;
+        const isInstalled = await this.executorService.isInstalled(tool.name, binaryName);
+        let version: string | undefined;
+
+        if (isInstalled) {
+          version = await this.executorService.getVersion(tool.name, binaryName) || undefined;
+          result.installed++;
+        } else {
+          result.notInstalled++;
+        }
+
+        // Update tool installation status
+        tool.installation = {
+          ...tool.installation!,
+          isInstalled,
+          version,
+          lastChecked: new Date(),
+        };
+        await tool.save();
+
+        result.tools.push({ name: tool.displayName, isInstalled, version });
+        this.logger.log(`Checked ${tool.name}: ${isInstalled ? 'installed' : 'not installed'}${version ? ` (v${version})` : ''}`);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        this.logger.warn(`Failed to check tool ${tool.name}: ${reason}`);
+        result.tools.push({ name: tool.displayName, isInstalled: false });
+        result.notInstalled++;
+      }
+    }
+
+    this.logger.log(`Refresh completed: ${result.installed} installed, ${result.notInstalled} not installed`);
+    return result;
+  }
 }

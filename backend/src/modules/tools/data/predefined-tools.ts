@@ -44,7 +44,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.EXPLOITATION],
     binaryName: 'sqlmap',
     installCommands: [
-      { method: 'pip', command: 'pip install sqlmap' },
+      { method: 'pip', command: 'pip install --break-system-packages sqlmap' },
       { method: 'apt', command: 'sudo apt install -y sqlmap' },
       { method: 'brew', command: 'brew install sqlmap' },
       { method: 'git', command: 'git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git /opt/sqlmap && ln -sf /opt/sqlmap/sqlmap.py /usr/local/bin/sqlmap' },
@@ -83,7 +83,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.DIRECTORY_FUZZING],
     binaryName: 'dirsearch',
     installCommands: [
-      { method: 'pip', command: 'pip install dirsearch' },
+      { method: 'pip', command: 'pip install --break-system-packages dirsearch' },
       { method: 'apt', command: 'sudo apt install -y dirsearch' },
       { method: 'git', command: 'git clone https://github.com/maurosoria/dirsearch.git /opt/dirsearch && ln -sf /opt/dirsearch/dirsearch.py /usr/local/bin/dirsearch' },
     ],
@@ -133,7 +133,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     binaryName: 'trufflehog',
     installCommands: [
       { method: 'brew', command: 'brew install trufflehog' },
-      { method: 'pip', command: 'pip install trufflehog' },
+      { method: 'pip', command: 'pip install --break-system-packages trufflehog' },
       { method: 'go', command: 'go install github.com/trufflesecurity/trufflehog/v3@latest' },
     ],
   },
@@ -264,7 +264,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.PARAMETER_DISCOVERY],
     binaryName: 'arjun',
     installCommands: [
-      { method: 'pip', command: 'pip install arjun' },
+      { method: 'pip', command: 'pip install --break-system-packages arjun' },
     ],
   },
   {
@@ -275,8 +275,8 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.JAVASCRIPT_ANALYSIS, ToolCategory.URL_DISCOVERY],
     binaryName: 'linkfinder',
     installCommands: [
-      { method: 'pip', command: 'pip install linkfinder' },
-      { method: 'git', command: 'git clone https://github.com/GerbenJavado/LinkFinder.git /opt/linkfinder && cd /opt/linkfinder && pip install -r requirements.txt && ln -sf /opt/linkfinder/linkfinder.py /usr/local/bin/linkfinder' },
+      { method: 'pip', command: 'pip install --break-system-packages linkfinder' },
+      { method: 'git', command: 'git clone https://github.com/GerbenJavado/LinkFinder.git /opt/linkfinder && cd /opt/linkfinder && pip install --break-system-packages -r requirements.txt && ln -sf /opt/linkfinder/linkfinder.py /usr/local/bin/linkfinder' },
     ],
   },
   {
@@ -287,7 +287,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.SECRET_DETECTION, ToolCategory.JAVASCRIPT_ANALYSIS],
     binaryName: 'secretfinder',
     installCommands: [
-      { method: 'git', command: 'git clone https://github.com/m4ll0k/SecretFinder.git /opt/secretfinder && cd /opt/secretfinder && pip install -r requirements.txt && ln -sf /opt/secretfinder/SecretFinder.py /usr/local/bin/secretfinder' },
+      { method: 'git', command: 'git clone https://github.com/m4ll0k/SecretFinder.git /opt/secretfinder && cd /opt/secretfinder && pip install --break-system-packages -r requirements.txt && ln -sf /opt/secretfinder/SecretFinder.py /usr/local/bin/secretfinder' },
     ],
   },
   {
@@ -298,7 +298,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.JAVASCRIPT_ANALYSIS],
     binaryName: 'jsparser',
     installCommands: [
-      { method: 'git', command: 'git clone https://github.com/nahamsec/JSParser.git /opt/jsparser && cd /opt/jsparser && pip install -r requirements.txt' },
+      { method: 'git', command: 'git clone https://github.com/nahamsec/JSParser.git /opt/jsparser && cd /opt/jsparser && pip install --break-system-packages -r requirements.txt' },
     ],
   },
   {
@@ -357,7 +357,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.WAF_DETECTION],
     binaryName: 'wafw00f',
     installCommands: [
-      { method: 'pip', command: 'pip install wafw00f' },
+      { method: 'pip', command: 'pip install --break-system-packages wafw00f' },
       { method: 'apt', command: 'sudo apt install -y wafw00f' },
     ],
   },
@@ -369,7 +369,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     categories: [ToolCategory.OSINT],
     binaryName: 'spyhunt',
     installCommands: [
-      { method: 'pip', command: 'pip install spyhunt' },
+      { method: 'pip', command: 'pip install --break-system-packages spyhunt' },
     ],
   },
   {

@@ -286,4 +286,15 @@ export class ToolsController {
     const tool = await this.toolsService.findById(id);
     return this.executorService.getAvailableInstallMethods(tool);
   }
+
+  /**
+   * POST /api/tools/refresh-status - Refresh installation status of all tools
+   */
+  @Post('refresh-status')
+  @Public()
+  @ApiOperation({ summary: 'Refresh installation status of all tools by checking available binaries' })
+  @ApiResponse({ status: 200, description: 'Installation status refreshed' })
+  async refreshStatus(): Promise<{ installed: number; notInstalled: number; tools: Array<{ name: string; isInstalled: boolean; version?: string }> }> {
+    return this.toolsService.refreshInstallationStatus();
+  }
 }

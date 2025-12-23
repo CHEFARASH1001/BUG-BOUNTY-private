@@ -6,8 +6,12 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
-# Install tools
-RUN apk add --no-cache curl bind-tools unzip git
+# Install tools and Go
+RUN apk add --no-cache curl bind-tools unzip git go nmap
+
+# Set Go environment
+ENV GOPATH=/root/go
+ENV PATH=$PATH:/root/go/bin:/usr/local/go/bin
 
 # Install subfinder binary
 RUN curl -sL https://github.com/projectdiscovery/subfinder/releases/download/v2.6.7/subfinder_2.6.7_linux_amd64.zip -o /tmp/subfinder.zip && \
@@ -36,6 +40,71 @@ RUN curl -sL https://github.com/projectdiscovery/dnsx/releases/download/v1.2.1/d
     mv /tmp/dnsx /usr/local/bin/ && \
     chmod +x /usr/local/bin/dnsx && \
     rm -rf /tmp/*
+
+# Install httpx binary
+RUN curl -sL https://github.com/projectdiscovery/httpx/releases/download/v1.6.10/httpx_1.6.10_linux_amd64.zip -o /tmp/httpx.zip && \
+    unzip /tmp/httpx.zip -d /tmp && \
+    mv /tmp/httpx /usr/local/bin/ && \
+    chmod +x /usr/local/bin/httpx && \
+    rm -rf /tmp/*
+
+# Install nuclei binary
+RUN curl -sL https://github.com/projectdiscovery/nuclei/releases/download/v3.3.7/nuclei_3.3.7_linux_amd64.zip -o /tmp/nuclei.zip && \
+    unzip /tmp/nuclei.zip -d /tmp && \
+    mv /tmp/nuclei /usr/local/bin/ && \
+    chmod +x /usr/local/bin/nuclei && \
+    rm -rf /tmp/*
+
+# Install katana binary
+RUN curl -sL https://github.com/projectdiscovery/katana/releases/download/v1.1.0/katana_1.1.0_linux_amd64.zip -o /tmp/katana.zip && \
+    unzip /tmp/katana.zip -d /tmp && \
+    mv /tmp/katana /usr/local/bin/ && \
+    chmod +x /usr/local/bin/katana && \
+    rm -rf /tmp/*
+
+# Install amass binary
+RUN curl -sL https://github.com/owasp-amass/amass/releases/download/v4.2.0/amass_Linux_amd64.zip -o /tmp/amass.zip && \
+    unzip /tmp/amass.zip -d /tmp && \
+    mv /tmp/amass_Linux_amd64/amass /usr/local/bin/ && \
+    chmod +x /usr/local/bin/amass && \
+    rm -rf /tmp/*
+
+# Install gau binary
+RUN curl -sL https://github.com/lc/gau/releases/download/v2.2.4/gau_2.2.4_linux_amd64.tar.gz -o /tmp/gau.tar.gz && \
+    tar -xzf /tmp/gau.tar.gz -C /tmp && \
+    mv /tmp/gau /usr/local/bin/ && \
+    chmod +x /usr/local/bin/gau && \
+    rm -rf /tmp/*
+
+# Install feroxbuster binary
+RUN curl -sL https://github.com/epi052/feroxbuster/releases/download/v2.11.0/x86_64-linux-feroxbuster.tar.gz -o /tmp/feroxbuster.tar.gz && \
+    tar -xzf /tmp/feroxbuster.tar.gz -C /tmp && \
+    mv /tmp/feroxbuster /usr/local/bin/ && \
+    chmod +x /usr/local/bin/feroxbuster && \
+    rm -rf /tmp/*
+
+# Install findomain binary
+RUN curl -sL https://github.com/Findomain/Findomain/releases/download/9.0.4/findomain-linux.zip -o /tmp/findomain.zip && \
+    unzip /tmp/findomain.zip -d /tmp && \
+    mv /tmp/findomain /usr/local/bin/ && \
+    chmod +x /usr/local/bin/findomain && \
+    rm -rf /tmp/*
+
+# Install urlfinder binary
+RUN curl -sL https://github.com/projectdiscovery/urlfinder/releases/download/v0.0.3/urlfinder_0.0.3_linux_amd64.zip -o /tmp/urlfinder.zip && \
+    unzip /tmp/urlfinder.zip -d /tmp && \
+    mv /tmp/urlfinder /usr/local/bin/ && \
+    chmod +x /usr/local/bin/urlfinder && \
+    rm -rf /tmp/*
+
+# Install hakrawler via go
+RUN go install github.com/hakluke/hakrawler@latest
+
+# Install waybackurls via go
+RUN go install github.com/tomnomnom/waybackurls@latest
+
+# Install assetfinder via go
+RUN go install github.com/tomnomnom/assetfinder@latest
 
 # Install dnsgen (Python tool)
 RUN apk add --no-cache python3 py3-pip && \

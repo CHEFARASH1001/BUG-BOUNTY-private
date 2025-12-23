@@ -20,6 +20,8 @@ import {
   ChevronDown,
   ChevronUp,
   Info,
+  Plus,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -34,6 +36,14 @@ interface ConfigOption {
   description: string;
   required: boolean;
   default?: any;
+}
+
+// Argument entry for the dynamic form
+interface ArgumentEntry {
+  id: string;
+  flag: string;
+  value: string;
+  type: 'flag-only' | 'flag-value' | 'value-only';
 }
 
 // Tool interface
@@ -82,7 +92,10 @@ interface ToolExecution {
 }
 
 // Execution status configuration
-const executionStatusConfig: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+const executionStatusConfig: Record<
+  string,
+  { label: string; color: string; bg: string; icon: any }
+> = {
   pending: { label: 'Pending', color: 'text-slate-400', bg: 'bg-slate-500/20', icon: Clock },
   running: { label: 'Running', color: 'text-blue-400', bg: 'bg-blue-500/20', icon: Loader2 },
   completed: { label: 'Completed', color: 'text-green-400', bg: 'bg-green-500/20', icon: CheckCircle },
@@ -131,21 +144,29 @@ const getTroubleshootingSuggestions = (errorMessage: string, stderr: string): st
   return suggestions;
 };
 
+// Generate unique ID for argument entries
+const generateId = () => Math.random().toString(36).substring(2, 9);
+
 export default function ToolExecutePage({ params }: { params: { id: string } }) {
   const [tool, setTool] = useState<Tool | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Execution form state
-  const [argumentsInput, setArgumentsInput] = useState('');
+
+  // Execution form state - individual arguments
+  const [argumentEntries, setArgumentEntries] = useState<ArgumentEntry[]>([
+    { id: generateId(), flag: '', value: '', type: 'flag-value' },
+  ]);
+  const [rawMode, setRawMode] = useState(false);
+  const [rawArguments, setRawArguments] = useState('');
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [showConfig, setShowConfig] = useState(false);
   const [executing, setExecuting] = useState(false);
-  
+  const [showingHelp, setShowingHelp] = useState(false);
+
   // Execution result state
   const [currentExecution, setCurrentExecution] = useState<ToolExecution | null>(null);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
+
   // Output display state
   const outputRef = useRef<HTMLPreElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -271,13 +292,58 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
     setConfigValues((prev) => ({ ...prev, [name]: value }));
   };
 
+  // Argument entry handlers
+  const addArgumentEntry = () => {
+    setArgumentEntries((prev) => [
+      ...prev,
+      { id: generateId(), flag: '', value: '', type: 'flag-value' },
+    ]);
+  };
+
+  const removeArgumentEntry = (id: string) => {
+    setArgumentEntries((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((entry) => entry.id !== id);
+    });
+  };
+
+  const updateArgumentEntry = (id: string, field: keyof ArgumentEntry, value: string) => {
+    setArgumentEntries((prev) =>
+      prev.map((entry) => (entry.id === id ? { ...entry, [field]: value } : entry))
+    );
+  };
+
+  // Build arguments array from entries
+  const buildArgumentsArray = useCallback((): string[] => {
+    if (rawMode) {
+      return parseArguments(rawArguments.trim());
+    }
+
+    const args: string[] = [];
+    for (const entry of argumentEntries) {
+      if (entry.type === 'flag-only' && entry.flag) {
+        args.push(entry.flag);
+      } else if (entry.type === 'value-only' && entry.value) {
+        args.push(entry.value);
+      } else if (entry.type === 'flag-value') {
+        if (entry.flag && entry.value) {
+          args.push(entry.flag, entry.value);
+        } else if (entry.flag) {
+          args.push(entry.flag);
+        } else if (entry.value) {
+          args.push(entry.value);
+        }
+      }
+    }
+    return args;
+  }, [rawMode, rawArguments, argumentEntries]);
+
   // Build command preview
   const buildCommandPreview = useCallback(() => {
     if (!tool) return '';
-    
+
     const binaryName = tool.installation?.binaryName || tool.name;
-    const args = argumentsInput.trim();
-    
+
     // Build config flags
     const configFlags: string[] = [];
     if (tool.configOptions) {
@@ -294,29 +360,88 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
         }
       }
     }
-    
+
+    // Build arguments from entries
+    const args = buildArgumentsArray();
+
     const parts = [binaryName];
     if (configFlags.length > 0) {
       parts.push(configFlags.join(' '));
     }
-    if (args) {
-      parts.push(args);
+    if (args.length > 0) {
+      parts.push(args.join(' '));
     }
-    
+
     return parts.join(' ');
-  }, [tool, argumentsInput, configValues]);
+  }, [tool, configValues, buildArgumentsArray]);
+
+  /**
+   * Parse command line arguments properly handling:
+   * - Quoted strings (single and double quotes)
+   * - Escaped characters
+   * - Arguments with spaces inside quotes
+   */
+  const parseArguments = (input: string): string[] => {
+    const args: string[] = [];
+    let current = '';
+    let inSingleQuote = false;
+    let inDoubleQuote = false;
+    let escaped = false;
+
+    for (let i = 0; i < input.length; i++) {
+      const char = input[i];
+
+      if (escaped) {
+        current += char;
+        escaped = false;
+        continue;
+      }
+
+      if (char === '\\') {
+        escaped = true;
+        continue;
+      }
+
+      if (char === "'" && !inDoubleQuote) {
+        inSingleQuote = !inSingleQuote;
+        continue;
+      }
+
+      if (char === '"' && !inSingleQuote) {
+        inDoubleQuote = !inDoubleQuote;
+        continue;
+      }
+
+      if (char === ' ' && !inSingleQuote && !inDoubleQuote) {
+        if (current.length > 0) {
+          args.push(current);
+          current = '';
+        }
+        continue;
+      }
+
+      current += char;
+    }
+
+    // Add the last argument if any
+    if (current.length > 0) {
+      args.push(current);
+    }
+
+    return args;
+  };
 
   // Execute tool
   const handleExecute = async () => {
     if (!tool || executing) return;
-    
+
     setExecuting(true);
     setCurrentExecution(null);
-    
+
     try {
-      // Parse arguments
-      const args = argumentsInput.trim().split(/\s+/).filter(Boolean);
-      
+      // Build arguments from entries or raw input
+      const args = buildArgumentsArray();
+
       // Add config flags to arguments
       if (tool.configOptions) {
         for (const option of tool.configOptions) {
@@ -332,12 +457,12 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
           }
         }
       }
-      
+
       const response = await toolsApi.execute(tool._id, {
         arguments: args,
         config: configValues,
       });
-      
+
       setCurrentExecution(response.data);
       
       // Start polling for updates if execution is running
@@ -350,7 +475,7 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
       setCurrentExecution({
         _id: 'error',
         tool: tool._id,
-        arguments: argumentsInput.trim().split(/\s+/).filter(Boolean),
+        arguments: buildArgumentsArray(),
         config: configValues,
         status: 'failed',
         stdout: '',
@@ -453,6 +578,49 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
     }
   };
 
+  // Show tool help/usage
+  const handleShowHelp = async () => {
+    if (!tool || showingHelp || isRunning) return;
+    
+    setShowingHelp(true);
+    setCurrentExecution(null);
+    
+    try {
+      // Try common help flags in order
+      const response = await toolsApi.execute(tool._id, {
+        arguments: ['-h'],
+        config: {},
+      });
+      
+      setCurrentExecution(response.data);
+      
+      // Start polling for updates if execution is running
+      if (response.data.status === 'running' || response.data.status === 'pending') {
+        startPolling(response.data._id);
+      }
+    } catch (err: any) {
+      console.error('Failed to get tool help:', err);
+      // Create a mock failed execution for display
+      setCurrentExecution({
+        _id: 'help-error',
+        tool: tool._id,
+        arguments: ['-h'],
+        config: {},
+        status: 'failed',
+        stdout: '',
+        stderr: '',
+        exitCode: -1,
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        duration: 0,
+        errorMessage: err.response?.data?.message || 'Failed to get tool help',
+        createdAt: new Date().toISOString(),
+      });
+    } finally {
+      setShowingHelp(false);
+    }
+  };
+
   // Format duration
   const formatDuration = (ms: number) => {
     if (ms < 1000) return `${ms}ms`;
@@ -545,22 +713,139 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
           </h3>
 
           <div className="space-y-4">
-            {/* Arguments Input */}
+            {/* Arguments Input Header */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Arguments
-              </label>
-              <textarea
-                value={argumentsInput}
-                onChange={(e) => setArgumentsInput(e.target.value)}
-                placeholder="Enter command arguments (e.g., -d example.com -o output.txt)"
-                rows={3}
-                disabled={!isInstalled || isRunning}
-                className="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              />
-              <p className="text-xs text-slate-500 mt-1">
-                Enter arguments as you would on the command line
-              </p>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-slate-300">Arguments</label>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setRawMode(!rawMode)}
+                    className={cn(
+                      'px-2 py-1 rounded text-xs font-medium transition-colors',
+                      rawMode
+                        ? 'bg-primary-500/20 text-primary-400'
+                        : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                    )}
+                  >
+                    {rawMode ? 'Structured' : 'Raw Mode'}
+                  </button>
+                  <button
+                    onClick={handleShowHelp}
+                    disabled={!isInstalled || showingHelp || isRunning}
+                    className={cn(
+                      'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium transition-colors',
+                      isInstalled && !showingHelp && !isRunning
+                        ? 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                        : 'bg-dark-700 text-slate-500 cursor-not-allowed'
+                    )}
+                    title="Show tool usage/help"
+                  >
+                    {showingHelp ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Info className="w-3 h-3" />
+                    )}
+                    Show Help (-h)
+                  </button>
+                </div>
+              </div>
+
+              {/* Raw Mode - Single textarea */}
+              {rawMode ? (
+                <div>
+                  <textarea
+                    value={rawArguments}
+                    onChange={(e) => setRawArguments(e.target.value)}
+                    placeholder='Enter arguments (e.g., -d example.com -o output.txt or --query "search term")'
+                    rows={3}
+                    disabled={!isInstalled || isRunning}
+                    className="w-full px-4 py-3 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Supports quoted strings: &quot;value with spaces&quot; or &apos;single
+                    quotes&apos;
+                  </p>
+                </div>
+              ) : (
+                /* Structured Mode - Individual argument inputs */
+                <div className="space-y-2">
+                  {argumentEntries.map((entry, index) => (
+                    <div key={entry.id} className="flex items-center gap-2">
+                      {/* Argument Type Selector */}
+                      <select
+                        value={entry.type}
+                        onChange={(e) =>
+                          updateArgumentEntry(
+                            entry.id,
+                            'type',
+                            e.target.value as ArgumentEntry['type']
+                          )
+                        }
+                        disabled={!isInstalled || isRunning}
+                        className="w-28 px-2 py-2 bg-dark-800 border border-dark-700 rounded-lg text-slate-300 text-xs focus:outline-none focus:border-primary-500 disabled:opacity-50"
+                      >
+                        <option value="flag-value">Flag + Value</option>
+                        <option value="flag-only">Flag Only</option>
+                        <option value="value-only">Value Only</option>
+                      </select>
+
+                      {/* Flag Input */}
+                      {(entry.type === 'flag-value' || entry.type === 'flag-only') && (
+                        <input
+                          type="text"
+                          value={entry.flag}
+                          onChange={(e) => updateArgumentEntry(entry.id, 'flag', e.target.value)}
+                          placeholder="-d, --domain"
+                          disabled={!isInstalled || isRunning}
+                          className="w-32 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono text-sm disabled:opacity-50"
+                        />
+                      )}
+
+                      {/* Value Input */}
+                      {(entry.type === 'flag-value' || entry.type === 'value-only') && (
+                        <input
+                          type="text"
+                          value={entry.value}
+                          onChange={(e) => updateArgumentEntry(entry.id, 'value', e.target.value)}
+                          placeholder="example.com"
+                          disabled={!isInstalled || isRunning}
+                          className="flex-1 px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 font-mono text-sm disabled:opacity-50"
+                        />
+                      )}
+
+                      {/* Remove Button */}
+                      <button
+                        onClick={() => removeArgumentEntry(entry.id)}
+                        disabled={!isInstalled || isRunning || argumentEntries.length <= 1}
+                        className={cn(
+                          'p-2 rounded-lg transition-colors',
+                          argumentEntries.length > 1 && isInstalled && !isRunning
+                            ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10'
+                            : 'text-slate-600 cursor-not-allowed'
+                        )}
+                        title="Remove argument"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+
+                  {/* Add Argument Button */}
+                  <button
+                    onClick={addArgumentEntry}
+                    disabled={!isInstalled || isRunning}
+                    className={cn(
+                      'flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors w-full justify-center border border-dashed',
+                      isInstalled && !isRunning
+                        ? 'border-dark-600 text-slate-400 hover:border-primary-500 hover:text-primary-400'
+                        : 'border-dark-700 text-slate-600 cursor-not-allowed'
+                    )}
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add Argument
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* Command Preview */}
@@ -609,7 +894,7 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
                             <p className="text-xs text-slate-600 font-mono">Flag: {option.flag}</p>
                           </div>
                         </div>
-                        
+
                         {option.type === 'boolean' ? (
                           <label className="flex items-center gap-2 mt-2">
                             <input
@@ -625,7 +910,12 @@ export default function ToolExecutePage({ params }: { params: { id: string } }) 
                           <input
                             type="number"
                             value={configValues[option.name] ?? option.default ?? ''}
-                            onChange={(e) => handleConfigChange(option.name, e.target.value ? Number(e.target.value) : undefined)}
+                            onChange={(e) =>
+                              handleConfigChange(
+                                option.name,
+                                e.target.value ? Number(e.target.value) : undefined
+                              )
+                            }
                             placeholder={option.default?.toString() || 'Enter value'}
                             disabled={!isInstalled || isRunning}
                             className="mt-2 w-full px-3 py-2 bg-dark-700 border border-dark-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-primary-500 text-sm disabled:opacity-50"

@@ -3,29 +3,19 @@ version: '3.8'
 services:
   # MongoDB Database
   mongodb:
-    image: mongo:7.0
+    image: mongo:6.0
     container_name: bb-mongodb
     restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: bugbounty2024
-      MONGO_INITDB_DATABASE: bugbounty
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
     networks:
       - bb-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # RabbitMQ for Message Queue
   rabbitmq:
-    image: rabbitmq:3.12-management-alpine
+    image: rabbitmq:3.12-management
     container_name: bb-rabbitmq
     restart: unless-stopped
     environment:
@@ -39,11 +29,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - bb-network
-    healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
 
   # NestJS Backend API - Development Mode
   backend:
@@ -55,7 +40,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 4000
-      MONGODB_URI: mongodb://admin:bugbounty2024@mongodb:27017/bugbounty?authSource=admin
+      MONGODB_URI: mongodb://mongodb:27017/bugbounty
       RABBITMQ_URL: amqp://bugbounty:bugbounty2024@rabbitmq:5672/watchtower
       JWT_SECRET: dev-jwt-secret-key
       HACKERONE_API_TOKEN: ${HACKERONE_API_TOKEN:-}
@@ -68,10 +53,8 @@ services:
       - ./backend/package.json:/app/package.json
       - scan_results:/app/results
     depends_on:
-      mongodb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - mongodb
+      - rabbitmq
     networks:
       - bb-network
 
@@ -84,7 +67,7 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
-      MONGODB_URI: mongodb://admin:bugbounty2024@mongodb:27017/bugbounty?authSource=admin
+      MONGODB_URI: mongodb://mongodb:27017/bugbounty
       RABBITMQ_URL: amqp://bugbounty:bugbounty2024@rabbitmq:5672/watchtower
       WORKER_ID: subfinder-worker-${HOSTNAME:-default}
     command: ["npm", "run", "start:worker"]
@@ -92,10 +75,8 @@ services:
       - ./backend/src:/app/src
       - scan_results:/app/results
     depends_on:
-      mongodb:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - mongodb
+      - rabbitmq
     networks:
       - bb-network
     deploy:

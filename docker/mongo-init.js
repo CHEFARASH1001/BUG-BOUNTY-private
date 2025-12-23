@@ -1,4 +1,17 @@
 // MongoDB Initialization Script
+// Create admin user first
+db = db.getSiblingDB('admin');
+db.createUser({
+  user: 'admin',
+  pwd: 'bugbounty2024',
+  roles: [
+    { role: 'userAdminAnyDatabase', db: 'admin' },
+    { role: 'readWriteAnyDatabase', db: 'admin' },
+    { role: 'dbAdminAnyDatabase', db: 'admin' }
+  ]
+});
+
+// Switch to bugbounty database
 db = db.getSiblingDB('bugbounty');
 
 // Create collections with validators

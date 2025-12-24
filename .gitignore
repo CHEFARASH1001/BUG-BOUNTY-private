@@ -316,3 +316,13 @@ monitoring/data/
 *.diff
 .todo
 .notes
+
+# ==================================
+# Archive Files
+# ==================================
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.rar
+*.7z

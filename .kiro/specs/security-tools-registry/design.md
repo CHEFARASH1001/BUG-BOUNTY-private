@@ -526,11 +526,8 @@ The following tools will be included in the bulk import:
 | linkfinder | linkfinder | javascript_analysis, url_discovery | https://github.com/GerbenJavado/LinkFinder |
 | secretfinder | secretfinder | secret_detection, javascript_analysis | https://github.com/m4ll0k/SecretFinder |
 | jsparser | jsparser | javascript_analysis | https://github.com/nahamsec/JSParser |
-| mantra | mantra | parameter_discovery | https://github.com/MrEmpy/mantra |
-| whatweb | whatweb | http_probing | https://github.com/urbanadventurer/WhatWeb |
 | assetfinder | assetfinder | subdomain_enumeration | https://github.com/tomnomnom/assetfinder |
 | nuclei | nuclei | vulnerability_scanning | https://github.com/projectdiscovery/nuclei |
 | wafw00f | wafw00f | waf_detection | https://github.com/EnableSecurity/wafw00f |
 | spyhunt | spyhunt | osint | https://github.com/spyhunt/spyhunt |
-| metasploit | msfconsole | exploitation | https://github.com/rapid7/metasploit-framework |
 

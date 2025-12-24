@@ -501,7 +501,6 @@ watchtower get technologies list | jq -r ".[].name" | sort -u | grep -v bootstra
 
 | Tool | Purpose | Link |
 |------|---------|------|
-| whatweb | Web technology identification | [GitHub](https://github.com/urbanadventurer/WhatWeb) |
 | wafw00f | WAF detection | [GitHub](https://github.com/EnableSecurity/wafw00f) |
 | nmap | Network scanning | [GitHub](https://github.com/nmap/nmap) |
 

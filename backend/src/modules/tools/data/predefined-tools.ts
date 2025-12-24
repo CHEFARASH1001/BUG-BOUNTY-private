@@ -32,7 +32,7 @@ export interface PredefinedTool {
  * Predefined list of security tools for bulk import
  * Requirements: 7.1
  * 
- * This list contains 29 well-known security reconnaissance and scanning tools
+ * This list contains 26 well-known security reconnaissance and scanning tools
  * that are commonly used in bug bounty and security research workflows.
  */
 export const PREDEFINED_TOOLS: PredefinedTool[] = [
@@ -301,30 +301,8 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
       { method: 'git', command: 'git clone https://github.com/nahamsec/JSParser.git /opt/jsparser && cd /opt/jsparser && pip install --break-system-packages -r requirements.txt' },
     ],
   },
-  {
-    name: 'mantra',
-    displayName: 'Mantra',
-    description: 'Tool for hunting down API key leaks in JavaScript files',
-    githubUrl: 'https://github.com/MrEmpy/mantra',
-    categories: [ToolCategory.PARAMETER_DISCOVERY],
-    binaryName: 'mantra',
-    installCommands: [
-      { method: 'go', command: 'go install github.com/MrEmpy/mantra@latest' },
-    ],
-  },
-  {
-    name: 'whatweb',
-    displayName: 'WhatWeb',
-    description: 'Next generation web scanner to identify technologies',
-    githubUrl: 'https://github.com/urbanadventurer/WhatWeb',
-    categories: [ToolCategory.HTTP_PROBING],
-    binaryName: 'whatweb',
-    installCommands: [
-      { method: 'apt', command: 'sudo apt install -y whatweb' },
-      { method: 'brew', command: 'brew install whatweb' },
-      { method: 'git', command: 'git clone https://github.com/urbanadventurer/WhatWeb.git /opt/whatweb && cd /opt/whatweb && bundle install && ln -sf /opt/whatweb/whatweb /usr/local/bin/whatweb' },
-    ],
-  },
+
+
   {
     name: 'assetfinder',
     displayName: 'Assetfinder',
@@ -372,16 +350,5 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
       { method: 'pip', command: 'pip install --break-system-packages spyhunt' },
     ],
   },
-  {
-    name: 'metasploit',
-    displayName: 'Metasploit Framework',
-    description: 'World-leading penetration testing framework',
-    githubUrl: 'https://github.com/rapid7/metasploit-framework',
-    categories: [ToolCategory.EXPLOITATION],
-    binaryName: 'msfconsole',
-    installCommands: [
-      { method: 'apt', command: 'sudo apt install -y metasploit-framework' },
-      { method: 'brew', command: 'brew install metasploit' },
-    ],
-  },
+
 ];

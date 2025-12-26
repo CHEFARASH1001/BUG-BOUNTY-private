@@ -31,6 +31,7 @@ import { CronModule } from './modules/cron/cron.module';
 import { DocumentationModule } from './modules/documentation/documentation.module';
 import { CliModule } from './modules/cli/cli.module';
 import { ToolsModule } from './modules/tools/tools.module';
+import { HexStrikeModule } from './modules/hexstrike-ai/hexstrike.module';
 
 @Module({
   imports: [
@@ -91,6 +92,7 @@ import { ToolsModule } from './modules/tools/tools.module';
     DocumentationModule,
     CliModule,
     ToolsModule,
+    HexStrikeModule,
   ],
 })
 export class AppModule {}

@@ -41,6 +41,7 @@ export class VulnerabilitiesService {
     programId?: string;
     targetId?: string;
     isNew?: boolean;
+    sourceTool?: string;
     search?: string;
   }): Promise<VulnerabilityDocument[]> {
     const query: any = {};
@@ -62,6 +63,9 @@ export class VulnerabilitiesService {
     }
     if (filters?.isNew !== undefined) {
       query.isNew = filters.isNew;
+    }
+    if (filters?.sourceTool) {
+      query.sourceTool = filters.sourceTool;
     }
     if (filters?.search) {
       query.$or = [
@@ -191,6 +195,15 @@ export class VulnerabilitiesService {
       result[item._id || 'unknown'] = item.count;
     }
     return result;
+  }
+
+  /**
+   * Get list of unique source tools used in vulnerabilities
+   * @returns Array of source tool names
+   */
+  async getSourceTools(): Promise<string[]> {
+    const result = await this.vulnModel.distinct('sourceTool', { sourceTool: { $ne: null } });
+    return result.filter((tool): tool is string => typeof tool === 'string' && tool.length > 0);
   }
 }
 

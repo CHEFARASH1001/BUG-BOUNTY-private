@@ -71,6 +71,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
       ABUSEIPDB_API_KEY: ${ABUSEIPDB_API_KEY:-}
+      HEXSTRIKE_URL: ${HEXSTRIKE_URL:-http://hexstrike-ai:8888}
     ports:
       - "4000:4000"
     volumes:
@@ -101,6 +102,38 @@ services:
       - backend
     networks:
       - bb-network
+
+  # HexStrike AI - AI-Powered Penetration Testing Framework
+  hexstrike-ai:
+    build:
+      context: ./hexstrike-ai
+      dockerfile: Dockerfile
+    container_name: bb-hexstrike-ai
+    restart: unless-stopped
+    environment:
+      HEXSTRIKE_PORT: 8888
+      HEXSTRIKE_HOST: 0.0.0.0
+    ports:
+      - "8888:8888"
+    volumes:
+      - hexstrike_results:/app/results
+      - hexstrike_logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - bb-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
 
   # Nuclei Scanner Container
   nuclei:
@@ -150,6 +183,8 @@ volumes:
   rabbitmq_data:
   scan_results:
   nuclei_templates:
+  hexstrike_results:
+  hexstrike_logs:
 
 networks:
   bb-network:

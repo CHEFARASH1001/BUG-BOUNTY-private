@@ -65,6 +65,38 @@ class SocketClient {
     this.socket?.emit('unsubscribe:tool-execution', { executionId });
   }
 
+  // HexStrike AI process subscriptions
+  subscribeHexStrikeProcesses() {
+    this.socket?.emit('subscribe:hexstrike-processes');
+  }
+
+  unsubscribeHexStrikeProcesses() {
+    this.socket?.emit('unsubscribe:hexstrike-processes');
+  }
+
+  subscribeHexStrikeProcess(pid: number) {
+    this.socket?.emit('subscribe:hexstrike-process', { pid });
+  }
+
+  unsubscribeHexStrikeProcess(pid: number) {
+    this.socket?.emit('unsubscribe:hexstrike-process', { pid });
+  }
+
+  // Check if socket is connected
+  isConnected(): boolean {
+    return this.socket?.connected ?? false;
+  }
+
+  // Force reconnect
+  reconnect() {
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket.connect();
+    } else {
+      this.connect();
+    }
+  }
+
   on(event: string, callback: (data: any) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());

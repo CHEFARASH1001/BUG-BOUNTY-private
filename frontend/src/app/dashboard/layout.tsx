@@ -30,6 +30,7 @@ import {
   Target,
   Zap,
   Database,
+  Brain,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi } from '@/lib/api';
@@ -43,6 +44,7 @@ const navigation = [
   { name: 'Vulnerabilities', href: '/dashboard/vulnerabilities', icon: AlertTriangle },
   { name: 'Scans', href: '/dashboard/scans', icon: Scan },
   { name: 'Tools', href: '/dashboard/tools', icon: Terminal },
+  { name: 'HexStrike AI', href: '/dashboard/hexstrike', icon: Brain },
   { name: 'Fuzzing', href: '/dashboard/fuzzing', icon: Zap },
   { name: 'DNS Brute', href: '/dashboard/dns-brute', icon: Database },
   { name: 'Chaos Sync', href: '/dashboard/chaos', icon: Activity },

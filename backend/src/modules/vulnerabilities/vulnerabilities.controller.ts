@@ -36,6 +36,7 @@ export class VulnerabilitiesController {
   @ApiQuery({ name: 'programId', required: false })
   @ApiQuery({ name: 'targetId', required: false })
   @ApiQuery({ name: 'isNew', required: false, type: Boolean })
+  @ApiQuery({ name: 'sourceTool', required: false })
   @ApiQuery({ name: 'search', required: false })
   findAll(
     @Query('severity') severity?: string,
@@ -44,6 +45,7 @@ export class VulnerabilitiesController {
     @Query('programId') programId?: string,
     @Query('targetId') targetId?: string,
     @Query('isNew') isNew?: boolean,
+    @Query('sourceTool') sourceTool?: string,
     @Query('search') search?: string,
   ) {
     return this.vulnService.findAll({
@@ -53,6 +55,7 @@ export class VulnerabilitiesController {
       programId,
       targetId,
       isNew,
+      sourceTool,
       search,
     });
   }
@@ -62,6 +65,12 @@ export class VulnerabilitiesController {
   @ApiQuery({ name: 'programId', required: false })
   getStats(@Query('programId') programId?: string) {
     return this.vulnService.getStats(programId);
+  }
+
+  @Get('source-tools')
+  @ApiOperation({ summary: 'Get list of unique source tools' })
+  getSourceTools() {
+    return this.vulnService.getSourceTools();
   }
 
   @Get('duplicates')

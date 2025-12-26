@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@golevelup/nestjs-rabbitmq": "^5.3.0",
+    "@nestjs/axios": "^4.0.1",
     "@nestjs/bull": "^10.0.1",
     "@nestjs/common": "^10.3.0",
     "@nestjs/config": "^3.1.1",
@@ -35,7 +36,7 @@
     "@nestjs/throttler": "^5.1.1",
     "@nestjs/websockets": "^10.3.0",
     "amqplib": "^0.10.9",
-    "axios": "^1.6.2",
+    "axios": "^1.13.2",
     "bcryptjs": "^2.4.3",
     "cheerio": "^1.0.0-rc.12",
     "class-transformer": "^0.5.1",

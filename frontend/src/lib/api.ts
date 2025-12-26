@@ -105,13 +105,14 @@ export const subdomainsApi = {
 
 // Vulnerabilities API
 export const vulnerabilitiesApi = {
-  getAll: (filters?: { severity?: string; status?: string; programId?: string; search?: string }) =>
+  getAll: (filters?: { severity?: string; status?: string; programId?: string; sourceTool?: string; search?: string }) =>
     api.get('/vulnerabilities', { params: filters }),
   getById: (id: string) => api.get(`/vulnerabilities/${id}`),
   update: (id: string, data: any) => api.put(`/vulnerabilities/${id}`, data),
   updateStatus: (id: string, status: string) => api.put(`/vulnerabilities/${id}/status`, { status }),
   delete: (id: string) => api.delete(`/vulnerabilities/${id}`),
   getStats: (programId?: string) => api.get('/vulnerabilities/stats', { params: { programId } }),
+  getSourceTools: () => api.get('/vulnerabilities/source-tools'),
 };
 
 // Scans API
@@ -608,4 +609,68 @@ export const toolsApi = {
   
   // Get available installation methods for a tool
   getInstallMethods: (id: string) => api.get(`/tools/${id}/install-methods`),
+};
+
+
+// HexStrike AI API - AI-powered penetration testing framework
+export const hexstrikeApi = {
+  // Health check - Get HexStrike AI server health status
+  // Requirements: 2.2
+  getHealth: () => api.get('/hexstrike/health'),
+
+  // Target Analysis - Analyze a target and get comprehensive profile
+  // Requirements: 2.3
+  analyzeTarget: (data: {
+    target: string;
+    depth?: number;
+    mode?: 'passive' | 'active' | 'aggressive';
+  }) => api.post('/hexstrike/analyze-target', data),
+
+  // Tools - Get list of available security tools
+  // Requirements: 2.4
+  getTools: () => api.get('/hexstrike/tools'),
+
+  // Tool Execution - Execute a specific security tool
+  // Requirements: 2.5
+  executeTool: (tool: string, data: {
+    target: string;
+    parameters?: Record<string, any>;
+  }) => api.post(`/hexstrike/tools/${tool}/execute`, data),
+
+  // Workflows - Get list of available AI workflows
+  // Requirements: 2.1
+  getWorkflows: () => api.get('/hexstrike/workflows'),
+
+  // Start Workflow - Start an AI workflow
+  // Requirements: 2.1
+  startWorkflow: (type: string, data: {
+    target: string;
+    options?: Record<string, any>;
+  }) => api.post(`/hexstrike/workflows/${type}/start`, data),
+
+  // Processes - Get list of active processes
+  // Requirements: 2.1
+  getProcesses: () => api.get('/hexstrike/processes'),
+
+  // Get Process Status - Get process status by PID
+  // Requirements: 2.1
+  getProcessStatus: (pid: number) => api.get(`/hexstrike/processes/${pid}`),
+
+  // Terminate Process - Terminate a running process
+  // Requirements: 2.1
+  terminateProcess: (pid: number) => api.post(`/hexstrike/processes/${pid}/terminate`),
+
+  // Configuration - Get HexStrike AI configuration
+  // Requirements: 2.1
+  getConfig: () => api.get('/hexstrike/config'),
+
+  // Update Configuration - Update HexStrike AI configuration
+  // Requirements: 2.1
+  updateConfig: (data: {
+    threads?: number;
+    timeout?: number;
+    rateLimit?: number;
+    scanDepth?: number;
+    outputDir?: string;
+  }) => api.put('/hexstrike/config', data),
 };

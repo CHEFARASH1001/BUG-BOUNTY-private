@@ -19,7 +19,8 @@
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:cov": "jest --coverage"
+    "test:cov": "jest --coverage",
+    "create-admin": "ts-node scripts/create-admin.ts"
   },
   "dependencies": {
     "@golevelup/nestjs-rabbitmq": "^5.3.0",

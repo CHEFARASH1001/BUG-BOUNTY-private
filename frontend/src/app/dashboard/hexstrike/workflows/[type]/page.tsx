@@ -188,18 +188,22 @@ export default function WorkflowExecutionPage() {
       const result = response.data;
       setToolResults((prev) => ({ ...prev, [toolName]: result }));
       
-      if (result.output) {
-        const outputLines = result.output.split('\n').slice(0, 20); // First 20 lines
+      // HexStrike AI returns stdout/stderr, not output
+      const output = result.stdout || result.output || '';
+      const errorOutput = result.stderr || '';
+      
+      if (output) {
+        const outputLines = output.split('\n').slice(0, 20); // First 20 lines
         setLogs((prev) => [
           ...prev,
           `[${new Date().toLocaleTimeString()}] ✅ ${toolName} completed`,
           ...outputLines.map((line: string) => `   ${line}`),
-          outputLines.length < result.output.split('\n').length 
-            ? `   ... (${result.output.split('\n').length - 20} more lines)` 
+          outputLines.length < output.split('\n').length 
+            ? `   ... (${output.split('\n').length - 20} more lines)` 
             : '',
         ].filter(Boolean));
-      } else if (result.error) {
-        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ❌ ${toolName}: ${result.error}`]);
+      } else if (result.error || errorOutput) {
+        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ❌ ${toolName}: ${result.error || errorOutput}`]);
       } else {
         setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ✅ ${toolName} completed (no output)`]);
       }
@@ -428,7 +432,7 @@ export default function WorkflowExecutionPage() {
             updatedSteps[stepIdx] = { 
               ...updatedSteps[stepIdx], 
               status: 'completed' as StepStatus,
-              output: result.output || result.error || 'Completed',
+              output: result.stdout || result.output || result.error || 'Completed',
               results: result
             };
             return { ...prev, steps: updatedSteps };
@@ -436,18 +440,22 @@ export default function WorkflowExecutionPage() {
           return prev;
         });
 
-        if (result.output) {
-          const outputLines = result.output.split('\n').filter((l: string) => l.trim()).slice(0, 10);
+        // HexStrike AI returns stdout/stderr, not output
+        const output = result.stdout || result.output || '';
+        const errorOutput = result.stderr || '';
+        
+        if (output) {
+          const outputLines = output.split('\n').filter((l: string) => l.trim()).slice(0, 10);
           setLogs((prev) => [
             ...prev,
             `[${new Date().toLocaleTimeString()}] ✅ ${tool} completed`,
             ...outputLines.map((line: string) => `   ${line}`),
-            outputLines.length < result.output.split('\n').filter((l: string) => l.trim()).length
-              ? `   ... (${result.output.split('\n').filter((l: string) => l.trim()).length - 10} more lines)`
+            outputLines.length < output.split('\n').filter((l: string) => l.trim()).length
+              ? `   ... (${output.split('\n').filter((l: string) => l.trim()).length - 10} more lines)`
               : '',
           ].filter(Boolean));
-        } else if (result.error) {
-          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ ${tool}: ${result.error}`]);
+        } else if (result.error || errorOutput) {
+          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ ${tool}: ${result.error || errorOutput}`]);
         } else {
           setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ✅ ${tool} completed (no output)`]);
         }

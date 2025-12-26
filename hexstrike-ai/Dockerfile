@@ -6,25 +6,41 @@ FROM golang:1.22-alpine AS go-builder
 
 ENV CGO_ENABLED=0
 ENV GOPATH=/go
-ENV GOPROXY=direct
-ENV GOSUMDB=off
+# Use default proxy for better reliability
+ENV GOPROXY=https://proxy.golang.org,direct
 
-# Install git for go install
-RUN apk add --no-cache git
+# Install git and build dependencies for go install
+RUN apk add --no-cache git ca-certificates
 
-# Install Go-based security tools (one at a time to handle failures)
-RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest || true
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest || true
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest || true
-RUN go install -v github.com/ffuf/ffuf/v2@latest || true
-RUN go install -v github.com/tomnomnom/assetfinder@latest || true
-RUN go install -v github.com/projectdiscovery/katana/cmd/katana@latest || true
-RUN go install -v github.com/lc/gau/v2/cmd/gau@latest || true
-RUN go install -v github.com/tomnomnom/waybackurls@latest || true
-RUN go install -v github.com/hahwul/dalfox/v2@latest || true
+# Install Go-based security tools
+# ProjectDiscovery tools
+RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    echo "✅ nuclei installed" || echo "❌ nuclei failed"
+RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    echo "✅ httpx installed" || echo "❌ httpx failed"
+RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    echo "✅ subfinder installed" || echo "❌ subfinder failed"
+RUN go install -v github.com/projectdiscovery/katana/cmd/katana@latest && \
+    echo "✅ katana installed" || echo "❌ katana failed"
+
+# Fuzzing tools
+RUN go install -v github.com/ffuf/ffuf/v2@latest && \
+    echo "✅ ffuf installed" || echo "❌ ffuf failed"
+
+# Recon tools
+RUN go install -v github.com/tomnomnom/assetfinder@latest && \
+    echo "✅ assetfinder installed" || echo "❌ assetfinder failed"
+RUN go install -v github.com/lc/gau/v2/cmd/gau@latest && \
+    echo "✅ gau installed" || echo "❌ gau failed"
+RUN go install -v github.com/tomnomnom/waybackurls@latest && \
+    echo "✅ waybackurls installed" || echo "❌ waybackurls failed"
+
+# XSS tools
+RUN go install -v github.com/hahwul/dalfox/v2@latest && \
+    echo "✅ dalfox installed" || echo "❌ dalfox failed"
 
 # List what was installed
-RUN ls -la /go/bin/ || echo "No tools installed"
+RUN echo "=== Installed Go tools ===" && ls -la /go/bin/
 
 # Stage 2: Final image
 FROM python:3.11-slim
@@ -77,6 +93,10 @@ COPY requirements-minimal.txt requirements.txt ./
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-minimal.txt
+
+# Install Python-based security tools
+RUN pip install --no-cache-dir arjun paramspider && \
+    echo "✅ Python security tools installed"
 
 # Copy HexStrike AI source code
 COPY hexstrike_server.py hexstrike_mcp.py ./

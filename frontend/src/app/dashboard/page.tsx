@@ -55,23 +55,26 @@ export default function DashboardPage() {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const [programsRes, domainsRes, subdomainsRes, executionsRes] = await Promise.all([
-        programsApi.getAll().catch(() => ({ data: [] })),
-        domainsApi.getAll().catch(() => ({ data: [] })),
-        subdomainsApi.getAll().catch(() => ({ data: [] })),
+      const [programsRes, domainsRes, subdomainsRes, aliveSubdomainsRes, executionsRes] = await Promise.all([
+        programsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+        domainsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+        subdomainsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+        subdomainsApi.getAll({ limit: 1, isAlive: true }).catch(() => ({ data: { pagination: { total: 0 } } })),
         cronApi.getExecutions({ limit: 5 }).catch(() => ({ data: [] })),
       ]);
 
-      const programs = Array.isArray(programsRes.data) ? programsRes.data : [];
-      const domains = Array.isArray(domainsRes.data) ? domainsRes.data : [];
-      const subdomains = Array.isArray(subdomainsRes.data) ? subdomainsRes.data : [];
+      // Extract totals from pagination - backend returns { data: [...], pagination: { total, ... } }
+      const programsTotal = programsRes.data?.pagination?.total ?? 0;
+      const domainsTotal = domainsRes.data?.pagination?.total ?? 0;
+      const subdomainsTotal = subdomainsRes.data?.pagination?.total ?? 0;
+      const aliveSubdomainsTotal = aliveSubdomainsRes.data?.pagination?.total ?? 0;
       const executions = Array.isArray(executionsRes.data) ? executionsRes.data : [];
 
       setStats({
-        programs: programs.length,
-        domains: domains.length,
-        subdomains: subdomains.length,
-        aliveSubdomains: subdomains.filter((s: any) => s.isAlive).length,
+        programs: programsTotal,
+        domains: domainsTotal,
+        subdomains: subdomainsTotal,
+        aliveSubdomains: aliveSubdomainsTotal,
       });
       setRecentExecutions(executions);
     } catch (error) {

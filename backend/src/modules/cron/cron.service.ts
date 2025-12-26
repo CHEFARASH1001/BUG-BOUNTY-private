@@ -20,7 +20,6 @@ import { AlertService } from '../alerts/alert.service';
 import { WaybackService } from '../recon/services/wayback.service';
 import { EndpointsService } from '../endpoints/endpoints.service';
 import { NucleiService } from '../scanner/services/nuclei.service';
-import { ChaosService } from '../recon/services/chaos.service';
 import { DNSBruteService } from '../recon/services/dns-brute.service';
 
 export interface JobDefinition {
@@ -92,11 +91,6 @@ export class CronService implements OnModuleInit {
       description: 'Waybackurls endpoint discovery for alive subdomains',
     },
     {
-      name: 'watch_chaos_sync',
-      schedule: '0 */12 * * *',
-      description: 'Chaos sync for watched programs',
-    },
-    {
       name: 'watch_dns_brute',
       schedule: '0 0 * * *',
       description: 'DNS brute forcing for watched domains',
@@ -122,7 +116,6 @@ export class CronService implements OnModuleInit {
     @Inject(forwardRef(() => WaybackService)) private waybackService: WaybackService,
     @Inject(forwardRef(() => EndpointsService)) private endpointsService: EndpointsService,
     @Inject(forwardRef(() => NucleiService)) private nucleiService: NucleiService,
-    @Inject(forwardRef(() => ChaosService)) private chaosService: ChaosService,
     @Inject(forwardRef(() => DNSBruteService)) private dnsBruteService: DNSBruteService,
   ) {}
 
@@ -205,11 +198,6 @@ export class CronService implements OnModuleInit {
   @Cron('0 */8 * * *') // Every 8 hours
   async scheduledWaybackWatch() {
     await this.runJobIfEnabled('watch_wayback', (log) => this.runWaybackWatch(log));
-  }
-
-  @Cron('0 */12 * * *') // Every 12 hours
-  async scheduledChaosSyncWatch() {
-    await this.runJobIfEnabled('watch_chaos_sync', (log) => this.runChaosSyncWatch(log));
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_1AM) // Daily at 1 AM
@@ -355,7 +343,6 @@ export class CronService implements OnModuleInit {
       watch_abuseipdb: (log) => this.runAbuseIPDBWatch(log),
       watch_ct_logs: (log) => this.runCTMonitor(log),
       watch_wayback: (log) => this.runWaybackWatch(log),
-      watch_chaos_sync: (log) => this.runChaosSyncWatch(log),
       watch_dns_brute: (log) => this.runDNSBruteWatch(log),
     };
 
@@ -1195,96 +1182,6 @@ export class CronService implements OnModuleInit {
       };
     } catch (error: any) {
       await log(`Wayback watch error: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Chaos sync for watched programs
-   * Periodically syncs subdomain data from ProjectDiscovery Chaos for watched programs
-   * Triggers alerts for new subdomain discoveries
-   * Requirements: 14.5
-   */
-  private async runChaosSyncWatch(log: LogFn): Promise<any> {
-    await log('Starting Chaos sync for watched programs...');
-
-    try {
-      // Get all programs with watching enabled
-      const watchedPrograms = await this.chaosService.getWatchedPrograms();
-      await log(`Found ${watchedPrograms.length} watched programs`);
-
-      if (watchedPrograms.length === 0) {
-        await log('No programs are being watched. Enable watching for programs first.');
-        return { message: 'No watched programs', synced: 0 };
-      }
-
-      let totalSynced = 0;
-      let totalNew = 0;
-      const results: { program: string; imported: number; new: number }[] = [];
-
-      for (const watchedProgram of watchedPrograms) {
-        try {
-          await log(`Syncing Chaos data for: ${watchedProgram.programName}`);
-
-          // Get existing subdomains for this program to calculate new count
-          const existingSubdomains: string[] = [];
-          
-          // Sync the program
-          const syncResult = await this.chaosService.syncProgram(
-            watchedProgram.programName,
-            existingSubdomains,
-          );
-
-          await log(`Synced ${syncResult.subdomainsImported} subdomains, ${syncResult.newSubdomains} new for ${watchedProgram.programName}`);
-
-          totalSynced += syncResult.subdomainsImported;
-          totalNew += syncResult.newSubdomains;
-          results.push({
-            program: watchedProgram.programName,
-            imported: syncResult.subdomainsImported,
-            new: syncResult.newSubdomains,
-          });
-
-          // If new subdomains were discovered, store them and send notification
-          if (syncResult.newSubdomains > 0) {
-            await log(`🆕 ${syncResult.newSubdomains} new subdomains discovered for ${watchedProgram.programName}`);
-
-            // Send notification for new Chaos discoveries
-            try {
-              await this.queueService.publishNotification({
-                type: 'new_subdomain',
-                data: {
-                  program: watchedProgram.programName,
-                  source: 'chaos',
-                  count: syncResult.newSubdomains,
-                  timestamp: new Date(),
-                },
-                channels: ['discord', 'telegram'],
-              });
-              await log('Notification sent for new Chaos discoveries');
-            } catch (notifyError: any) {
-              await log(`Failed to send Chaos notification: ${notifyError.message}`);
-            }
-          }
-
-          // Rate limiting - wait between syncs
-          await new Promise(resolve => setTimeout(resolve, 3000));
-        } catch (error: any) {
-          await log(`Error syncing ${watchedProgram.programName}: ${error.message}`);
-        }
-      }
-
-      await log(`Chaos sync complete: ${totalSynced} subdomains synced, ${totalNew} new`);
-
-      return {
-        message: 'Chaos sync completed',
-        programsSynced: watchedPrograms.length,
-        totalSubdomains: totalSynced,
-        newSubdomains: totalNew,
-        results,
-      };
-    } catch (error: any) {
-      await log(`Chaos sync error: ${error.message}`);
       throw error;
     }
   }

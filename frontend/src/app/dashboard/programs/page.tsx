@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   Building2,
@@ -12,17 +12,20 @@ import {
   DollarSign,
   Calendar,
   ExternalLink,
-  Users,
-  Target,
   Shield,
   CheckCircle,
-  XCircle,
   Loader2,
   RefreshCw,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDate } from '@/lib/utils';
 import { programsApi } from '@/lib/api';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface Program {
   _id: string;
@@ -35,6 +38,14 @@ interface Program {
   scopes?: { assetIdentifier: string; assetType: string; status?: string }[];
   scopeCount?: number;
   createdAt?: string;
+  dataSources?: string[];
+}
+
+interface Pagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 }
 
 const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
@@ -58,46 +69,114 @@ const platformColors: Record<string, string> = {
   'Self-hosted': 'bg-slate-500/20 text-slate-400',
 };
 
+const dataSourceConfig: Record<string, { label: string; color: string }> = {
+  'hackerone-api': { label: 'H1 API', color: 'bg-purple-500/30 text-purple-300 border-purple-500/50' },
+  'bugcrowd-api': { label: 'BC API', color: 'bg-orange-500/30 text-orange-300 border-orange-500/50' },
+  'chaos': { label: 'Chaos', color: 'bg-emerald-500/30 text-emerald-300 border-emerald-500/50' },
+  'bounty-targets': { label: 'BT Data', color: 'bg-sky-500/30 text-sky-300 border-sky-500/50' },
+};
+
+const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
+
 export default function ProgramsPage() {
   const [programs, setPrograms] = useState<Program[]>([]);
+  const [pagination, setPagination] = useState<Pagination>({
+    page: 1,
+    limit: 50,
+    total: 0,
+    totalPages: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
+  const [selectedDataSource, setSelectedDataSource] = useState<string | null>(null);
+  const [selectedProgramType, setSelectedProgramType] = useState<string | null>(null);
 
-  const fetchPrograms = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await programsApi.getAll({
-        status: selectedStatus || undefined,
-        platform: selectedPlatform || undefined,
-        search: searchQuery || undefined,
-      });
-      const data = response.data;
-      setPrograms(Array.isArray(data) ? data : []);
-    } catch (err: any) {
-      console.error('Failed to fetch programs:', err);
-      setError(err.response?.data?.message || err.message || 'Failed to load programs');
-    } finally {
-      setLoading(false);
+  const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const fetchPrograms = useCallback(
+    async (page = 1, limit = pagination.limit) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await programsApi.getAll({
+          status: selectedStatus || undefined,
+          platform: selectedPlatform || undefined,
+          search: debouncedSearch || undefined,
+          offersBounties:
+            selectedProgramType === 'bbp'
+              ? 'true'
+              : selectedProgramType === 'vdp'
+                ? 'false'
+                : undefined,
+          dataSource: selectedDataSource || undefined,
+          page,
+          limit,
+        });
+        const { data, pagination: paginationData } = response.data;
+        setPrograms(Array.isArray(data) ? data : []);
+        setPagination(paginationData);
+      } catch (err: any) {
+        console.error('Failed to fetch programs:', err);
+        setError(err.response?.data?.message || err.message || 'Failed to load programs');
+      } finally {
+        setLoading(false);
+      }
+    },
+    [selectedStatus, selectedPlatform, debouncedSearch, selectedProgramType, selectedDataSource, pagination.limit]
+  );
+
+  useEffect(() => {
+    fetchPrograms(1, pagination.limit);
+  }, [selectedStatus, selectedPlatform, debouncedSearch, selectedProgramType, selectedDataSource]);
+
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= pagination.totalPages) {
+      fetchPrograms(newPage, pagination.limit);
     }
   };
 
-  useEffect(() => {
-    fetchPrograms();
-  }, [selectedStatus, selectedPlatform]);
+  const handlePageSizeChange = (newLimit: number) => {
+    setPagination((prev) => ({ ...prev, limit: newLimit }));
+    fetchPrograms(1, newLimit);
+  };
 
-  const filteredPrograms = programs.filter((program) => {
-    const matchesSearch = !searchQuery || 
-      program.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      program.handle?.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  const hasActiveFilters =
+    selectedStatus || selectedPlatform || selectedDataSource || selectedProgramType || searchQuery;
 
-  const activeCount = programs.filter(p => p.status === 'active' || p.status === 'open' || p.status === 'public_mode').length;
+  const clearFilters = () => {
+    setSearchQuery('');
+    setSelectedStatus(null);
+    setSelectedPlatform(null);
+    setSelectedDataSource(null);
+    setSelectedProgramType(null);
+  };
+
+  const activeCount = programs.filter(
+    (p) => p.status === 'active' || p.status === 'open' || p.status === 'public_mode'
+  ).length;
   const totalScopes = programs.reduce((a, b) => a + (b.scopeCount || b.scopes?.length || 0), 0);
+
+  const getPageNumbers = () => {
+    const { page, totalPages } = pagination;
+    const pages: (number | string)[] = [];
+    const showPages = 5;
+
+    if (totalPages <= showPages + 2) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (page > 3) pages.push('...');
+      const start = Math.max(2, page - 1);
+      const end = Math.min(totalPages - 1, page + 1);
+      for (let i = start; i <= end; i++) pages.push(i);
+      if (page < totalPages - 2) pages.push('...');
+      pages.push(totalPages);
+    }
+    return pages;
+  };
 
   return (
     <div className="space-y-6">
@@ -112,7 +191,7 @@ export default function ProgramsPage() {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={fetchPrograms}
+            onClick={() => fetchPrograms(pagination.page, pagination.limit)}
             disabled={loading}
             className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700"
           >
@@ -129,7 +208,6 @@ export default function ProgramsPage() {
         </div>
       </div>
 
-      {/* Error Message */}
       {error && (
         <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
           <p className="text-red-400">{error}</p>
@@ -137,12 +215,13 @@ export default function ProgramsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Programs', value: programs.length, icon: Building2, color: 'text-primary-400' },
-          { label: 'Active', value: activeCount, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'Total Scopes', value: totalScopes, icon: Globe, color: 'text-blue-400' },
-          { label: 'With Bounties', value: programs.filter(p => p.offersBounties).length, icon: DollarSign, color: 'text-yellow-400' },
+          { label: 'Total Programs', value: pagination.total, icon: Building2, color: 'text-primary-400' },
+          { label: 'Active (page)', value: activeCount, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Scopes (page)', value: totalScopes, icon: Globe, color: 'text-blue-400' },
+          { label: 'BBP (page)', value: programs.filter((p) => p.offersBounties).length, icon: DollarSign, color: 'text-yellow-400' },
+          { label: 'VDP (page)', value: programs.filter((p) => !p.offersBounties).length, icon: Shield, color: 'text-slate-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -163,19 +242,27 @@ export default function ProgramsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
-            placeholder="Search programs..."
+            placeholder="Search programs by name or handle..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Filter className="w-4 h-4 text-slate-400" />
           <select
             value={selectedStatus || ''}
@@ -187,7 +274,8 @@ export default function ProgramsPage() {
             <option value="open">Open</option>
             <option value="public_mode">Public</option>
             <option value="paused">Paused</option>
-            <option value="inactive">Inactive</option>
+            <option value="archived">Archived</option>
+            <option value="closed">Closed</option>
           </select>
           <select
             value={selectedPlatform || ''}
@@ -199,11 +287,55 @@ export default function ProgramsPage() {
             <option value="bugcrowd">Bugcrowd</option>
             <option value="intigriti">Intigriti</option>
             <option value="yeswehack">YesWeHack</option>
+            <option value="synack">Synack</option>
+            <option value="federacy">Federacy</option>
+            <option value="github">GitHub</option>
+            <option value="custom">Custom</option>
           </select>
+          <select
+            value={selectedProgramType || ''}
+            onChange={(e) => setSelectedProgramType(e.target.value || null)}
+            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+          >
+            <option value="">All Types</option>
+            <option value="bbp">BBP (Bounty)</option>
+            <option value="vdp">VDP (No Bounty)</option>
+          </select>
+          <select
+            value={selectedDataSource || ''}
+            onChange={(e) => setSelectedDataSource(e.target.value || null)}
+            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+          >
+            <option value="">All Sources</option>
+            <option value="hackerone-api">HackerOne API</option>
+            <option value="bugcrowd-api">Bugcrowd API</option>
+            <option value="chaos">Chaos</option>
+            <option value="bounty-targets">Bounty Targets</option>
+          </select>
+
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+            >
+              <X className="w-3 h-3" />
+              Clear
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Loading State */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 text-sm text-slate-400">
+          <span>Filtered: {pagination.total} programs</span>
+          {debouncedSearch && <span className="px-2 py-0.5 bg-dark-800 rounded">Search: &quot;{debouncedSearch}&quot;</span>}
+          {selectedStatus && <span className="px-2 py-0.5 bg-dark-800 rounded">Status: {selectedStatus}</span>}
+          {selectedPlatform && <span className="px-2 py-0.5 bg-dark-800 rounded">Platform: {selectedPlatform}</span>}
+          {selectedProgramType && <span className="px-2 py-0.5 bg-dark-800 rounded">Type: {selectedProgramType.toUpperCase()}</span>}
+          {selectedDataSource && <span className="px-2 py-0.5 bg-dark-800 rounded">Source: {selectedDataSource}</span>}
+        </div>
+      )}
+
       {loading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
@@ -211,124 +343,216 @@ export default function ProgramsPage() {
         </div>
       )}
 
-      {/* Programs List */}
       {!loading && (
-        <div className="space-y-4">
-          {filteredPrograms.slice(0, 50).map((program, index) => {
-            const status = statusConfig[program.status] || statusConfig.active;
-            const platformColor = platformColors[program.platform] || 'bg-slate-500/20 text-slate-400';
-            
-            return (
-              <motion.div
-                key={program._id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: Math.min(index * 0.02, 0.5) }}
-                className="group relative"
-              >
-                <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
-                <div className="relative p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-primary-500/20 rounded-xl">
-                        <Building2 className="w-6 h-6 text-primary-400" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-3 mb-1 flex-wrap">
-                          <Link
-                            href={`/dashboard/programs/${program._id}`}
-                            className="text-lg font-semibold text-white hover:text-primary-400 transition-colors"
-                          >
-                            {program.name}
-                          </Link>
-                          <span className={cn(
-                            'px-2 py-0.5 rounded text-xs font-medium',
-                            status.bg,
-                            status.color
-                          )}>
-                            {status.label}
-                          </span>
-                          {program.offersBounties && (
-                            <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">
-                              Bounty
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-sm text-slate-500 mb-3">@{program.handle}</p>
-                        <div className="flex items-center gap-4 text-sm flex-wrap">
-                          <span className={cn('px-2 py-1 rounded text-xs capitalize', platformColor)}>
-                            {program.platform}
-                          </span>
-                          <span className="flex items-center gap-1 text-slate-400">
-                            <Globe className="w-4 h-4" />
-                            {program.scopeCount || program.scopes?.length || 0} scopes
-                          </span>
-                          {program.url && (
-                            <a 
-                              href={program.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-primary-400 hover:text-primary-300"
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                              View Program
-                            </a>
-                          )}
-                          {program.createdAt && (
-                            <span className="flex items-center gap-1 text-slate-400">
-                              <Calendar className="w-4 h-4" />
-                              {formatDate(program.createdAt)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Link
-                        href={`/dashboard/programs/${program._id}`}
-                        className="p-2 text-slate-400 hover:text-primary-400 transition-colors"
-                        title="View Details"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Link>
-                      <button className="p-2 text-slate-400 hover:text-white transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
+        <>
+          <div className="space-y-4">
+            {programs.map((program, index) => {
+              const status = statusConfig[program.status] || statusConfig.active;
+              const platformColor = platformColors[program.platform] || 'bg-slate-500/20 text-slate-400';
 
-                  {/* Scope preview */}
-                  {program.scopes && program.scopes.length > 0 && (
-                    <div className="mt-4 pt-4 border-t border-dark-800">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs text-slate-500">Scope:</span>
-                        {program.scopes.slice(0, 3).map((s, i) => (
-                          <span key={i} className="px-2 py-1 bg-dark-800 text-xs text-slate-300 rounded">
-                            {s.assetIdentifier}
-                          </span>
-                        ))}
-                        {program.scopes.length > 3 && (
-                          <span className="text-xs text-slate-500">+{program.scopes.length - 3} more</span>
-                        )}
+              return (
+                <motion.div
+                  key={program._id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: Math.min(index * 0.02, 0.5) }}
+                  className="group relative"
+                >
+                  <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
+                  <div className="relative p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div className="p-3 bg-primary-500/20 rounded-xl">
+                          <Building2 className="w-6 h-6 text-primary-400" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-3 mb-1 flex-wrap">
+                            <Link
+                              href={`/dashboard/programs/${program._id}`}
+                              className="text-lg font-semibold text-white hover:text-primary-400 transition-colors"
+                            >
+                              {program.name}
+                            </Link>
+                            <span className={cn('px-2 py-0.5 rounded text-xs font-medium', status.bg, status.color)}>
+                              {status.label}
+                            </span>
+                            {program.offersBounties ? (
+                              <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">BBP</span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-xs bg-slate-500/20 text-slate-400">VDP</span>
+                            )}
+                          </div>
+                          <p className="text-sm text-slate-500 mb-3">@{program.handle}</p>
+                          <div className="flex items-center gap-4 text-sm flex-wrap">
+                            <span className={cn('px-2 py-1 rounded text-xs capitalize', platformColor)}>
+                              {program.platform}
+                            </span>
+                            {program.dataSources && program.dataSources.length > 0 && (
+                              <div className="flex items-center gap-1">
+                                {program.dataSources.map((source) => {
+                                  const config = dataSourceConfig[source] || {
+                                    label: source,
+                                    color: 'bg-slate-500/30 text-slate-300 border-slate-500/50',
+                                  };
+                                  return (
+                                    <span
+                                      key={source}
+                                      className={cn('px-1.5 py-0.5 rounded text-[10px] font-medium border', config.color)}
+                                      title={`Data from: ${source}`}
+                                    >
+                                      {config.label}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            <span className="flex items-center gap-1 text-slate-400">
+                              <Globe className="w-4 h-4" />
+                              {program.scopeCount || program.scopes?.length || 0} scopes
+                            </span>
+                            {program.url && (
+                              <a
+                                href={program.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-primary-400 hover:text-primary-300"
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                                View Program
+                              </a>
+                            )}
+                            {program.createdAt && (
+                              <span className="flex items-center gap-1 text-slate-400">
+                                <Calendar className="w-4 h-4" />
+                                {formatDate(program.createdAt)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/programs/${program._id}`}
+                          className="p-2 text-slate-400 hover:text-primary-400 transition-colors"
+                          title="View Details"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Link>
+                        <button className="p-2 text-slate-400 hover:text-white transition-colors">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
+
+                    {program.scopes && program.scopes.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-dark-800">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs text-slate-500">Scope:</span>
+                          {program.scopes.slice(0, 3).map((s, i) => (
+                            <span key={i} className="px-2 py-1 bg-dark-800 text-xs text-slate-300 rounded">
+                              {s.assetIdentifier}
+                            </span>
+                          ))}
+                          {program.scopes.length > 3 && (
+                            <span className="text-xs text-slate-500">+{program.scopes.length - 3} more</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+
+          {/* Pagination */}
+          {pagination.totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-dark-900/80 rounded-xl border border-dark-800">
+              <div className="flex items-center gap-4 text-sm text-slate-400">
+                <span>
+                  Showing {(pagination.page - 1) * pagination.limit + 1}-
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} programs
+                </span>
+                <div className="flex items-center gap-2">
+                  <span>Per page:</span>
+                  <select
+                    value={pagination.limit}
+                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                    className="px-2 py-1 bg-dark-800 border border-dark-700 rounded text-slate-300 focus:outline-none focus:border-primary-500/50"
+                  >
+                    {PAGE_SIZE_OPTIONS.map((size) => (
+                      <option key={size} value={size}>
+                        {size}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => handlePageChange(1)}
+                  disabled={pagination.page === 1}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="First page"
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.page - 1)}
+                  disabled={pagination.page === 1}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Previous page"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                <div className="flex items-center gap-1 mx-2">
+                  {getPageNumbers().map((pageNum, idx) =>
+                    pageNum === '...' ? (
+                      <span key={`ellipsis-${idx}`} className="px-2 text-slate-500">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={pageNum}
+                        onClick={() => handlePageChange(pageNum as number)}
+                        className={cn(
+                          'min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors',
+                          pagination.page === pageNum
+                            ? 'bg-primary-600 text-white'
+                            : 'text-slate-400 hover:text-white hover:bg-dark-700'
+                        )}
+                      >
+                        {pageNum}
+                      </button>
+                    )
                   )}
                 </div>
-              </motion.div>
-            );
-          })}
 
-          {filteredPrograms.length > 50 && (
-            <div className="text-center py-4">
-              <p className="text-slate-400 text-sm">
-                Showing 50 of {filteredPrograms.length} programs. Use filters to narrow results.
-              </p>
+                <button
+                  onClick={() => handlePageChange(pagination.page + 1)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Next page"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => handlePageChange(pagination.totalPages)}
+                  disabled={pagination.page === pagination.totalPages}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Last page"
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           )}
-        </div>
+        </>
       )}
 
-      {!loading && filteredPrograms.length === 0 && (
+      {!loading && programs.length === 0 && (
         <div className="text-center py-12">
           <Building2 className="w-12 h-12 text-slate-600 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">No programs found</h3>
@@ -347,4 +571,3 @@ export default function ProgramsPage() {
     </div>
   );
 }
-

@@ -44,7 +44,17 @@ export const authApi = {
 
 // Programs API
 export const programsApi = {
-  getAll: (filters?: { status?: string; platform?: string; search?: string }) =>
+  getAll: (filters?: { 
+    status?: string; 
+    platform?: string; 
+    search?: string;
+    offersBounties?: string;
+    dataSource?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }) =>
     api.get('/programs', { params: filters }),
   getById: (id: string) => api.get(`/programs/${id}`),
   create: (data: any) => api.post('/programs', data),

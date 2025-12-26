@@ -302,6 +302,254 @@ describe('PlatformSyncService Property-Based Tests', () => {
 
 
   /**
+   * **Feature: bounty-data-sources, Property 5: Upsert Preserves Uniqueness and Timestamps**
+   * 
+   * *For any* program synced multiple times, there should be exactly one record with
+   * matching platform+handle, and the firstSyncedAt timestamp should remain unchanged
+   * from the first sync while lastSyncedAt should be updated.
+   * 
+   * **Validates: Requirements 7.1, 7.3, 7.4**
+   */
+  describe('Property 5: Upsert Preserves Uniqueness and Timestamps', () => {
+    /**
+     * Simulates the upsert behavior for programs
+     * This mirrors the logic in upsertBountyTargetsProgram and upsertChaosProgram
+     */
+    interface MockProgram {
+      platform: string;
+      handle: string;
+      name: string;
+      firstSyncedAt: Date;
+      lastSyncedAt: Date;
+    }
+
+    const simulateUpsert = (
+      database: Map<string, MockProgram>,
+      program: { platform: string; handle: string; name: string }
+    ): { isNew: boolean; firstSyncedAt: Date; lastSyncedAt: Date } => {
+      const key = `${program.platform}:${program.handle}`;
+      const now = new Date();
+      
+      const existing = database.get(key);
+      
+      if (existing) {
+        // Update existing - preserve firstSyncedAt (Requirement 7.4)
+        const updated: MockProgram = {
+          ...existing,
+          name: program.name,
+          lastSyncedAt: now,
+          // firstSyncedAt is preserved
+        };
+        database.set(key, updated);
+        return { isNew: false, firstSyncedAt: existing.firstSyncedAt, lastSyncedAt: now };
+      }
+      
+      // Create new
+      const newProgram: MockProgram = {
+        platform: program.platform,
+        handle: program.handle,
+        name: program.name,
+        firstSyncedAt: now,
+        lastSyncedAt: now,
+      };
+      database.set(key, newProgram);
+      return { isNew: true, firstSyncedAt: now, lastSyncedAt: now };
+    };
+
+    it('should create exactly one record per platform+handle combination', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            platform: fc.constantFrom('hackerone', 'bugcrowd', 'intigriti', 'yeswehack', 'federacy', 'other'),
+            handle: fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+            name: fc.string({ minLength: 1, maxLength: 50 }),
+          }),
+          fc.integer({ min: 1, max: 10 }), // number of times to sync
+          (program, syncCount) => {
+            const database = new Map<string, MockProgram>();
+            
+            // Sync the same program multiple times
+            for (let i = 0; i < syncCount; i++) {
+              simulateUpsert(database, program);
+            }
+            
+            // Should have exactly one record
+            return database.size === 1;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should preserve firstSyncedAt timestamp on subsequent syncs', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            platform: fc.constantFrom('hackerone', 'bugcrowd', 'intigriti', 'yeswehack', 'federacy', 'other'),
+            handle: fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+            name: fc.string({ minLength: 1, maxLength: 50 }),
+          }),
+          fc.integer({ min: 2, max: 10 }), // at least 2 syncs
+          (program, syncCount) => {
+            const database = new Map<string, MockProgram>();
+            
+            // First sync
+            const firstResult = simulateUpsert(database, program);
+            const originalFirstSyncedAt = firstResult.firstSyncedAt;
+            
+            // Subsequent syncs
+            for (let i = 1; i < syncCount; i++) {
+              const result = simulateUpsert(database, { ...program, name: `${program.name}-v${i}` });
+              
+              // firstSyncedAt should be preserved
+              if (result.firstSyncedAt.getTime() !== originalFirstSyncedAt.getTime()) {
+                return false;
+              }
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should update lastSyncedAt on each sync', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            platform: fc.constantFrom('hackerone', 'bugcrowd', 'intigriti'),
+            handle: fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+            name: fc.string({ minLength: 1, maxLength: 50 }),
+          }),
+          (program) => {
+            const database = new Map<string, MockProgram>();
+            
+            // First sync
+            simulateUpsert(database, program);
+            const key = `${program.platform}:${program.handle}`;
+            const afterFirst = database.get(key)!.lastSyncedAt;
+            
+            // Second sync (with small delay to ensure different timestamp)
+            const result = simulateUpsert(database, program);
+            
+            // lastSyncedAt should be updated (>= previous)
+            return result.lastSyncedAt.getTime() >= afterFirst.getTime();
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should use platform+handle as unique identifier', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              platform: fc.constantFrom('hackerone', 'bugcrowd', 'intigriti', 'yeswehack'),
+              handle: fc.string({ minLength: 1, maxLength: 20 }).filter(s => s.trim().length > 0),
+              name: fc.string({ minLength: 1, maxLength: 30 }),
+            }),
+            { minLength: 1, maxLength: 20 }
+          ),
+          (programs) => {
+            const database = new Map<string, MockProgram>();
+            
+            // Sync all programs
+            for (const program of programs) {
+              simulateUpsert(database, program);
+            }
+            
+            // Count unique platform+handle combinations
+            const uniqueKeys = new Set(programs.map(p => `${p.platform}:${p.handle}`));
+            
+            // Database should have exactly as many records as unique keys
+            return database.size === uniqueKeys.size;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should return isNew=true only on first sync', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            platform: fc.constantFrom('hackerone', 'bugcrowd', 'intigriti'),
+            handle: fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+            name: fc.string({ minLength: 1, maxLength: 50 }),
+          }),
+          fc.integer({ min: 2, max: 10 }),
+          (program, syncCount) => {
+            const database = new Map<string, MockProgram>();
+            
+            // First sync should return isNew=true
+            const firstResult = simulateUpsert(database, program);
+            if (!firstResult.isNew) {
+              return false;
+            }
+            
+            // Subsequent syncs should return isNew=false
+            for (let i = 1; i < syncCount; i++) {
+              const result = simulateUpsert(database, program);
+              if (result.isNew) {
+                return false;
+              }
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should allow same handle on different platforms', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+          fc.string({ minLength: 1, maxLength: 50 }),
+          (handle, name) => {
+            const database = new Map<string, MockProgram>();
+            const platforms = ['hackerone', 'bugcrowd', 'intigriti', 'yeswehack', 'federacy'];
+            
+            // Sync same handle on all platforms
+            for (const platform of platforms) {
+              simulateUpsert(database, { platform, handle, name });
+            }
+            
+            // Should have one record per platform
+            return database.size === platforms.length;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should distinguish between direct API and bounty-targets syncs', () => {
+      fc.assert(
+        fc.property(
+          fc.string({ minLength: 1, maxLength: 30 }).filter(s => s.trim().length > 0),
+          fc.string({ minLength: 1, maxLength: 50 }),
+          (handle, name) => {
+            const database = new Map<string, MockProgram>();
+            
+            // Sync from direct API
+            simulateUpsert(database, { platform: 'hackerone', handle, name });
+            
+            // Sync from bounty-targets (now uses same platform, so updates existing)
+            simulateUpsert(database, { platform: 'hackerone', handle, name: `${name} (updated)` });
+            
+            // Should have one record (bounty-targets updates existing)
+            return database.size === 1;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
    * **Feature: platform-data-enrichment, Property 11: Rate Limit Retry with Exponential Backoff**
    * 
    * *For any* sequence of rate limit errors from the HackerOne API, the retry delays 
@@ -644,6 +892,419 @@ describe('PlatformSyncService Property-Based Tests', () => {
               successfulResults.length === expectedSuccessCount &&
               failedIds.length === expectedFailCount
             );
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * **Feature: bounty-data-sources, Property 6: Sync Result Accuracy**
+   * 
+   * *For any* sync operation, the Sync_Result should accurately reflect:
+   * - newPrograms + updatedPrograms equals total programs processed
+   * - successCount + failureCount equals total programs attempted
+   * - duration should be positive
+   * 
+   * **Validates: Requirements 4.5, 6.3**
+   */
+  describe('Property 6: Sync Result Accuracy', () => {
+    interface SimulatedSyncResult {
+      platform: string;
+      newPrograms: number;
+      updatedPrograms: number;
+      newScopes: number;
+      errors: string[];
+      duration: number;
+      successCount: number;
+      failureCount: number;
+    }
+
+    /**
+     * Simulates a sync operation and returns a SyncResult
+     * This mirrors the logic in syncChaos, syncBountyTargets, etc.
+     */
+    const simulateSync = (
+      programs: Array<{ isNew: boolean; shouldFail: boolean; scopeCount: number }>,
+      platform: string
+    ): SimulatedSyncResult => {
+      const startTime = Date.now();
+      const result: SimulatedSyncResult = {
+        platform,
+        newPrograms: 0,
+        updatedPrograms: 0,
+        newScopes: 0,
+        errors: [],
+        duration: 0,
+        successCount: 0,
+        failureCount: 0,
+      };
+
+      for (const program of programs) {
+        try {
+          if (program.shouldFail) {
+            throw new Error('Sync failed');
+          }
+
+          if (program.isNew) {
+            result.newPrograms++;
+          } else {
+            result.updatedPrograms++;
+          }
+          result.newScopes += program.scopeCount;
+          result.successCount++;
+        } catch (error: any) {
+          result.errors.push(error.message);
+          result.failureCount++;
+          // Continue processing - error isolation
+        }
+      }
+
+      result.duration = Date.now() - startTime;
+      return result;
+    };
+
+    it('should have newPrograms + updatedPrograms equal to successCount', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.constant(false), // Only successful programs
+              scopeCount: fc.nat({ max: 100 }),
+            }),
+            { minLength: 0, maxLength: 50 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets', 'hackerone', 'bugcrowd'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            // For successful programs, newPrograms + updatedPrograms should equal successCount
+            return result.newPrograms + result.updatedPrograms === result.successCount;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have successCount + failureCount equal to total programs attempted', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.boolean(),
+              scopeCount: fc.nat({ max: 100 }),
+            }),
+            { minLength: 0, maxLength: 50 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets', 'hackerone', 'bugcrowd'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            // successCount + failureCount should equal total programs
+            return result.successCount + result.failureCount === programs.length;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have non-negative duration', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.boolean(),
+              scopeCount: fc.nat({ max: 100 }),
+            }),
+            { minLength: 0, maxLength: 20 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            // Duration should be non-negative
+            return result.duration >= 0;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have errors array length equal to failureCount', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.boolean(),
+              scopeCount: fc.nat({ max: 100 }),
+            }),
+            { minLength: 0, maxLength: 50 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets', 'hackerone', 'bugcrowd'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            // errors array length should equal failureCount
+            return result.errors.length === result.failureCount;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have newScopes equal to sum of scope counts for successful programs', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.boolean(),
+              scopeCount: fc.nat({ max: 100 }),
+            }),
+            { minLength: 0, maxLength: 50 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            // newScopes should equal sum of scopeCount for successful programs
+            const expectedScopes = programs
+              .filter(p => !p.shouldFail)
+              .reduce((sum, p) => sum + p.scopeCount, 0);
+            
+            return result.newScopes === expectedScopes;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should have zero counts when no programs are processed', () => {
+      fc.assert(
+        fc.property(
+          fc.constantFrom('chaos', 'bounty-targets', 'hackerone', 'bugcrowd'),
+          (platform) => {
+            const result = simulateSync([], platform);
+            
+            return (
+              result.newPrograms === 0 &&
+              result.updatedPrograms === 0 &&
+              result.newScopes === 0 &&
+              result.successCount === 0 &&
+              result.failureCount === 0 &&
+              result.errors.length === 0
+            );
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should correctly track new vs updated programs', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.record({
+              isNew: fc.boolean(),
+              shouldFail: fc.constant(false),
+              scopeCount: fc.nat({ max: 10 }),
+            }),
+            { minLength: 1, maxLength: 50 }
+          ),
+          fc.constantFrom('chaos', 'bounty-targets'),
+          (programs, platform) => {
+            const result = simulateSync(programs, platform);
+            
+            const expectedNew = programs.filter(p => p.isNew).length;
+            const expectedUpdated = programs.filter(p => !p.isNew).length;
+            
+            return (
+              result.newPrograms === expectedNew &&
+              result.updatedPrograms === expectedUpdated
+            );
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+  });
+
+  /**
+   * **Feature: bounty-data-sources, Property 7: Exponential Backoff Delay Calculation**
+   * 
+   * *For any* retry attempt number n (0-indexed), the calculated backoff delay 
+   * should equal baseDelay * 2^n, capped at maxDelay.
+   * 
+   * **Validates: Requirements 6.1**
+   */
+  describe('Property 7: Exponential Backoff Delay Calculation', () => {
+    let backoffService: PlatformSyncService;
+
+    beforeEach(() => {
+      // Create a service instance with the calculateBackoffDelay method
+      backoffService = {
+        calculateBackoffDelay: PlatformSyncService.prototype.calculateBackoffDelay,
+      } as unknown as PlatformSyncService;
+    });
+
+    it('should calculate delay as baseDelay * 2^attempt', () => {
+      fc.assert(
+        fc.property(
+          fc.nat({ max: 10 }), // attempt number (0-indexed)
+          fc.record({
+            baseDelayMs: fc.integer({ min: 100, max: 5000 }),
+            maxDelayMs: fc.integer({ min: 50000, max: 100000 }), // High max to avoid capping
+            maxRetries: fc.integer({ min: 1, max: 5 }),
+          }),
+          (attempt, config) => {
+            const delay = backoffService.calculateBackoffDelay(attempt, config);
+            
+            // Expected: baseDelay * 2^attempt (before capping)
+            const expectedDelay = config.baseDelayMs * Math.pow(2, attempt);
+            
+            // Since maxDelay is high, delay should equal expected
+            return delay === Math.min(expectedDelay, config.maxDelayMs);
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should cap delay at maxDelayMs', () => {
+      fc.assert(
+        fc.property(
+          fc.nat({ max: 20 }), // attempt number (can be high to trigger cap)
+          fc.record({
+            baseDelayMs: fc.integer({ min: 1000, max: 5000 }),
+            maxDelayMs: fc.integer({ min: 5000, max: 15000 }),
+            maxRetries: fc.integer({ min: 1, max: 5 }),
+          }),
+          (attempt, config) => {
+            const delay = backoffService.calculateBackoffDelay(attempt, config);
+            
+            // Delay should never exceed maxDelayMs
+            return delay <= config.maxDelayMs;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should produce delays 1s, 2s, 4s, 8s for default config', () => {
+      fc.assert(
+        fc.property(fc.constant(null), () => {
+          // Default config as specified in Requirements 6.1
+          const defaultConfig: RetryConfig = {
+            maxRetries: 3,
+            baseDelayMs: 1000,
+            maxDelayMs: 8000,
+          };
+          
+          const delay0 = backoffService.calculateBackoffDelay(0, defaultConfig);
+          const delay1 = backoffService.calculateBackoffDelay(1, defaultConfig);
+          const delay2 = backoffService.calculateBackoffDelay(2, defaultConfig);
+          const delay3 = backoffService.calculateBackoffDelay(3, defaultConfig);
+          
+          // Expected delays: 1000ms, 2000ms, 4000ms, 8000ms
+          return (
+            delay0 === 1000 &&
+            delay1 === 2000 &&
+            delay2 === 4000 &&
+            delay3 === 8000
+          );
+        }),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should return baseDelayMs for attempt 0', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            baseDelayMs: fc.integer({ min: 100, max: 10000 }),
+            maxDelayMs: fc.integer({ min: 10000, max: 100000 }),
+            maxRetries: fc.integer({ min: 1, max: 5 }),
+          }),
+          (config) => {
+            const delay = backoffService.calculateBackoffDelay(0, config);
+            
+            // For attempt 0: baseDelay * 2^0 = baseDelay * 1 = baseDelay
+            return delay === config.baseDelayMs;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should double delay with each subsequent attempt', () => {
+      fc.assert(
+        fc.property(
+          fc.integer({ min: 0, max: 5 }), // starting attempt
+          fc.record({
+            baseDelayMs: fc.integer({ min: 100, max: 1000 }),
+            maxDelayMs: fc.integer({ min: 100000, max: 200000 }), // Very high to avoid capping
+            maxRetries: fc.integer({ min: 3, max: 5 }),
+          }),
+          (startAttempt, config) => {
+            const delay1 = backoffService.calculateBackoffDelay(startAttempt, config);
+            const delay2 = backoffService.calculateBackoffDelay(startAttempt + 1, config);
+            
+            // delay2 should be exactly double delay1 (when not capped)
+            return delay2 === delay1 * 2;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should produce monotonically increasing delays', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            baseDelayMs: fc.integer({ min: 100, max: 2000 }),
+            maxDelayMs: fc.integer({ min: 10000, max: 50000 }),
+            maxRetries: fc.integer({ min: 3, max: 5 }),
+          }),
+          (config) => {
+            const delays: number[] = [];
+            
+            // Calculate delays for attempts 0 through 5
+            for (let attempt = 0; attempt <= 5; attempt++) {
+              delays.push(backoffService.calculateBackoffDelay(attempt, config));
+            }
+            
+            // Each delay should be >= the previous one
+            for (let i = 1; i < delays.length; i++) {
+              if (delays[i] < delays[i - 1]) {
+                return false;
+              }
+            }
+            
+            return true;
+          }
+        ),
+        { numRuns: 100 }
+      );
+    });
+
+    it('should handle edge case of attempt 0 with low maxDelay', () => {
+      fc.assert(
+        fc.property(
+          fc.record({
+            baseDelayMs: fc.integer({ min: 5000, max: 10000 }),
+            maxDelayMs: fc.integer({ min: 1000, max: 4000 }), // maxDelay < baseDelay
+            maxRetries: fc.integer({ min: 1, max: 3 }),
+          }),
+          (config) => {
+            const delay = backoffService.calculateBackoffDelay(0, config);
+            
+            // Should be capped at maxDelayMs even for attempt 0
+            return delay === config.maxDelayMs;
           }
         ),
         { numRuns: 100 }

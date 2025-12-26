@@ -87,6 +87,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
             },
           },
           {
+            name: 'watchtower.platform-sync',
+            options: {
+              durable: true,
+              arguments: {
+                'x-dead-letter-exchange': 'watchtower.dlx',
+                'x-dead-letter-routing-key': 'dlq',
+              },
+            },
+          },
+          {
             name: 'watchtower.dlq',
             options: {
               durable: true,

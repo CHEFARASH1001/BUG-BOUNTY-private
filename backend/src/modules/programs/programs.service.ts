@@ -28,26 +28,50 @@ export class ProgramsService {
     status?: string;
     platform?: string;
     search?: string;
-  }): Promise<any[]> {
+    offersBounties?: string;
+    dataSource?: string;
+    page?: number;
+    limit?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<{ data: any[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const query: any = {};
+    const page = filters?.page || 1;
+    const limit = filters?.limit || 50;
+    const skip = (page - 1) * limit;
+    const sortBy = filters?.sortBy || 'createdAt';
+    const sortOrder = filters?.sortOrder === 'asc' ? 1 : -1;
 
     if (filters?.status) {
       query.status = filters.status;
     }
     if (filters?.platform) {
-      query.platform = filters.platform;
+      // Case-insensitive platform matching
+      query.platform = { $regex: new RegExp(`^${filters.platform}`, 'i') };
     }
     if (filters?.search) {
       query.$or = [
         { name: { $regex: filters.search, $options: 'i' } },
+        { handle: { $regex: filters.search, $options: 'i' } },
         { description: { $regex: filters.search, $options: 'i' } },
       ];
     }
+    if (filters?.offersBounties !== undefined && filters.offersBounties !== '') {
+      query.offersBounties = filters.offersBounties === 'true';
+    }
+    if (filters?.dataSource) {
+      query.dataSources = filters.dataSource;
+    }
 
-    // Use aggregation to include scope counts
+    // Get total count for pagination
+    const total = await this.programModel.countDocuments(query).exec();
+
+    // Use aggregation to include scope counts with pagination
     const programs = await this.programModel.aggregate([
       { $match: query },
-      { $sort: { createdAt: -1 } },
+      { $sort: { [sortBy]: sortOrder } },
+      { $skip: skip },
+      { $limit: limit },
       {
         $lookup: {
           from: 'scopes',
@@ -61,7 +85,7 @@ export class ProgramsService {
           scopeCount: { $size: '$scopesList' },
           scopes: {
             $map: {
-              input: { $slice: ['$scopesList', 10] }, // Limit to first 10 for preview
+              input: { $slice: ['$scopesList', 10] },
               as: 'scope',
               in: {
                 assetIdentifier: '$$scope.target',
@@ -74,12 +98,20 @@ export class ProgramsService {
       },
       {
         $project: {
-          scopesList: 0, // Remove the full list to reduce payload
+          scopesList: 0,
         },
       },
     ]).exec();
 
-    return programs;
+    return {
+      data: programs,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findById(id: string): Promise<ProgramDocument> {
@@ -105,7 +137,6 @@ export class ProgramsService {
     if (!result) {
       throw new NotFoundException('Program not found');
     }
-    // Also delete associated domains
     await this.domainModel.deleteMany({ programId: new Types.ObjectId(id) }).exec();
   }
 
@@ -143,12 +174,12 @@ export class ProgramsService {
   }
 
   async getDomains(id: string): Promise<DomainDocument[]> {
-    await this.findById(id); // Verify program exists
+    await this.findById(id);
     return this.domainModel.find({ programId: new Types.ObjectId(id) }).exec();
   }
 
   async getVulnerabilities(id: string): Promise<VulnerabilityDocument[]> {
-    await this.findById(id); // Verify program exists
+    await this.findById(id);
     return this.vulnModel
       .find({ programId: new Types.ObjectId(id) })
       .sort({ severity: 1, createdAt: -1 })
@@ -156,7 +187,7 @@ export class ProgramsService {
   }
 
   async getScopes(id: string): Promise<ScopeDocument[]> {
-    await this.findById(id); // Verify program exists
+    await this.findById(id);
     return this.scopeModel
       .find({ programId: new Types.ObjectId(id) })
       .sort({ status: 1, target: 1 })
@@ -176,4 +207,3 @@ export class ProgramsService {
     });
   }
 }
-

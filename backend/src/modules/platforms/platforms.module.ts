@@ -2,7 +2,10 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { HackerOneService } from './services/hackerone.service';
 import { BugcrowdService } from './services/bugcrowd.service';
+import { ChaosService } from './services/chaos.service';
+import { BountyTargetsService } from './services/bounty-targets.service';
 import { PlatformSyncService } from './platform-sync.service';
+import { PlatformSyncWorker } from './platform-sync.worker';
 import { PlatformsController } from './platforms.controller';
 import { Program, ProgramSchema } from '../../schemas/program.schema';
 import { Scope, ScopeSchema } from '../../schemas/scope.schema';
@@ -24,11 +27,16 @@ import { NotificationsModule } from '../notifications/notifications.module';
   providers: [
     HackerOneService,
     BugcrowdService,
+    ChaosService,
+    BountyTargetsService,
     PlatformSyncService,
+    PlatformSyncWorker,
   ],
   exports: [
     HackerOneService,
     BugcrowdService,
+    ChaosService,
+    BountyTargetsService,
     PlatformSyncService,
   ],
 })

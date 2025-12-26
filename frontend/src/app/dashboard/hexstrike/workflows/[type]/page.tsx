@@ -362,6 +362,137 @@ export default function WorkflowExecutionPage() {
   }, []);
 
 
+  // Execute tools from assessment and capture results
+  const executeToolsFromAssessment = async (assessment: any, targetDomain: string) => {
+    // Collect all unique tools from the assessment
+    const toolsToRun: { tool: string; priority: number }[] = [];
+    
+    // Get tools from vulnerability tests (highest priority)
+    if (assessment.vulnerability_hunting?.vulnerability_tests) {
+      assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
+        if (test.tools) {
+          test.tools.forEach((tool: string) => {
+            if (!toolsToRun.find(t => t.tool === tool)) {
+              toolsToRun.push({ tool, priority: test.priority || 5 });
+            }
+          });
+        }
+      });
+    }
+
+    // Sort by priority (highest first)
+    toolsToRun.sort((a, b) => b.priority - a.priority);
+
+    // Limit to top tools to avoid overwhelming
+    const toolsToExecute = toolsToRun.slice(0, 5);
+
+    if (toolsToExecute.length === 0) {
+      setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ No tools to execute from assessment`]);
+      return;
+    }
+
+    setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] 🔧 Executing ${toolsToExecute.length} priority tools...`]);
+
+    // Execute each tool sequentially
+    for (const { tool } of toolsToExecute) {
+      setRunningTools((prev) => new Set(prev).add(tool));
+      setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] 🔧 Running ${tool} on ${targetDomain}...`]);
+
+      // Update execution step status
+      setExecution((prev) => {
+        if (!prev) return prev;
+        const stepIdx = prev.steps.findIndex(s => s.tool === tool);
+        if (stepIdx >= 0) {
+          const updatedSteps = [...prev.steps];
+          updatedSteps[stepIdx] = { ...updatedSteps[stepIdx], status: 'running' as StepStatus };
+          return { ...prev, steps: updatedSteps, currentStep: stepIdx };
+        }
+        return prev;
+      });
+
+      try {
+        const response = await hexstrikeApi.executeTool(tool, {
+          target: targetDomain,
+          parameters: { url: targetDomain, domain: targetDomain },
+        });
+
+        const result = response.data;
+        setToolResults((prev) => ({ ...prev, [tool]: result }));
+
+        // Update execution step with results
+        setExecution((prev) => {
+          if (!prev) return prev;
+          const stepIdx = prev.steps.findIndex(s => s.tool === tool);
+          if (stepIdx >= 0) {
+            const updatedSteps = [...prev.steps];
+            updatedSteps[stepIdx] = { 
+              ...updatedSteps[stepIdx], 
+              status: 'completed' as StepStatus,
+              output: result.output || result.error || 'Completed',
+              results: result
+            };
+            return { ...prev, steps: updatedSteps };
+          }
+          return prev;
+        });
+
+        if (result.output) {
+          const outputLines = result.output.split('\n').filter((l: string) => l.trim()).slice(0, 10);
+          setLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] ✅ ${tool} completed`,
+            ...outputLines.map((line: string) => `   ${line}`),
+            outputLines.length < result.output.split('\n').filter((l: string) => l.trim()).length
+              ? `   ... (${result.output.split('\n').filter((l: string) => l.trim()).length - 10} more lines)`
+              : '',
+          ].filter(Boolean));
+        } else if (result.error) {
+          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ⚠️ ${tool}: ${result.error}`]);
+        } else {
+          setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ✅ ${tool} completed (no output)`]);
+        }
+      } catch (err: any) {
+        const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ❌ ${tool} failed: ${errorMsg}`]);
+        
+        // Update step as failed
+        setExecution((prev) => {
+          if (!prev) return prev;
+          const stepIdx = prev.steps.findIndex(s => s.tool === tool);
+          if (stepIdx >= 0) {
+            const updatedSteps = [...prev.steps];
+            updatedSteps[stepIdx] = { 
+              ...updatedSteps[stepIdx], 
+              status: 'failed' as StepStatus,
+              error: errorMsg
+            };
+            return { ...prev, steps: updatedSteps };
+          }
+          return prev;
+        });
+      } finally {
+        setRunningTools((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(tool);
+          return newSet;
+        });
+      }
+    }
+
+    // Mark execution as completed
+    setExecution((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        status: 'completed',
+        endTime: new Date().toISOString(),
+        currentStep: prev.totalSteps
+      };
+    });
+
+    setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ✅ All tools completed`]);
+  };
+
   // Start workflow execution
   const handleStart = async () => {
     if (!validateForm()) return;
@@ -369,6 +500,7 @@ export default function WorkflowExecutionPage() {
     setExecuting(true);
     setError(null);
     setExecution(null);
+    setToolResults({});
     setLogs([`[${new Date().toLocaleTimeString()}] 🚀 Starting ${workflowType} workflow for target: ${target.trim()}`]);
     setActiveTab('logs'); // Switch to logs tab when starting
 
@@ -378,62 +510,80 @@ export default function WorkflowExecutionPage() {
         options,
       });
 
-      // Initialize execution state with mock steps
-      const mockSteps: WorkflowStep[] = (workflow?.requiredTools || ['nmap', 'nuclei', 'ffuf']).map((tool, idx) => ({
+      // Log the assessment results
+      const assessment = response.data.assessment || response.data;
+      setAssessmentData(assessment);
+      
+      // Collect tools from assessment for steps
+      const toolsFromAssessment: string[] = [];
+      if (assessment.vulnerability_hunting?.vulnerability_tests) {
+        assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
+          if (test.tools) {
+            test.tools.forEach((tool: string) => {
+              if (!toolsFromAssessment.includes(tool)) {
+                toolsFromAssessment.push(tool);
+              }
+            });
+          }
+        });
+      }
+      
+      // Use assessment tools or fallback to workflow required tools
+      const toolsToUse = toolsFromAssessment.length > 0 
+        ? toolsFromAssessment.slice(0, 5) 
+        : (workflow?.requiredTools || ['nmap', 'nuclei', 'ffuf']);
+
+      // Initialize execution state with real steps
+      const steps: WorkflowStep[] = toolsToUse.map((tool, idx) => ({
         id: `step-${idx}`,
         tool,
         displayName: tool.charAt(0).toUpperCase() + tool.slice(1),
-        status: idx === 0 ? 'running' : 'pending',
+        status: 'pending' as StepStatus,
       }));
 
       const newExecution: WorkflowExecution = {
         id: response.data.id || `exec-${Date.now()}`,
         type: workflowType,
         target: target.trim(),
-        status: 'completed', // Workflow returns immediately with assessment
-        currentStep: mockSteps.length,
-        totalSteps: mockSteps.length,
-        steps: mockSteps.map(s => ({ ...s, status: 'completed' as StepStatus })),
+        status: 'running',
+        currentStep: 0,
+        totalSteps: steps.length,
+        steps,
         startTime: new Date().toISOString(),
-        endTime: new Date().toISOString(),
         findings: [],
         pid: response.data.pid,
       };
 
       setExecution(newExecution);
       
-      // Log the assessment results
-      if (response.data.assessment) {
-        const assessment = response.data.assessment;
-        setAssessmentData(assessment);
-        setLogs((prev) => [
-          ...prev,
-          `[${new Date().toLocaleTimeString()}] ✅ Assessment completed for ${target.trim()}`,
-          `[${new Date().toLocaleTimeString()}] 📊 Summary:`,
-          `   - Total tools: ${assessment.summary?.total_tools || 'N/A'}`,
-          `   - Workflow count: ${assessment.summary?.workflow_count || 'N/A'}`,
-          `   - Priority score: ${assessment.summary?.priority_score || 'N/A'}`,
-          `   - Estimated time: ${Math.round((assessment.summary?.total_estimated_time || 0) / 60)} minutes`,
-          `[${new Date().toLocaleTimeString()}] 🔍 Reconnaissance phases: ${assessment.reconnaissance?.phases?.length || 0}`,
-          `[${new Date().toLocaleTimeString()}] 🐛 Vulnerability tests: ${assessment.vulnerability_hunting?.vulnerability_tests?.length || 0}`,
-          `[${new Date().toLocaleTimeString()}] 🕵️ OSINT phases: ${assessment.osint?.osint_phases?.length || 0}`,
-          `[${new Date().toLocaleTimeString()}] 💼 Business logic tests: ${assessment.business_logic?.business_logic_tests?.length || 0}`,
-        ]);
-        
-        // Log detailed vulnerability tests
-        if (assessment.vulnerability_hunting?.vulnerability_tests) {
-          assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
-            setLogs((prev) => [
-              ...prev,
-              `[${new Date().toLocaleTimeString()}] 🎯 ${test.vulnerability_type?.toUpperCase()}: Priority ${test.priority}, Tools: ${test.tools?.join(', ') || 'N/A'}`,
-            ]);
-          });
-        }
-      } else {
-        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ✅ Workflow completed`]);
+      setLogs((prev) => [
+        ...prev,
+        `[${new Date().toLocaleTimeString()}] ✅ Assessment completed for ${target.trim()}`,
+        `[${new Date().toLocaleTimeString()}] 📊 Summary:`,
+        `   - Total tools: ${assessment.summary?.total_tools || 'N/A'}`,
+        `   - Workflow count: ${assessment.summary?.workflow_count || 'N/A'}`,
+        `   - Priority score: ${assessment.summary?.priority_score || 'N/A'}`,
+        `   - Estimated time: ${Math.round((assessment.summary?.total_estimated_time || 0) / 60)} minutes`,
+        `[${new Date().toLocaleTimeString()}] 🔍 Reconnaissance phases: ${assessment.reconnaissance?.phases?.length || 0}`,
+        `[${new Date().toLocaleTimeString()}] 🐛 Vulnerability tests: ${assessment.vulnerability_hunting?.vulnerability_tests?.length || 0}`,
+        `[${new Date().toLocaleTimeString()}] 🕵️ OSINT phases: ${assessment.osint?.osint_phases?.length || 0}`,
+        `[${new Date().toLocaleTimeString()}] 💼 Business logic tests: ${assessment.business_logic?.business_logic_tests?.length || 0}`,
+      ]);
+      
+      // Log detailed vulnerability tests
+      if (assessment.vulnerability_hunting?.vulnerability_tests) {
+        assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
+          setLogs((prev) => [
+            ...prev,
+            `[${new Date().toLocaleTimeString()}] 🎯 ${test.vulnerability_type?.toUpperCase()}: Priority ${test.priority}, Tools: ${test.tools?.join(', ') || 'N/A'}`,
+          ]);
+        });
       }
 
-      // Switch to report tab
+      // Now execute the tools and capture results
+      await executeToolsFromAssessment(assessment, target.trim());
+
+      // Switch to report tab after completion
       setActiveTab('report');
     } catch (err: any) {
       console.error('Workflow start failed:', err);
@@ -502,60 +652,92 @@ export default function WorkflowExecutionPage() {
   };
 
 
-  // Generate report from assessment data
+  // Generate report from assessment data and tool results
   const generateReport = (): WorkflowReport | null => {
     if (!execution || execution.status !== 'completed') return null;
 
-    // Use real assessment data if available
-    if (assessmentData) {
-      const findings: Finding[] = [];
-      
-      // Extract findings from vulnerability tests
-      if (assessmentData.vulnerability_hunting?.vulnerability_tests) {
-        assessmentData.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
-          findings.push({
-            name: `${test.vulnerability_type?.toUpperCase()} Testing Plan`,
-            severity: test.priority >= 9 ? 'critical' : test.priority >= 7 ? 'high' : test.priority >= 5 ? 'medium' : 'low',
-            description: `${test.test_scenarios?.length || 0} test scenarios with ${test.tools?.length || 0} tools`,
-            tool: test.tools?.join(', ') || 'N/A',
-          });
+    const findings: Finding[] = [];
+    const recommendations: string[] = [];
+
+    // Add findings from actual tool results first
+    Object.entries(toolResults).forEach(([tool, result]) => {
+      if (result.output && result.output.trim()) {
+        // Parse output for potential findings
+        const output = result.output;
+        
+        // Check for vulnerability indicators in output
+        const vulnPatterns = [
+          { pattern: /critical|CRITICAL/gi, severity: 'critical' as const },
+          { pattern: /high|HIGH/gi, severity: 'high' as const },
+          { pattern: /medium|MEDIUM/gi, severity: 'medium' as const },
+          { pattern: /low|LOW/gi, severity: 'low' as const },
+          { pattern: /vuln|vulnerability|CVE-/gi, severity: 'medium' as const },
+          { pattern: /injection|sqli|xss|rce|ssrf|idor/gi, severity: 'high' as const },
+        ];
+
+        let foundSeverity: 'critical' | 'high' | 'medium' | 'low' | 'info' = 'info';
+        for (const { pattern, severity } of vulnPatterns) {
+          if (pattern.test(output)) {
+            foundSeverity = severity;
+            break;
+          }
+        }
+
+        // Extract first meaningful lines as description
+        const lines = output.split('\n').filter((l: string) => l.trim()).slice(0, 3);
+        const description = lines.join(' ').slice(0, 200) || `${tool} scan completed`;
+
+        findings.push({
+          name: `${tool.charAt(0).toUpperCase() + tool.slice(1)} Scan Results`,
+          severity: foundSeverity,
+          description,
+          tool,
+          evidence: output.slice(0, 500),
+        });
+      } else if (result.error) {
+        findings.push({
+          name: `${tool.charAt(0).toUpperCase() + tool.slice(1)} Error`,
+          severity: 'info',
+          description: result.error,
+          tool,
         });
       }
+    });
 
-      const recommendations: string[] = [];
-      
-      // Add recommendations based on assessment
-      if (assessmentData.reconnaissance?.phases) {
-        recommendations.push(`Run ${assessmentData.reconnaissance.phases.length} reconnaissance phases for comprehensive coverage`);
-      }
-      if (assessmentData.osint?.osint_phases) {
-        recommendations.push(`Execute ${assessmentData.osint.osint_phases.length} OSINT gathering phases`);
-      }
-      if (assessmentData.business_logic?.business_logic_tests) {
-        recommendations.push(`Perform ${assessmentData.business_logic.business_logic_tests.length} business logic test categories`);
-      }
-
-      return {
-        workflowType: execution.type,
-        target: execution.target,
-        executionDuration: 0,
-        stepsCompleted: execution.currentStep,
-        totalSteps: execution.totalSteps,
-        findings,
-        recommendations,
-        summary: `Assessment completed for ${execution.target}. Identified ${findings.length} vulnerability categories to test with ${assessmentData.summary?.total_tools || 0} tools. Estimated time: ${Math.round((assessmentData.summary?.total_estimated_time || 0) / 60)} minutes.`,
-      };
+    // Add findings from assessment data if no tool results
+    if (findings.length === 0 && assessmentData?.vulnerability_hunting?.vulnerability_tests) {
+      assessmentData.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
+        findings.push({
+          name: `${test.vulnerability_type?.toUpperCase()} Testing Plan`,
+          severity: test.priority >= 9 ? 'critical' : test.priority >= 7 ? 'high' : test.priority >= 5 ? 'medium' : 'low',
+          description: `${test.test_scenarios?.length || 0} test scenarios with ${test.tools?.length || 0} tools`,
+          tool: test.tools?.join(', ') || 'N/A',
+        });
+      });
     }
 
-    // Fallback mock report
-    const mockFindings: Finding[] = [
-      {
-        name: 'Open Port Detected',
-        severity: 'info',
-        description: 'Port 443 (HTTPS) is open and accessible',
-        tool: 'nmap',
-      },
-    ];
+    // Generate recommendations based on results
+    if (Object.keys(toolResults).length > 0) {
+      recommendations.push('Review the tool outputs for potential vulnerabilities');
+      
+      const failedTools = execution.steps.filter(s => s.status === 'failed');
+      if (failedTools.length > 0) {
+        recommendations.push(`Retry failed tools: ${failedTools.map(s => s.tool).join(', ')}`);
+      }
+    }
+
+    if (assessmentData?.reconnaissance?.phases) {
+      recommendations.push(`Run ${assessmentData.reconnaissance.phases.length} reconnaissance phases for comprehensive coverage`);
+    }
+    if (assessmentData?.osint?.osint_phases) {
+      recommendations.push(`Execute ${assessmentData.osint.osint_phases.length} OSINT gathering phases`);
+    }
+    if (assessmentData?.business_logic?.business_logic_tests) {
+      recommendations.push(`Perform ${assessmentData.business_logic.business_logic_tests.length} business logic test categories`);
+    }
+
+    const toolsExecuted = Object.keys(toolResults).length;
+    const toolsWithOutput = Object.values(toolResults).filter((r: any) => r.output?.trim()).length;
 
     return {
       workflowType: execution.type,
@@ -563,11 +745,13 @@ export default function WorkflowExecutionPage() {
       executionDuration: execution.startTime && execution.endTime
         ? Math.floor((new Date(execution.endTime).getTime() - new Date(execution.startTime).getTime()) / 1000)
         : 0,
-      stepsCompleted: execution.currentStep,
+      stepsCompleted: execution.steps.filter(s => s.status === 'completed').length,
       totalSteps: execution.totalSteps,
-      findings: mockFindings,
-      recommendations: ['Review the assessment plan and execute recommended tools'],
-      summary: `Completed ${execution.type} workflow on ${execution.target}.`,
+      findings,
+      recommendations,
+      summary: toolsExecuted > 0 
+        ? `Executed ${toolsExecuted} tools on ${execution.target}. ${toolsWithOutput} tools returned output. ${findings.length} findings identified.`
+        : `Assessment completed for ${execution.target}. Identified ${findings.length} vulnerability categories to test with ${assessmentData?.summary?.total_tools || 0} tools.`,
     };
   };
 
@@ -575,6 +759,7 @@ export default function WorkflowExecutionPage() {
   const renderFinding = (finding: Finding, index: number) => {
     const colors = severityColors[finding.severity] || severityColors.info;
     const tools = finding.tool.split(', ').filter(t => t && t !== 'N/A');
+    const hasEvidence = finding.evidence && finding.evidence.trim();
     
     return (
       <div key={index} className={cn('p-4 rounded-lg border', colors.bg, colors.border)}>
@@ -585,12 +770,24 @@ export default function WorkflowExecutionPage() {
           </span>
         </div>
         <p className="text-sm text-slate-400 mb-2">{finding.description}</p>
-        <div className="flex items-center justify-between">
+        
+        {/* Show evidence/output if available */}
+        {hasEvidence && (
+          <div className="mt-3 p-2 bg-dark-900/50 rounded text-xs">
+            <div className="text-green-400 mb-1">📋 Tool Output:</div>
+            <pre className="text-slate-400 overflow-x-auto whitespace-pre-wrap max-h-48 overflow-y-auto font-mono">
+              {finding.evidence}
+              {finding.evidence && finding.evidence.length >= 500 && '...'}
+            </pre>
+          </div>
+        )}
+        
+        <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Wrench className="w-3.5 h-3.5" />
-            <span>Tools: {finding.tool}</span>
+            <span>Tool: {finding.tool}</span>
           </div>
-          {tools.length > 0 && (
+          {tools.length > 0 && !hasEvidence && (
             <div className="flex gap-1">
               {tools.slice(0, 2).map((tool) => (
                 <button
@@ -620,15 +817,6 @@ export default function WorkflowExecutionPage() {
             </div>
           )}
         </div>
-        {toolResults[tools[0]] && (
-          <div className="mt-3 p-2 bg-dark-900/50 rounded text-xs">
-            <div className="text-green-400 mb-1">✅ Scan completed</div>
-            <pre className="text-slate-400 overflow-x-auto whitespace-pre-wrap max-h-32 overflow-y-auto">
-              {toolResults[tools[0]].output?.slice(0, 500) || 'No output'}
-              {toolResults[tools[0]].output?.length > 500 && '...'}
-            </pre>
-          </div>
-        )}
         {finding.remediation && (
           <div className="mt-2 p-2 bg-dark-900/50 rounded text-xs text-slate-400">
             <span className="text-slate-500">Remediation:</span> {finding.remediation}

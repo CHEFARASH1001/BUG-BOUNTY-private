@@ -87,6 +87,33 @@ services:
           cpus: '1'
           memory: 512M
 
+  # Platform Sync Workers - Scalable workers for parallel program sync
+  # Scale with: docker-compose -f docker-compose.dev.yml up -d --scale platform-sync-worker=5
+  platform-sync-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongodb:27017/bugbounty
+      RABBITMQ_URL: amqp://bugbounty:bugbounty2024@rabbitmq:5672/watchtower
+      WORKER_ID: platform-sync-worker-${HOSTNAME:-default}
+    command: ["npm", "run", "start:platform-sync-worker"]
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      - mongodb
+      - rabbitmq
+    networks:
+      - bb-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
   # Subfinder - Subdomain Discovery Tool (for direct CLI usage)
   subfinder:
     image: projectdiscovery/subfinder:latest

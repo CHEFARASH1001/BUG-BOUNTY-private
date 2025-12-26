@@ -14,7 +14,7 @@ export class Program {
   @Prop({ trim: true })
   description: string;
 
-  @Prop({ enum: ['hackerone', 'bugcrowd', 'intigriti', 'synack', 'custom', 'github', 'other'], default: 'custom' })
+  @Prop({ enum: ['hackerone', 'bugcrowd', 'intigriti', 'synack', 'yeswehack', 'federacy', 'custom', 'github', 'other'], default: 'custom' })
   platform: string;
 
   @Prop()
@@ -138,6 +138,11 @@ export class Program {
   // Program launch date (Requirements: 3.4)
   @Prop()
   launchedAt: Date;
+
+  // Data sources that have provided this program's data
+  // Tracks which providers (direct API, chaos, bounty-targets) have synced this program
+  @Prop({ type: [String], default: [] })
+  dataSources: string[];
 }
 
 export const ProgramSchema = SchemaFactory.createForClass(Program);

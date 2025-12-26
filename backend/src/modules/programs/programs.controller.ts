@@ -35,12 +35,34 @@ export class ProgramsController {
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'platform', required: false })
   @ApiQuery({ name: 'search', required: false })
+  @ApiQuery({ name: 'offersBounties', required: false })
+  @ApiQuery({ name: 'dataSource', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'sortBy', required: false })
+  @ApiQuery({ name: 'sortOrder', required: false, enum: ['asc', 'desc'] })
   findAll(
     @Query('status') status?: string,
     @Query('platform') platform?: string,
     @Query('search') search?: string,
+    @Query('offersBounties') offersBounties?: string,
+    @Query('dataSource') dataSource?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    return this.programsService.findAll({ status, platform, search });
+    return this.programsService.findAll({ 
+      status, 
+      platform, 
+      search, 
+      offersBounties, 
+      dataSource,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      sortBy,
+      sortOrder,
+    });
   }
 
   @Get(':id')

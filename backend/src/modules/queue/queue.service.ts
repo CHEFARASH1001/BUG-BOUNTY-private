@@ -48,6 +48,12 @@ export interface SubfinderJobData {
   batchId?: string;
 }
 
+export interface PlatformSyncJobData {
+  type: 'bounty-targets' | 'chaos';
+  program: any;
+  batchId: string;
+}
+
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);
@@ -226,6 +232,46 @@ export class QueueService {
       }
     }
     this.logger.log(`Published ${published}/${domains.length} subfinder jobs for batch ${batchId}`);
+    return published;
+  }
+
+  async publishPlatformSyncJob(data: PlatformSyncJobData): Promise<void> {
+    try {
+      await this.amqpConnection.publish(
+        QueueConstants.EXCHANGE_DIRECT,
+        QueueConstants.ROUTING_PLATFORM_SYNC,
+        data,
+        {
+          persistent: true,
+          contentType: 'application/json',
+          timestamp: Date.now(),
+        },
+      );
+    } catch (error) {
+      this.logger.error(`Failed to publish platform sync job: ${error.message}`);
+      throw error;
+    }
+  }
+
+  async publishPlatformSyncBatch(
+    programs: any[],
+    type: 'bounty-targets' | 'chaos',
+    batchId: string,
+  ): Promise<number> {
+    let published = 0;
+    for (const program of programs) {
+      try {
+        await this.publishPlatformSyncJob({
+          type,
+          program,
+          batchId,
+        });
+        published++;
+      } catch (error) {
+        this.logger.error(`Failed to publish platform sync job for ${program.handle}: ${error.message}`);
+      }
+    }
+    this.logger.log(`Published ${published}/${programs.length} platform sync jobs for batch ${batchId}`);
     return published;
   }
 }

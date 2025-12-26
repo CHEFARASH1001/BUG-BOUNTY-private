@@ -62,7 +62,16 @@ interface Program {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  dataSources?: string[];
 }
+
+// Data source badge configuration
+const dataSourceConfig: Record<string, { label: string; color: string }> = {
+  'hackerone-api': { label: 'HackerOne API', color: 'bg-purple-500/30 text-purple-300 border-purple-500/50' },
+  'bugcrowd-api': { label: 'Bugcrowd API', color: 'bg-orange-500/30 text-orange-300 border-orange-500/50' },
+  'chaos': { label: 'Chaos (ProjectDiscovery)', color: 'bg-emerald-500/30 text-emerald-300 border-emerald-500/50' },
+  'bounty-targets': { label: 'Bounty Targets Data', color: 'bg-sky-500/30 text-sky-300 border-sky-500/50' },
+};
 
 interface Domain {
   _id: string;
@@ -394,6 +403,25 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
                   <label className="text-xs text-slate-500 uppercase tracking-wide">Bounty Status</label>
                   <p className="text-white mt-1">{program.offersBounties ? 'Bounties Available' : 'No Bounties'}</p>
                 </div>
+                {/* Data Sources */}
+                {program.dataSources && program.dataSources.length > 0 && (
+                  <div>
+                    <label className="text-xs text-slate-500 uppercase tracking-wide">Data Sources</label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {program.dataSources.map((source) => {
+                        const config = dataSourceConfig[source] || { label: source, color: 'bg-slate-500/30 text-slate-300 border-slate-500/50' };
+                        return (
+                          <span
+                            key={source}
+                            className={cn('px-2 py-1 rounded text-xs font-medium border', config.color)}
+                          >
+                            {config.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
 

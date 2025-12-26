@@ -166,7 +166,7 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 9s
       retries: 3
       start_period: 120s
     networks:

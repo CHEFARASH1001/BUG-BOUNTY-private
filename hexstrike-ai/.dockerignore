@@ -1,0 +1,73 @@
+# HexStrike AI Docker ignore file
+
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# Virtual environments
+hexstrike-env/
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Documentation and assets
+README.md
+*.md
+assets/
+*.png
+*.jpg
+*.gif
+
+# Logs and temporary files
+*.log
+hexstrike.log
+*.tmp
+*.temp
+
+# Demo and example files
+demo.py
+python_usage.py
+usage_examples.sh
+web_interface.html
+
+# MCP configuration (will be mounted as volume)
+hexstrike-ai-mcp.json

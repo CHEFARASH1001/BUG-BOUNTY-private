@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HexStrike AI - Web Interface</title>
+    <style>
+        body {
+            background: #0a0a0a;
+            color: #ff4444;
+            font-family: 'Courier New', monospace;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            border: 2px solid #ff4444;
+            padding: 20px;
+            margin-bottom: 30px;
+            background: linear-gradient(45deg, #1a0000, #330000);
+        }
+        .tool-section {
+            background: #111;
+            border: 1px solid #ff4444;
+            margin: 20px 0;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ff6666;
+        }
+        input, textarea, select {
+            width: 100%;
+            padding: 10px;
+            background: #222;
+            border: 1px solid #ff4444;
+            color: #fff;
+            border-radius: 3px;
+        }
+        button {
+            background: #ff4444;
+            color: #fff;
+            border: none;
+            padding: 12px 24px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        button:hover {
+            background: #ff6666;
+        }
+        .output {
+            background: #000;
+            border: 1px solid #ff4444;
+            padding: 15px;
+            margin-top: 20px;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .success { background: #004400; border: 1px solid #00ff00; }
+        .error { background: #440000; border: 1px solid #ff0000; }
+        .loading { background: #444400; border: 1px solid #ffff00; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔥 HexStrike AI - Web Interface</h1>
+            <p>Advanced Cybersecurity Automation Platform</p>
+            <div id="serverStatus">Checking server status...</div>
+        </div>
+
+        <div class="tool-section">
+            <h2>🛠️ Security Tool Executor</h2>
+            <div class="form-group">
+                <label for="toolSelect">Select Tool:</label>
+                <select id="toolSelect">
+                    <option value="nmap">Nmap - Network Scanner</option>
+                    <option value="gobuster">Gobuster - Directory Brute Forcer</option>
+                    <option value="nikto">Nikto - Web Vulnerability Scanner</option>
+                    <option value="sqlmap">SQLMap - SQL Injection Tester</option>
+                    <option value="dirb">Dirb - Web Directory Scanner</option>
+                    <option value="httpx">HTTPx - HTTP Toolkit</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="target">Target (IP/Domain):</label>
+                <input type="text" id="target" placeholder="e.g., scanme.nmap.org or 192.168.1.1">
+            </div>
+            
+            <div class="form-group">
+                <label for="customArgs">Custom Arguments (optional):</label>
+                <input type="text" id="customArgs" placeholder="e.g., -sV -T4 for nmap">
+            </div>
+            
+            <div class="form-group">
+                <label for="timeout">Timeout (seconds):</label>
+                <input type="number" id="timeout" value="60" min="10" max="600">
+            </div>
+            
+            <button onclick="executeTool()">🚀 Execute Tool</button>
+            <button onclick="clearOutput()">🗑️ Clear Output</button>
+        </div>
+
+        <div class="tool-section">
+            <h2>📊 Execution Results</h2>
+            <div id="status"></div>
+            <div id="output" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        const SERVER_URL = 'http://localhost:8888';
+        
+        // Check server status on load
+        window.onload = function() {
+            checkServerStatus();
+        };
+        
+        async function checkServerStatus() {
+            try {
+                const response = await fetch(`${SERVER_URL}/health`);
+                const data = await response.json();
+                
+                document.getElementById('serverStatus').innerHTML = `
+                    ✅ Server Online | Version: ${data.version} | 
+                    Tools: ${data.total_tools_available}/${data.total_tools_count}
+                `;
+                document.getElementById('serverStatus').className = 'status success';
+            } catch (error) {
+                document.getElementById('serverStatus').innerHTML = '❌ Server Offline';
+                document.getElementById('serverStatus').className = 'status error';
+            }
+        }
+        
+        async function executeTool() {
+            const tool = document.getElementById('toolSelect').value;
+            const target = document.getElementById('target').value;
+            const customArgs = document.getElementById('customArgs').value;
+            const timeout = parseInt(document.getElementById('timeout').value);
+            
+            if (!target) {
+                alert('Please enter a target!');
+                return;
+            }
+            
+            // Build arguments based on tool
+            let args = [];
+            switch(tool) {
+                case 'nmap':
+                    args = customArgs ? customArgs.split(' ') : ['-sS', '-T4'];
+                    args.push(target);
+                    break;
+                case 'gobuster':
+                    args = ['dir', '-u', `http://${target}`, '-w', '/usr/share/wordlists/dirb/common.txt'];
+                    if (customArgs) args = args.concat(customArgs.split(' '));
+                    break;
+                case 'nikto':
+                    args = ['-h', `http://${target}`];
+                    if (customArgs) args = args.concat(customArgs.split(' '));
+                    break;
+                case 'sqlmap':
+                    args = ['-u', `http://${target}`, '--batch'];
+                    if (customArgs) args = args.concat(customArgs.split(' '));
+                    break;
+                case 'dirb':
+                    args = [`http://${target}`];
+                    if (customArgs) args = args.concat(customArgs.split(' '));
+                    break;
+                case 'httpx':
+                    args = ['-u', target];
+                    if (customArgs) args = args.concat(customArgs.split(' '));
+                    break;
+            }
+            
+            // Show loading status
+            document.getElementById('status').innerHTML = `🔄 Executing ${tool} on ${target}...`;
+            document.getElementById('status').className = 'status loading';
+            document.getElementById('output').textContent = 'Executing command...\n';
+            
+            try {
+                const response = await fetch(`${SERVER_URL}/api/command`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        command: tool,
+                        args: args,
+                        timeout: timeout
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Update status
+                if (result.success) {
+                    document.getElementById('status').innerHTML = 
+                        `✅ Success | Execution time: ${result.execution_time.toFixed(2)}s`;
+                    document.getElementById('status').className = 'status success';
+                } else {
+                    document.getElementById('status').innerHTML = 
+                        `❌ Failed | Return code: ${result.return_code}`;
+                    document.getElementById('status').className = 'status error';
+                }
+                
+                // Update output
+                let output = `Command: ${tool} ${args.join(' ')}\n`;
+                output += `Execution time: ${result.execution_time.toFixed(2)}s\n`;
+                output += `Return code: ${result.return_code}\n\n`;
+                
+                if (result.stdout) {
+                    output += `STDOUT:\n${result.stdout}\n\n`;
+                }
+                
+                if (result.stderr) {
+                    output += `STDERR:\n${result.stderr}\n`;
+                }
+                
+                document.getElementById('output').textContent = output;
+                
+            } catch (error) {
+                document.getElementById('status').innerHTML = `❌ Error: ${error.message}`;
+                document.getElementById('status').className = 'status error';
+                document.getElementById('output').textContent = `Error executing command: ${error.message}`;
+            }
+        }
+        
+        function clearOutput() {
+            document.getElementById('output').textContent = '';
+            document.getElementById('status').innerHTML = '';
+        }
+    </script>
+</body>
+</html>

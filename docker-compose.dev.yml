@@ -149,28 +149,31 @@ services:
       - bb-network
 
   # HexStrike AI - AI-Powered Penetration Testing Framework
-  hexstrike-ai:
-    build:
-      context: ./hexstrike-ai
-      dockerfile: Dockerfile
-    container_name: bb-hexstrike-ai
-    restart: unless-stopped
-    environment:
-      HEXSTRIKE_PORT: 8888
-      HEXSTRIKE_HOST: 0.0.0.0
-    ports:
-      - "8888:8888"
-    volumes:
-      - hexstrike_results:/app/results
-      - hexstrike_logs:/app/logs
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
-      interval: 30s
-      timeout: 9s
-      retries: 3
-      start_period: 120s
-    networks:
-      - bb-network
+  #hexstrike-ai:
+    # build:
+    #   context: ./hexstrike-ai
+    #   dockerfile: Dockerfile
+    # dns:
+    #   - 8.8.8.8
+    #   - 8.8.4.4
+    # container_name: bb-hexstrike-ai
+    # restart: unless-stopped
+    # environment:
+    #   HEXSTRIKE_PORT: 8888
+    #   HEXSTRIKE_HOST: 0.0.0.0
+    # ports:
+    #   - "8888:8888"
+    # volumes:
+    #   - hexstrike_results:/app/results
+    #   - hexstrike_logs:/app/logs
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:8888/health"]
+    #   interval: 30s
+    #   timeout: 9s
+    #   retries: 3
+    #   start_period: 120s
+    # networks:
+    #   - bb-network
 
   # Next.js Frontend - Development Mode
   frontend:

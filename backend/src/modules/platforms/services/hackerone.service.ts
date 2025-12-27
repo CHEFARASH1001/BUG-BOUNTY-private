@@ -109,7 +109,6 @@ export class HackerOneService {
       });
 
       const data = response.data;
-      console.log(data, 'kkpopokpopko')
       if (data.data && Array.isArray(data.data)) {
         for (const item of data.data) {
           const program = this.transformProgram(item);

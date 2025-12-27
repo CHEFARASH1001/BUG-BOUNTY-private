@@ -2,42 +2,37 @@
 # Advanced Penetration Testing Framework with 150+ Security Tools
 
 # Stage 1: Build Go tools
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.22 AS go-builder
 
 ENV CGO_ENABLED=0
 ENV GOPATH=/go
-# Use default proxy for better reliability
-ENV GOPROXY=https://proxy.golang.org,direct
+# Use direct mode first to bypass proxy issues, then fallback to proxy
+ENV GOPROXY=direct,https://proxy.golang.org
+ENV GOSUMDB=off
 
 # Install git and build dependencies for go install
-RUN apk add --no-cache git ca-certificates
+# Using Debian package manager (more reliable than Alpine for network issues)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Go-based security tools
+# Install Go-based security tools (continue on failure for network resilience)
 # ProjectDiscovery tools
-RUN go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
-    echo "✅ nuclei installed" || echo "❌ nuclei failed"
-RUN go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
-    echo "✅ httpx installed" || echo "❌ httpx failed"
-RUN go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
-    echo "✅ subfinder installed" || echo "❌ subfinder failed"
-RUN go install -v github.com/projectdiscovery/katana/cmd/katana@latest && \
-    echo "✅ katana installed" || echo "❌ katana failed"
+RUN (go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && echo "✅ nuclei installed") || echo "❌ nuclei failed" || true
+RUN (go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest && echo "✅ httpx installed") || echo "❌ httpx failed" || true
+RUN (go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && echo "✅ subfinder installed") || echo "❌ subfinder failed" || true
+RUN (go install -v github.com/projectdiscovery/katana/cmd/katana@latest && echo "✅ katana installed") || echo "❌ katana failed" || true
 
 # Fuzzing tools
-RUN go install -v github.com/ffuf/ffuf/v2@latest && \
-    echo "✅ ffuf installed" || echo "❌ ffuf failed"
+RUN (go install -v github.com/ffuf/ffuf/v2@latest && echo "✅ ffuf installed") || echo "❌ ffuf failed" || true
 
 # Recon tools
-RUN go install -v github.com/tomnomnom/assetfinder@latest && \
-    echo "✅ assetfinder installed" || echo "❌ assetfinder failed"
-RUN go install -v github.com/lc/gau/v2/cmd/gau@latest && \
-    echo "✅ gau installed" || echo "❌ gau failed"
-RUN go install -v github.com/tomnomnom/waybackurls@latest && \
-    echo "✅ waybackurls installed" || echo "❌ waybackurls failed"
+RUN (go install -v github.com/tomnomnom/assetfinder@latest && echo "✅ assetfinder installed") || echo "❌ assetfinder failed" || true
+RUN (go install -v github.com/lc/gau/v2/cmd/gau@latest && echo "✅ gau installed") || echo "❌ gau failed" || true
+RUN (go install -v github.com/tomnomnom/waybackurls@latest && echo "✅ waybackurls installed") || echo "❌ waybackurls failed" || true
 
 # XSS tools
-RUN go install -v github.com/hahwul/dalfox/v2@latest && \
-    echo "✅ dalfox installed" || echo "❌ dalfox failed"
+RUN (go install -v github.com/hahwul/dalfox/v2@latest && echo "✅ dalfox installed") || echo "❌ dalfox failed" || true
 
 # List what was installed
 RUN echo "=== Installed Go tools ===" && ls -la /go/bin/
@@ -52,8 +47,11 @@ ENV HEXSTRIKE_HOST=0.0.0.0
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PATH="/opt/go-tools:${PATH}"
 
-# Install system dependencies and security tools
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install system dependencies and security tools with retry logic
+RUN for i in 1 2 3; do \
+    apt-get update && break || sleep 5; \
+    done && \
+    apt-get install -y --no-install-recommends \
     # Core system tools
     curl wget git unzip zip \
     build-essential gcc g++ make \
@@ -64,16 +62,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gobuster dirb sqlmap \
     # Binary analysis tools
     binutils gdb binwalk \
-    # Additional utilities
-    jq xmlstarlet perl libnet-ssleay-perl \
+    # Additional utilities (use perl-base instead of perl)
+    jq xmlstarlet perl-base libnet-ssleay-perl \
     # Clean up
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && apt-get clean || \
+    (echo "⚠️  Some packages may have failed to install due to network issues" && \
+     apt-get install -y --no-install-recommends curl wget git ca-certificates || true)
 
-# Install nikto from source
-RUN git clone https://github.com/sullo/nikto.git /opt/nikto \
+# Install nikto from source (continue on failure)
+RUN (git clone https://github.com/sullo/nikto.git /opt/nikto \
     && chmod +x /opt/nikto/program/nikto.pl \
-    && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto
+    && ln -s /opt/nikto/program/nikto.pl /usr/local/bin/nikto) || \
+    echo "⚠️  nikto installation failed (network issue)" || true
 
 # Create go-tools directory and copy Go tools from builder stage
 RUN mkdir -p /opt/go-tools

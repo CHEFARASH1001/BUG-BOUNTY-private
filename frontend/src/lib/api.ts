@@ -64,6 +64,7 @@ export const programsApi = {
   getDomains: (id: string) => api.get(`/programs/${id}/domains`),
   getVulnerabilities: (id: string) => api.get(`/programs/${id}/vulnerabilities`),
   getScopes: (id: string) => api.get(`/programs/${id}/scopes`),
+  getDashboardStats: () => api.get('/programs/dashboard-stats'),
 };
 
 // Domains API

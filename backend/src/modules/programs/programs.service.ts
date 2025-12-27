@@ -206,4 +206,36 @@ export class ProgramsService {
       vulnerabilityCount: vulnCount,
     });
   }
+
+  async getDashboardStats(): Promise<{
+    totalPrograms: number;
+    activePrograms: number;
+    totalScopes: number;
+    bbpCount: number;
+    vdpCount: number;
+  }> {
+    const [
+      totalPrograms,
+      activePrograms,
+      bbpCount,
+      vdpCount,
+      scopeStats,
+    ] = await Promise.all([
+      this.programModel.countDocuments().exec(),
+      this.programModel.countDocuments({
+        status: { $in: ['active', 'open', 'public_mode'] },
+      }).exec(),
+      this.programModel.countDocuments({ offersBounties: true }).exec(),
+      this.programModel.countDocuments({ offersBounties: false }).exec(),
+      this.scopeModel.countDocuments().exec(),
+    ]);
+
+    return {
+      totalPrograms,
+      activePrograms,
+      totalScopes: scopeStats,
+      bbpCount,
+      vdpCount,
+    };
+  }
 }

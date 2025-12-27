@@ -29,6 +29,13 @@ export class ProgramsController {
     return this.programsService.create(createProgramDto, req.user.sub);
   }
 
+  @Get('dashboard-stats')
+  @Public()
+  @ApiOperation({ summary: 'Get dashboard statistics for all programs' })
+  getDashboardStats() {
+    return this.programsService.getDashboardStats();
+  }
+
   @Get()
   @Public() // Allow public access for dev mode
   @ApiOperation({ summary: 'Get all programs' })

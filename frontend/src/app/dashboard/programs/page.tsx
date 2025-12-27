@@ -48,6 +48,14 @@ interface Pagination {
   totalPages: number;
 }
 
+interface DashboardStats {
+  totalPrograms: number;
+  activePrograms: number;
+  totalScopes: number;
+  bbpCount: number;
+  vdpCount: number;
+}
+
 const statusConfig: Record<string, { color: string; bg: string; label: string }> = {
   active: { color: 'text-green-400', bg: 'bg-green-500/20', label: 'Active' },
   paused: { color: 'text-yellow-400', bg: 'bg-yellow-500/20', label: 'Paused' },
@@ -86,6 +94,7 @@ export default function ProgramsPage() {
     total: 0,
     totalPages: 0,
   });
+  const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -95,6 +104,15 @@ export default function ProgramsPage() {
   const [selectedProgramType, setSelectedProgramType] = useState<string | null>(null);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
+
+  const fetchDashboardStats = useCallback(async () => {
+    try {
+      const response = await programsApi.getDashboardStats();
+      setDashboardStats(response.data);
+    } catch (err: any) {
+      console.error('Failed to fetch dashboard stats:', err);
+    }
+  }, []);
 
   const fetchPrograms = useCallback(
     async (page = 1, limit = pagination.limit) => {
@@ -130,6 +148,7 @@ export default function ProgramsPage() {
 
   useEffect(() => {
     fetchPrograms(1, pagination.limit);
+    fetchDashboardStats();
   }, [selectedStatus, selectedPlatform, debouncedSearch, selectedProgramType, selectedDataSource]);
 
   const handlePageChange = (newPage: number) => {
@@ -154,10 +173,11 @@ export default function ProgramsPage() {
     setSelectedProgramType(null);
   };
 
-  const activeCount = programs.filter(
+  // Page-level stats (for filtered view)
+  const pageActiveCount = programs.filter(
     (p) => p.status === 'active' || p.status === 'open' || p.status === 'public_mode'
   ).length;
-  const totalScopes = programs.reduce((a, b) => a + (b.scopeCount || b.scopes?.length || 0), 0);
+  const pageTotalScopes = programs.reduce((a, b) => a + (b.scopeCount || b.scopes?.length || 0), 0);
 
   const getPageNumbers = () => {
     const { page, totalPages } = pagination;
@@ -217,11 +237,11 @@ export default function ProgramsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         {[
-          { label: 'Total Programs', value: pagination.total, icon: Building2, color: 'text-primary-400' },
-          { label: 'Active (page)', value: activeCount, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'Scopes (page)', value: totalScopes, icon: Globe, color: 'text-blue-400' },
-          { label: 'BBP (page)', value: programs.filter((p) => p.offersBounties).length, icon: DollarSign, color: 'text-yellow-400' },
-          { label: 'VDP (page)', value: programs.filter((p) => !p.offersBounties).length, icon: Shield, color: 'text-slate-400' },
+          { label: 'Total Programs', value: dashboardStats?.totalPrograms ?? pagination.total, icon: Building2, color: 'text-primary-400' },
+          { label: 'Active', value: dashboardStats?.activePrograms ?? pageActiveCount, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Total Scopes', value: dashboardStats?.totalScopes ?? pageTotalScopes, icon: Globe, color: 'text-blue-400' },
+          { label: 'BBP', value: dashboardStats?.bbpCount ?? 0, icon: DollarSign, color: 'text-yellow-400' },
+          { label: 'VDP', value: dashboardStats?.vdpCount ?? 0, icon: Shield, color: 'text-slate-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}

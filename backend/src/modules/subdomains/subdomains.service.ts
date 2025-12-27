@@ -88,6 +88,9 @@ export class SubdomainsService {
   async findAll(filters?: {
     domainId?: string;
     programId?: string;
+    platform?: string;
+    programType?: 'bbp' | 'vdp';
+    dataSource?: string;
     isAlive?: boolean;
     hasVulnerabilities?: boolean;
     httpStatus?: string;
@@ -119,6 +122,38 @@ export class SubdomainsService {
     const skip = (page - 1) * limit;
     const sortBy = filters?.sortBy || 'createdAt';
     const sortOrder = filters?.sortOrder === 'asc' ? 1 : -1;
+
+    // Build program filter conditions for platform, programType, and dataSource
+    const programFilter: any = {};
+    if (filters?.platform) {
+      programFilter.platform = filters.platform;
+    }
+    if (filters?.programType) {
+      programFilter.offersBounties = filters.programType === 'bbp';
+    }
+    if (filters?.dataSource) {
+      programFilter.dataSources = { $in: [filters.dataSource] };
+    }
+
+    // If we have program-level filters, find matching domains first
+    if (Object.keys(programFilter).length > 0) {
+      const { Program } = await import('../../schemas/program.schema');
+      const programModel = this.domainModel.db.model('Program');
+      const matchingPrograms = await programModel.find(programFilter).select('_id');
+      const programIds = matchingPrograms.map(p => p._id);
+      
+      const domains = await this.domainModel.find({ programId: { $in: programIds } }).select('_id');
+      const domainIds = domains.map(d => d._id);
+      
+      if (query.domainId) {
+        // Intersect with existing domainId filter
+        query.domainId = { $in: domainIds.filter(id => 
+          query.domainId.$in ? query.domainId.$in.some((qid: Types.ObjectId) => qid.equals(id)) : query.domainId.equals(id)
+        )};
+      } else {
+        query.domainId = { $in: domainIds };
+      }
+    }
 
     if (filters?.domainId) {
       query.domainId = new Types.ObjectId(filters.domainId);
@@ -328,6 +363,8 @@ export class SubdomainsService {
     httpStatuses: number[];
     domains: { _id: string; domain: string }[];
     programs: { _id: string; name: string }[];
+    platforms: string[];
+    dataSources: string[];
   }> {
     // Return cached data if still valid
     if (
@@ -337,8 +374,11 @@ export class SubdomainsService {
       return this.filterOptionsCache.data;
     }
 
+    // Get program model for platform and dataSource queries
+    const programModel = this.domainModel.db.model('Program');
+
     // Use aggregation pipeline for better performance - limit results
-    const [technologies, sources, cdns, httpStatuses, domains] = await Promise.all([
+    const [technologies, sources, cdns, httpStatuses, domains, platforms, dataSources] = await Promise.all([
       this.subdomainModel.distinct('technologies').then((t) => t.slice(0, 100)),
       this.subdomainModel.distinct('sources').then((s) => s.slice(0, 50)),
       this.subdomainModel.distinct('cdn').then((c) => c.slice(0, 50)),
@@ -349,6 +389,8 @@ export class SubdomainsService {
         .populate('programId', 'name')
         .limit(500)
         .lean(),
+      programModel.distinct('platform'),
+      programModel.distinct('dataSources'),
     ]);
 
     // Extract unique programs from domains
@@ -373,6 +415,8 @@ export class SubdomainsService {
         domain: d.domain,
       })),
       programs: programs.sort((a, b) => a.name.localeCompare(b.name)),
+      platforms: platforms.filter(Boolean).sort(),
+      dataSources: dataSources.filter(Boolean).sort(),
     };
 
     // Cache the result

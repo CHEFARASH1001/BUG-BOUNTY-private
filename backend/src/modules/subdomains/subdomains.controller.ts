@@ -33,6 +33,9 @@ export class SubdomainsController {
   @ApiOperation({ summary: 'Get all subdomains with pagination' })
   @ApiQuery({ name: 'domainId', required: false })
   @ApiQuery({ name: 'programId', required: false })
+  @ApiQuery({ name: 'platform', required: false, description: 'Filter by program platform (hackerone, bugcrowd, etc.)' })
+  @ApiQuery({ name: 'programType', required: false, enum: ['bbp', 'vdp'], description: 'Filter by program type (bbp=bug bounty, vdp=vulnerability disclosure)' })
+  @ApiQuery({ name: 'dataSource', required: false, description: 'Filter by data source (bounty-targets, chaos, etc.)' })
   @ApiQuery({ name: 'isAlive', required: false, type: Boolean })
   @ApiQuery({ name: 'hasVulnerabilities', required: false, type: Boolean })
   @ApiQuery({ name: 'httpStatus', required: false })
@@ -49,6 +52,9 @@ export class SubdomainsController {
   findAll(
     @Query('domainId') domainId?: string,
     @Query('programId') programId?: string,
+    @Query('platform') platform?: string,
+    @Query('programType') programType?: 'bbp' | 'vdp',
+    @Query('dataSource') dataSource?: string,
     @Query('isAlive') isAlive?: string,
     @Query('hasVulnerabilities') hasVulnerabilities?: string,
     @Query('httpStatus') httpStatus?: string,
@@ -66,6 +72,9 @@ export class SubdomainsController {
     return this.subdomainsService.findAll({
       domainId,
       programId,
+      platform,
+      programType,
+      dataSource,
       isAlive: isAlive === undefined ? undefined : isAlive === 'true',
       hasVulnerabilities: hasVulnerabilities === 'true',
       httpStatus,

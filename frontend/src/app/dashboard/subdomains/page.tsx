@@ -99,6 +99,8 @@ interface FilterOptions {
   httpStatuses: number[];
   domains: { _id: string; domain: string }[];
   programs: { _id: string; name: string }[];
+  platforms: string[];
+  dataSources: string[];
 }
 
 const getStatusColor = (status: number | null | undefined) => {
@@ -297,10 +299,12 @@ export default function SubdomainsPage() {
   const [filterTechnology, setFilterTechnology] = useState<string>('');
   const [filterSource, setFilterSource] = useState<string>('');
   const [filterFresh, setFilterFresh] = useState<string>('');
+  const [filterPlatform, setFilterPlatform] = useState<string>('');
+  const [filterProgramType, setFilterProgramType] = useState<string>('');
+  const [filterDataSource, setFilterDataSource] = useState<string>('');
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [showFilters, setShowFilters] = useState(false);
   const [filterOptionsLoaded, setFilterOptionsLoaded] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
@@ -373,7 +377,6 @@ export default function SubdomainsPage() {
   }, [handleSubdomainUpdate, handleSubdomainStatusChange]);
 
   useEffect(() => {
-    if (!showFilters || filterOptionsLoaded) return;
     const fetchFilterOptions = async () => {
       try {
         const response = await subdomainsApi.getFilterOptions();
@@ -384,7 +387,7 @@ export default function SubdomainsPage() {
       }
     };
     fetchFilterOptions();
-  }, [showFilters, filterOptionsLoaded]);
+  }, []);
 
   const fetchSubdomains = useCallback(async (page = 1) => {
     setLoading(true);
@@ -399,6 +402,9 @@ export default function SubdomainsPage() {
       if (filterTechnology) params.technology = filterTechnology;
       if (filterSource) params.source = filterSource;
       if (filterFresh) params.isNew = filterFresh;
+      if (filterPlatform) params.platform = filterPlatform;
+      if (filterProgramType) params.programType = filterProgramType;
+      if (filterDataSource) params.dataSource = filterDataSource;
       if (debouncedSearch) params.search = debouncedSearch;
 
       const response = await subdomainsApi.getAll(params);
@@ -416,11 +422,11 @@ export default function SubdomainsPage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.limit, filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, debouncedSearch, sortBy, sortOrder]);
+  }, [pagination.limit, filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, filterPlatform, filterProgramType, filterDataSource, debouncedSearch, sortBy, sortOrder]);
 
   useEffect(() => {
     fetchSubdomains(1);
-  }, [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, debouncedSearch, sortBy, sortOrder]);
+  }, [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, filterPlatform, filterProgramType, filterDataSource, debouncedSearch, sortBy, sortOrder]);
 
   const handlePageChange = (newPage: number) => {
     if (newPage >= 1 && newPage <= pagination.totalPages) {
@@ -445,9 +451,12 @@ export default function SubdomainsPage() {
     setFilterTechnology('');
     setFilterSource('');
     setFilterFresh('');
+    setFilterPlatform('');
+    setFilterProgramType('');
+    setFilterDataSource('');
   };
 
-  const activeFilterCount = [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh].filter(Boolean).length;
+  const activeFilterCount = [filterAlive, filterProgram, filterDomain, filterHttpStatus, filterCdn, filterTechnology, filterSource, filterFresh, filterPlatform, filterProgramType, filterDataSource].filter(Boolean).length;
 
   const exportSubdomains = async () => {
     try {
@@ -460,6 +469,9 @@ export default function SubdomainsPage() {
       if (filterTechnology) params.technology = filterTechnology;
       if (filterSource) params.source = filterSource;
       if (filterFresh) params.isNew = filterFresh;
+      if (filterPlatform) params.platform = filterPlatform;
+      if (filterProgramType) params.programType = filterProgramType;
+      if (filterDataSource) params.dataSource = filterDataSource;
       if (debouncedSearch) params.search = debouncedSearch;
 
       const response = await subdomainsApi.getAll(params);
@@ -558,195 +570,288 @@ export default function SubdomainsPage() {
         ))}
       </div>
 
-      {/* Search and Filter Toggle */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search subdomains..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
-          />
+      {/* Filters Section */}
+      <div className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 space-y-4">
+        {/* Search and Sort Row */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search subdomains..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            >
+              <option value="createdAt">Sort: Date</option>
+              <option value="subdomain">Sort: Name</option>
+              <option value="httpStatus">Sort: Status</option>
+            </select>
+            <select
+              value={sortOrder}
+              onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearAllFilters}
+                className="flex items-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+              >
+                <X className="w-3 h-3" />
+                Clear ({activeFilterCount})
+              </button>
+            )}
+          </div>
         </div>
 
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 border rounded-lg text-sm font-medium transition-colors',
-            showFilters || activeFilterCount > 0
-              ? 'bg-primary-600/20 border-primary-500/50 text-primary-400'
-              : 'bg-dark-800 border-dark-700 text-slate-300 hover:bg-dark-700'
-          )}
-        >
-          <Filter className="w-4 h-4" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-primary-500 text-white text-xs rounded-full">
-              {activeFilterCount}
-            </span>
-          )}
-        </button>
-
-        {activeFilterCount > 0 && (
-          <button
-            onClick={clearAllFilters}
-            className="flex items-center gap-1 px-3 py-2 text-sm text-slate-400 hover:text-white transition-colors"
-          >
-            <X className="w-4 h-4" />
-            Clear all
-          </button>
+        {/* All Filters Grid */}
+        {!filterOptions ? (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
+            <span className="ml-2 text-sm text-slate-400">Loading filters...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Status</label>
+              <select
+                value={filterAlive}
+                onChange={(e) => setFilterAlive(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                <option value="true">Alive</option>
+                <option value="false">Dead</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">HTTP Status</label>
+              <select
+                value={filterHttpStatus}
+                onChange={(e) => setFilterHttpStatus(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.httpStatuses.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Platform</label>
+              <select
+                value={filterPlatform}
+                onChange={(e) => setFilterPlatform(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.platforms.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Type</label>
+              <select
+                value={filterProgramType}
+                onChange={(e) => setFilterProgramType(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                <option value="bbp">BBP</option>
+                <option value="vdp">VDP</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Program</label>
+              <select
+                value={filterProgram}
+                onChange={(e) => setFilterProgram(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.programs.map((p) => (
+                  <option key={p._id} value={p._id}>{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Domain</label>
+              <select
+                value={filterDomain}
+                onChange={(e) => setFilterDomain(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.domains.map((d) => (
+                  <option key={d._id} value={d._id}>{d.domain}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Data Source</label>
+              <select
+                value={filterDataSource}
+                onChange={(e) => setFilterDataSource(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.dataSources.map((ds) => (
+                  <option key={ds} value={ds}>{ds}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">CDN</label>
+              <select
+                value={filterCdn}
+                onChange={(e) => setFilterCdn(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.cdns.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Technology</label>
+              <select
+                value={filterTechnology}
+                onChange={(e) => setFilterTechnology(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.technologies.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Source</label>
+              <select
+                value={filterSource}
+                onChange={(e) => setFilterSource(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                {filterOptions?.sources.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-slate-400 mb-1">Freshness</label>
+              <select
+                value={filterFresh}
+                onChange={(e) => setFilterFresh(e.target.value)}
+                className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+              >
+                <option value="">All</option>
+                <option value="true">Fresh</option>
+                <option value="false">Not Fresh</option>
+              </select>
+            </div>
+          </div>
         )}
 
-        <select
-          value={sortBy}
-          onChange={(e) => setSortBy(e.target.value)}
-          className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-        >
-          <option value="createdAt">Sort by Date</option>
-          <option value="subdomain">Sort by Name</option>
-          <option value="httpStatus">Sort by Status</option>
-        </select>
-
-        <select
-          value={sortOrder}
-          onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-          className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-        >
-          <option value="desc">Descending</option>
-          <option value="asc">Ascending</option>
-        </select>
+        {/* Active Filters Tags */}
+        {activeFilterCount > 0 && (
+          <div className="flex items-center gap-2 pt-2 border-t border-dark-700 flex-wrap">
+            <span className="text-xs text-slate-500">Active:</span>
+            {debouncedSearch && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                &quot;{debouncedSearch}&quot;
+                <button onClick={() => setSearchQuery('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterAlive && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterAlive === 'true' ? 'Alive' : 'Dead'}
+                <button onClick={() => setFilterAlive('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterHttpStatus && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                HTTP {filterHttpStatus}
+                <button onClick={() => setFilterHttpStatus('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterPlatform && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterPlatform}
+                <button onClick={() => setFilterPlatform('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterProgramType && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterProgramType === 'bbp' ? 'BBP' : 'VDP'}
+                <button onClick={() => setFilterProgramType('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterProgram && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterOptions?.programs.find(p => p._id === filterProgram)?.name || 'Program'}
+                <button onClick={() => setFilterProgram('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterDomain && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterOptions?.domains.find(d => d._id === filterDomain)?.domain || 'Domain'}
+                <button onClick={() => setFilterDomain('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterDataSource && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterDataSource}
+                <button onClick={() => setFilterDataSource('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterCdn && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                CDN: {filterCdn}
+                <button onClick={() => setFilterCdn('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterTechnology && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterTechnology}
+                <button onClick={() => setFilterTechnology('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterSource && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterSource}
+                <button onClick={() => setFilterSource('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+            {filterFresh && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded">
+                {filterFresh === 'true' ? 'Fresh' : 'Not Fresh'}
+                <button onClick={() => setFilterFresh('')} className="hover:text-white"><X className="w-3 h-3" /></button>
+              </span>
+            )}
+          </div>
+        )}
       </div>
-
-      {/* Advanced Filters Panel */}
-      {showFilters && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
-        >
-          {!filterOptions ? (
-            <div className="flex items-center justify-center py-4">
-              <Loader2 className="w-5 h-5 text-primary-400 animate-spin" />
-              <span className="ml-2 text-sm text-slate-400">Loading filters...</span>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Status</label>
-                <select
-                  value={filterAlive}
-                  onChange={(e) => setFilterAlive(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  <option value="true">Alive</option>
-                  <option value="false">Dead</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Program</label>
-                <select
-                  value={filterProgram}
-                  onChange={(e) => setFilterProgram(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All Programs</option>
-                  {filterOptions?.programs.map((p) => (
-                    <option key={p._id} value={p._id}>{p.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Domain</label>
-                <select
-                  value={filterDomain}
-                  onChange={(e) => setFilterDomain(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All Domains</option>
-                  {filterOptions?.domains.map((d) => (
-                    <option key={d._id} value={d._id}>{d.domain}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">HTTP Status</label>
-                <select
-                  value={filterHttpStatus}
-                  onChange={(e) => setFilterHttpStatus(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  {filterOptions?.httpStatuses.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">CDN</label>
-                <select
-                  value={filterCdn}
-                  onChange={(e) => setFilterCdn(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  {filterOptions?.cdns.map((c) => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Technology</label>
-                <select
-                  value={filterTechnology}
-                  onChange={(e) => setFilterTechnology(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  {filterOptions?.technologies.map((t) => (
-                    <option key={t} value={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Source</label>
-                <select
-                  value={filterSource}
-                  onChange={(e) => setFilterSource(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  {filterOptions?.sources.map((s) => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs text-slate-400 mb-1">Freshness</label>
-                <select
-                  value={filterFresh}
-                  onChange={(e) => setFilterFresh(e.target.value)}
-                  className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-                >
-                  <option value="">All</option>
-                  <option value="true">Fresh Only</option>
-                  <option value="false">Not Fresh</option>
-                </select>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      )}
 
       {/* Loading State */}
       {loading && (

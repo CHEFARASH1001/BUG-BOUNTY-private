@@ -73,14 +73,17 @@ export class CronController {
   @Public()
   @ApiOperation({ summary: 'Get job execution history' })
   @ApiQuery({ name: 'jobName', required: false })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'List of job executions' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default: 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page (default: 20)' })
+  @ApiResponse({ status: 200, description: 'List of job executions with pagination' })
   async getExecutions(
     @Query('jobName') jobName?: string,
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     return this.cronService.getExecutions(
       jobName,
+      page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );
   }

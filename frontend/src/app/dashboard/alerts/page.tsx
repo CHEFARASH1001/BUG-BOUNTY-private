@@ -358,10 +358,12 @@ export default function AlertsPage() {
       try {
         const [rulesRes, programsRes] = await Promise.all([
           alertsApi.getRules(),
-          programsApi.getAll(),
+          programsApi.getAll({ limit: 1000 }),
         ]);
         setRules(rulesRes.data || []);
-        setPrograms(programsRes.data || []);
+        // Handle paginated response from programsApi
+        const programsData = programsRes.data?.data || programsRes.data || [];
+        setPrograms(programsData);
       } catch (err) {
         console.error('Failed to fetch data:', err);
       } finally {

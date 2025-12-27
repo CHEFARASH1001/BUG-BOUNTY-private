@@ -30,9 +30,10 @@ import {
   Zap,
   Database,
   Brain,
+  Loader2,
 } from 'lucide-react';
 import { clsx } from 'clsx';
-import { cronApi } from '@/lib/api';
+import { cronApi, authApi } from '@/lib/api';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -77,12 +78,37 @@ export default function DashboardLayout({
   const [documentsExpanded, setDocumentsExpanded] = useState(true);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+
+  // Check authentication on mount
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+      
+      try {
+        await authApi.me();
+        setIsAuthenticated(true);
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        localStorage.removeItem('token');
+        router.push('/login');
+      }
+    };
+    
+    checkAuth();
+  }, [router]);
   
   // Fetch recent job executions as notifications
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const fetchNotifications = async () => {
       try {
         const response = await cronApi.getExecutions({ limit: 5 });
@@ -100,7 +126,7 @@ export default function DashboardLayout({
       }
     };
     fetchNotifications();
-  }, []);
+  }, [isAuthenticated]);
 
   // Close notifications when clicking outside
   useEffect(() => {
@@ -136,6 +162,23 @@ export default function DashboardLayout({
       default: return <Info className="w-4 h-4 text-blue-400" />;
     }
   };
+
+  // Show loading while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-dark-950 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 text-primary-400 animate-spin" />
+          <p className="text-slate-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-dark-950 flex">

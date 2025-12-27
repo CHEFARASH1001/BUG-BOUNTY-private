@@ -60,7 +60,8 @@ export class ScoresController {
   @Get('top/programs')
   @Public()
   @ApiOperation({ summary: 'Get top scored programs' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results (default 20)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results per page (default 20)' })
   @ApiQuery({
     name: 'sortBy',
     required: false,
@@ -75,13 +76,15 @@ export class ScoresController {
     ],
     description: 'Sort by score type',
   })
-  @ApiResponse({ status: 200, description: 'Top programs by score' })
+  @ApiResponse({ status: 200, description: 'Top programs by score with pagination' })
   async getTopPrograms(
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
   ) {
     return this.scoresService.getTopScores(
       ScoreTargetType.PROGRAM,
+      page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
       sortBy || 'totalScore',
     );
@@ -90,7 +93,8 @@ export class ScoresController {
   @Get('top/domains')
   @Public()
   @ApiOperation({ summary: 'Get top scored domains' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results (default 20)' })
+  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number (default 1)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Number of results per page (default 20)' })
   @ApiQuery({
     name: 'sortBy',
     required: false,
@@ -105,13 +109,15 @@ export class ScoresController {
     ],
     description: 'Sort by score type',
   })
-  @ApiResponse({ status: 200, description: 'Top domains by score' })
+  @ApiResponse({ status: 200, description: 'Top domains by score with pagination' })
   async getTopDomains(
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('sortBy') sortBy?: string,
   ) {
     return this.scoresService.getTopScores(
       ScoreTargetType.DOMAIN,
+      page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
       sortBy || 'totalScore',
     );

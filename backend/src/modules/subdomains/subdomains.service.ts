@@ -324,6 +324,7 @@ export class SubdomainsService {
     total: number;
     alive: number;
     dead: number;
+    withCdn: number;
     withWaf: number;
     withVulnerabilities: number;
     newToday: number;
@@ -331,9 +332,10 @@ export class SubdomainsService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const [total, alive, withWaf, withVulnerabilities, newToday] = await Promise.all([
+    const [total, alive, withCdn, withWaf, withVulnerabilities, newToday] = await Promise.all([
       this.subdomainModel.countDocuments(),
       this.subdomainModel.countDocuments({ isAlive: true }),
+      this.subdomainModel.countDocuments({ cdn: { $exists: true, $ne: [] } }),
       this.subdomainModel.countDocuments({ waf: { $exists: true, $ne: [] } }),
       this.subdomainModel.countDocuments({ vulnerabilityCount: { $gt: 0 } }),
       this.subdomainModel.countDocuments({ firstSeen: { $gte: today } }),
@@ -343,6 +345,7 @@ export class SubdomainsService {
       total,
       alive,
       dead: total - alive,
+      withCdn,
       withWaf,
       withVulnerabilities,
       newToday,

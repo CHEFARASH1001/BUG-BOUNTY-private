@@ -1151,20 +1151,36 @@ export class ScoresService {
 
   async getTopScores(
     targetType: ScoreTargetType,
+    page = 1,
     limit = 20,
     sortBy = 'totalScore',
-  ): Promise<ScoreDocument[]> {
+  ): Promise<{ data: ScoreDocument[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const validSortFields = [
       'totalScore', 'exploitabilityScore', 'historicalScore',
       'programQualityScore', 'competitionScore', 'attackSurfaceScore', 'pentestScore',
     ];
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'totalScore';
+    const skip = (page - 1) * limit;
 
-    return this.scoreModel
-      .find({ targetType })
-      .sort({ [sortField]: -1 })
-      .limit(limit)
-      .exec();
+    const [data, total] = await Promise.all([
+      this.scoreModel
+        .find({ targetType })
+        .sort({ [sortField]: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.scoreModel.countDocuments({ targetType }).exec(),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async compareScores(targetIds: string[], targetType: ScoreTargetType): Promise<ScoreDocument[]> {

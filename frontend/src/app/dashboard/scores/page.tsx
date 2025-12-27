@@ -351,19 +351,25 @@ export default function ScoresPage() {
   const [syncing, setSyncing] = useState(false);
   const [sortBy, setSortBy] = useState('totalScore');
   const [selectedTier, setSelectedTier] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<{ total: number; totalPages: number } | null>(null);
+  const limit = 20;
 
   useEffect(() => {
     fetchData();
-  }, [sortBy]);
+  }, [sortBy, page]);
 
   const fetchData = async () => {
     try {
       setLoading(true);
       const [scoresRes, statsRes] = await Promise.all([
-        scoresApi.getTopPrograms({ limit: 500, sortBy: sortBy as any }),
+        scoresApi.getTopPrograms({ page, limit, sortBy: sortBy as any }),
         scoresApi.getStats(),
       ]);
-      setScores(scoresRes.data || []);
+      setScores(scoresRes.data.data || scoresRes.data || []);
+      if (scoresRes.data.pagination) {
+        setPagination(scoresRes.data.pagination);
+      }
       setStats(statsRes.data);
     } catch (error) {
       console.error('Failed to fetch scores:', error);
@@ -578,8 +584,44 @@ export default function ScoresPage() {
         /* Score Cards */
         <div className="space-y-4">
           {filteredScores.map((score, index) => (
-            <ScoreCard key={score._id} score={score} rank={index + 1} />
+            <ScoreCard key={score._id} score={score} rank={((page - 1) * limit) + index + 1} />
           ))}
+          
+          {/* Pagination */}
+          {pagination && pagination.totalPages > 1 && !selectedTier && (
+            <div className="flex items-center justify-between p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800">
+              <div className="text-sm text-slate-400">
+                Showing {((page - 1) * limit) + 1} - {Math.min(page * limit, pagination.total)} of {pagination.total} programs
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    page === 1
+                      ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+                  }`}
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-slate-400">
+                  Page {page} of {pagination.totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
+                  disabled={page === pagination.totalPages}
+                  className={`px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                    page === pagination.totalPages
+                      ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
+                      : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+                  }`}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

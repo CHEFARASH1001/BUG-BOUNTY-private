@@ -287,6 +287,7 @@ export default function SubdomainsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterOptions, setFilterOptions] = useState<FilterOptions | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [stats, setStats] = useState<{ total: number; alive: number; dead: number; withCdn: number } | null>(null);
   
   // Filter states
   const [searchQuery, setSearchQuery] = useState('');
@@ -377,16 +378,20 @@ export default function SubdomainsPage() {
   }, [handleSubdomainUpdate, handleSubdomainStatusChange]);
 
   useEffect(() => {
-    const fetchFilterOptions = async () => {
+    const fetchInitialData = async () => {
       try {
-        const response = await subdomainsApi.getFilterOptions();
-        setFilterOptions(response.data);
+        const [filterResponse, statsResponse] = await Promise.all([
+          subdomainsApi.getFilterOptions(),
+          subdomainsApi.getOverviewStats(),
+        ]);
+        setFilterOptions(filterResponse.data);
+        setStats(statsResponse.data);
         setFilterOptionsLoaded(true);
       } catch (err) {
-        console.error('Failed to fetch filter options:', err);
+        console.error('Failed to fetch initial data:', err);
       }
     };
-    fetchFilterOptions();
+    fetchInitialData();
   }, []);
 
   const fetchSubdomains = useCallback(async (page = 1) => {
@@ -489,10 +494,6 @@ export default function SubdomainsPage() {
     }
   };
 
-  const aliveCount = subdomains.filter(s => s.isAlive).length;
-  const deadCount = subdomains.filter(s => !s.isAlive).length;
-  const withCdnCount = subdomains.filter(s => s.cdn && s.cdn.length > 0).length;
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -547,10 +548,10 @@ export default function SubdomainsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total', value: pagination.total.toLocaleString(), icon: Layers, color: 'text-primary-400' },
-          { label: 'Alive (page)', value: aliveCount, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'Dead (page)', value: deadCount, icon: XCircle, color: 'text-red-400' },
-          { label: 'With CDN (page)', value: withCdnCount, icon: Shield, color: 'text-orange-400' },
+          { label: 'Total', value: stats?.total?.toLocaleString() ?? '...', icon: Layers, color: 'text-primary-400' },
+          { label: 'Alive', value: stats?.alive?.toLocaleString() ?? '...', icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Dead', value: stats?.dead?.toLocaleString() ?? '...', icon: XCircle, color: 'text-red-400' },
+          { label: 'With CDN', value: stats?.withCdn?.toLocaleString() ?? '...', icon: Shield, color: 'text-orange-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
@@ -562,7 +563,7 @@ export default function SubdomainsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-slate-400 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
+                <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
               </div>
               <stat.icon className={cn('w-8 h-8', stat.color)} />
             </div>

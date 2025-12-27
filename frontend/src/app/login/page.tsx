@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Terminal, Mail, Lock, Eye, EyeOff, ArrowRight, Github, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
@@ -12,6 +13,8 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const redirectUrl = searchParams.get('redirect');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +25,8 @@ export default function LoginPage() {
       const response = await authApi.login(email, password);
       const { accessToken } = response.data;
       localStorage.setItem('token', accessToken);
-      window.location.href = '/dashboard';
+      // Redirect to the original destination or dashboard
+      window.location.href = redirectUrl || '/dashboard';
     } catch (err: any) {
       console.error('Login failed:', err);
       setError(err.response?.data?.message || 'Invalid credentials');

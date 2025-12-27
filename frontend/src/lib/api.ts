@@ -179,7 +179,7 @@ export const cronApi = {
   updateConfig: (jobName: string, data: { schedule?: string; enabled?: boolean }) =>
     api.put(`/cron/configs/${jobName}`, data),
   triggerJob: (jobName: string) => api.post(`/cron/trigger/${jobName}`),
-  getExecutions: (filters?: { jobName?: string; limit?: number }) =>
+  getExecutions: (filters?: { jobName?: string; page?: number; limit?: number }) =>
     api.get('/cron/executions', { params: filters }),
   getRunningJobs: () => api.get('/cron/running'),
   getExecutionLogs: (executionId: string) => api.get(`/cron/executions/${executionId}/logs`),
@@ -229,14 +229,16 @@ export const scoresApi = {
   getProgramScore: (id: string) => api.get(`/scores/program/${id}`),
   getDomainScore: (id: string) => api.get(`/scores/domain/${id}`),
   
-  // Get top scores with sorting options
+  // Get top scores with sorting options and pagination
   getTopPrograms: (filters?: { 
+    page?: number;
     limit?: number; 
     sortBy?: 'totalScore' | 'exploitabilityScore' | 'historicalScore' | 
              'programQualityScore' | 'competitionScore' | 'attackSurfaceScore' | 'pentestScore';
   }) => api.get('/scores/top/programs', { params: filters }),
   
   getTopDomains: (filters?: { 
+    page?: number;
     limit?: number; 
     sortBy?: 'totalScore' | 'exploitabilityScore' | 'historicalScore' | 
              'programQualityScore' | 'competitionScore' | 'attackSurfaceScore' | 'pentestScore';

@@ -356,14 +356,31 @@ export class CronService implements OnModuleInit {
 
   async getExecutions(
     jobName?: string,
+    page = 1,
     limit = 20,
-  ): Promise<JobExecutionDocument[]> {
+  ): Promise<{ data: JobExecutionDocument[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const query = jobName ? { jobName } : {};
-    return this.jobExecutionModel
-      .find(query)
-      .sort({ startedAt: -1 })
-      .limit(limit)
-      .exec();
+    const skip = (page - 1) * limit;
+    
+    const [data, total] = await Promise.all([
+      this.jobExecutionModel
+        .find(query)
+        .sort({ startedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .exec(),
+      this.jobExecutionModel.countDocuments(query).exec(),
+    ]);
+    
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async getRunningJobs(): Promise<JobExecutionDocument[]> {

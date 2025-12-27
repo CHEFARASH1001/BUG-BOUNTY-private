@@ -134,17 +134,23 @@ export default function CronJobsPage() {
     messagesUnacked: number;
   } | null>(null);
   const [clearingQueue, setClearingQueue] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyPagination, setHistoryPagination] = useState<{ total: number; totalPages: number } | null>(null);
+  const historyLimit = 20;
 
   const fetchData = async () => {
     try {
       const [configsRes, executionsRes, runningRes, queueStatsRes] = await Promise.all([
         cronApi.getConfigs(),
-        cronApi.getExecutions({ limit: 50 }),
+        cronApi.getExecutions({ page: historyPage, limit: historyLimit }),
         cronApi.getRunningJobs(),
         cronApi.getSubfinderQueueStats().catch(() => ({ data: null })),
       ]);
       setConfigs(configsRes.data);
-      setExecutions(executionsRes.data);
+      setExecutions(executionsRes.data.data || executionsRes.data);
+      if (executionsRes.data.pagination) {
+        setHistoryPagination(executionsRes.data.pagination);
+      }
       setRunningJobs(runningRes.data);
       if (queueStatsRes.data) {
         setSubfinderQueueStats(queueStatsRes.data);
@@ -161,7 +167,7 @@ export default function CronJobsPage() {
     // Poll for updates every 10 seconds
     const interval = setInterval(fetchData, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [historyPage]);
 
   const handleTriggerJob = async (jobName: string) => {
     setTriggeringJob(jobName);
@@ -709,6 +715,44 @@ export default function CronJobsPage() {
                 </tbody>
               </table>
             </div>
+            
+            {/* Pagination */}
+            {historyPagination && historyPagination.totalPages > 1 && (
+              <div className="flex items-center justify-between p-4 border-t border-dark-800">
+                <div className="text-sm text-slate-400">
+                  Showing {((historyPage - 1) * historyLimit) + 1} - {Math.min(historyPage * historyLimit, historyPagination.total)} of {historyPagination.total} executions
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
+                    disabled={historyPage === 1}
+                    className={clsx(
+                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                      historyPage === 1
+                        ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+                    )}
+                  >
+                    Previous
+                  </button>
+                  <span className="text-sm text-slate-400">
+                    Page {historyPage} of {historyPagination.totalPages}
+                  </span>
+                  <button
+                    onClick={() => setHistoryPage(p => Math.min(historyPagination.totalPages, p + 1))}
+                    disabled={historyPage === historyPagination.totalPages}
+                    className={clsx(
+                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                      historyPage === historyPagination.totalPages
+                        ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
+                        : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
+                    )}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

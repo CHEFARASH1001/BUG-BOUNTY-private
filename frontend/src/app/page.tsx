@@ -10,17 +10,109 @@ import {
   Scan,
   ArrowRight,
   Terminal,
-  Zap
+  Zap,
+  Loader2,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { programsApi, domainsApi, subdomainsApi, scansApi } from '@/lib/api';
+
+interface Stats {
+  programs: number;
+  domains: number;
+  subdomains: number;
+  aliveHosts: number;
+}
 
 export default function HomePage() {
   const [domain, setDomain] = useState('');
   const [mounted, setMounted] = useState(false);
+  const [stats, setStats] = useState<Stats>({ programs: 0, domains: 0, subdomains: 0, aliveHosts: 0 });
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<{ success: boolean; message: string } | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
+    
+    // Fetch real stats from the backend
+    const fetchStats = async () => {
+      try {
+        const [programsRes, domainsRes, subdomainsRes, aliveRes] = await Promise.all([
+          programsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+          domainsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+          subdomainsApi.getAll({ limit: 1 }).catch(() => ({ data: { pagination: { total: 0 } } })),
+          subdomainsApi.getAll({ limit: 1, isAlive: true }).catch(() => ({ data: { pagination: { total: 0 } } })),
+        ]);
+
+        setStats({
+          programs: programsRes.data?.pagination?.total ?? 0,
+          domains: domainsRes.data?.pagination?.total ?? 0,
+          subdomains: subdomainsRes.data?.pagination?.total ?? 0,
+          aliveHosts: aliveRes.data?.pagination?.total ?? 0,
+        });
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    fetchStats();
   }, []);
+
+  const handleStartScan = async () => {
+    if (!domain.trim()) {
+      setScanResult({ success: false, message: 'Please enter a domain' });
+      return;
+    }
+
+    // Check if user is logged in
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) {
+      // Redirect to login with return URL
+      router.push(`/login?redirect=/dashboard/scans/new?domain=${encodeURIComponent(domain)}`);
+      return;
+    }
+
+    setScanning(true);
+    setScanResult(null);
+
+    try {
+      // Create a new scan for the domain
+      const response = await scansApi.create({
+        target: domain,
+        type: 'full',
+        options: {
+          subdomain_enum: true,
+          dns_resolution: true,
+          http_probe: true,
+        }
+      });
+      
+      setScanResult({ success: true, message: 'Scan started! Redirecting to dashboard...' });
+      
+      // Redirect to scans page after a short delay
+      setTimeout(() => {
+        router.push('/dashboard/scans');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Failed to start scan:', error);
+      if (error.response?.status === 401) {
+        router.push(`/login?redirect=/dashboard/scans/new?domain=${encodeURIComponent(domain)}`);
+      } else {
+        setScanResult({ 
+          success: false, 
+          message: error.response?.data?.message || 'Failed to start scan. Please try again.' 
+        });
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const features = [
     {
@@ -145,15 +237,50 @@ export default function HomePage() {
                   type="text"
                   value={domain}
                   onChange={(e) => setDomain(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleStartScan()}
                   placeholder="Enter target domain (e.g., example.com)"
                   className="flex-1 px-4 py-5 bg-transparent text-white placeholder-slate-500 focus:outline-none text-lg"
+                  disabled={scanning}
                 />
-                <button className="m-2 px-6 py-3 bg-primary-600 hover:bg-primary-500 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors">
-                  <Zap className="w-5 h-5" />
-                  Start Scan
+                <button 
+                  onClick={handleStartScan}
+                  disabled={scanning}
+                  className="m-2 px-6 py-3 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-600/50 text-white font-semibold rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  {scanning ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Scanning...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-5 h-5" />
+                      Start Scan
+                    </>
+                  )}
                 </button>
               </div>
             </div>
+            
+            {/* Scan result message */}
+            {scanResult && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className={`mt-4 p-3 rounded-lg flex items-center gap-2 ${
+                  scanResult.success 
+                    ? 'bg-green-500/20 border border-green-500/30 text-green-400' 
+                    : 'bg-red-500/20 border border-red-500/30 text-red-400'
+                }`}
+              >
+                {scanResult.success ? (
+                  <CheckCircle className="w-5 h-5" />
+                ) : (
+                  <XCircle className="w-5 h-5" />
+                )}
+                <span>{scanResult.message}</span>
+              </motion.div>
+            )}
           </motion.div>
 
           {/* Stats */}
@@ -164,10 +291,10 @@ export default function HomePage() {
             className="grid grid-cols-2 md:grid-cols-4 gap-6 max-w-3xl mx-auto mb-20"
           >
             {[
-              { label: 'Domains Scanned', value: '10K+' },
-              { label: 'Vulns Found', value: '50K+' },
-              { label: 'Subdomains', value: '5M+' },
-              { label: 'Uptime', value: '99.9%' },
+              { label: 'Programs', value: statsLoading ? '...' : stats.programs.toLocaleString() },
+              { label: 'Domains', value: statsLoading ? '...' : stats.domains.toLocaleString() },
+              { label: 'Subdomains', value: statsLoading ? '...' : stats.subdomains.toLocaleString() },
+              { label: 'Alive Hosts', value: statsLoading ? '...' : stats.aliveHosts.toLocaleString() },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="text-3xl font-bold text-primary-400 mb-1">{stat.value}</div>

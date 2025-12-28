@@ -17,10 +17,13 @@ import {
   Github,
   X,
   Upload,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { toolsApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
 
 // Tool category enum matching backend
 const ToolCategory = {
@@ -103,6 +106,8 @@ export default function ToolsPage() {
     failureCount: number;
     failures?: Array<{ name: string; reason: string }>;
   } | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   const fetchTools = async () => {
     setLoading(true);
@@ -189,36 +194,38 @@ export default function ToolsPage() {
   const activeCount = tools.filter((t) => t.isActive).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Wrench className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <Wrench className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Security Tools Registry
           </h1>
-          <p className="text-slate-400 mt-1">Manage and execute security reconnaissance tools</p>
+          <p className="text-sm md:text-base text-slate-400 mt-1">Manage and execute security reconnaissance tools</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={fetchTools}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700"
+            className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] px-3 md:px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700 touch-manipulation"
+            aria-label="Refresh"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <button
             onClick={handleBulkImport}
             disabled={importing}
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+            className="flex items-center justify-center gap-2 min-h-[44px] px-3 md:px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation"
           >
             {importing ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <Download className="w-4 h-4" />
             )}
-            Import Tools
+            <span className="hidden xs:inline">Import Tools</span>
+            <span className="xs:hidden">Import</span>
           </button>
         </div>
       </div>
@@ -231,7 +238,7 @@ export default function ToolsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: 'Total Tools', value: tools.length, icon: Wrench, color: 'text-primary-400' },
           { label: 'Installed', value: installedCount, icon: CheckCircle, color: 'text-green-400' },
@@ -243,84 +250,166 @@ export default function ToolsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+            className="p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
+                <p className="text-slate-400 text-xs md:text-sm">{stat.label}</p>
+                <p className="text-lg md:text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
               </div>
-              <stat.icon className={cn('w-8 h-8', stat.color)} />
+              <stat.icon className={cn('w-6 h-6 md:w-8 md:h-8', stat.color)} />
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search tools..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <select
-            value={selectedCategory || ''}
-            onChange={(e) => setSelectedCategory(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+      {isMobile ? (
+        <div className="space-y-3">
+          {/* Search - always visible */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search tools..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors touch-manipulation"
+            />
+          </div>
+          
+          {/* Collapsible filter button */}
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3 min-h-[44px]',
+              'bg-dark-800 border border-dark-700 rounded-lg',
+              'text-sm text-slate-300 font-medium',
+              'transition-colors hover:bg-dark-700 touch-manipulation',
+              filtersExpanded && 'border-primary-500/30 bg-dark-700'
+            )}
+            aria-expanded={filtersExpanded}
           >
-            <option value="">All Categories</option>
-            {Object.entries(ToolCategory).map(([key, value]) => (
-              <option key={value} value={value}>
-                {categoryConfig[value]?.label || key} ({categoryCounts[value] || 0})
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* Category Tabs */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={() => setSelectedCategory(null)}
-          className={cn(
-            'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-            !selectedCategory
-              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-              : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
-          )}
-        >
-          All ({tools.length})
-        </button>
-        {Object.entries(ToolCategory)
-          .map(([_, value]) => ({
-            category: value,
-            count: categoryCounts[value] || 0,
-            config: categoryConfig[value],
-          }))
-          .filter((item) => item.count > 0)
-          .sort((a, b) => b.count - a.count)
-          .map(({ category, count, config }) => (
-            <button
-              key={category}
-              onClick={() => setSelectedCategory(category)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-sm font-medium transition-colors',
-                selectedCategory === category
-                  ? `${config?.bg || 'bg-slate-500/20'} ${config?.color || 'text-slate-400'} border border-current/30`
-                  : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span>Category Filter</span>
+              {selectedCategory && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  1
+                </span>
               )}
+            </div>
+            {filtersExpanded ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+          
+          {/* Expandable filter panel */}
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-200 ease-in-out',
+              filtersExpanded ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0'
+            )}
+          >
+            <div className="p-4 bg-dark-800/50 border border-dark-700 rounded-lg space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Category</label>
+                <select
+                  value={selectedCategory || ''}
+                  onChange={(e) => setSelectedCategory(e.target.value || null)}
+                  className="w-full px-3 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
+                >
+                  <option value="">All Categories</option>
+                  {Object.entries(ToolCategory).map(([key, value]) => (
+                    <option key={value} value={value}>
+                      {categoryConfig[value]?.label || key} ({categoryCounts[value] || 0})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {selectedCategory && (
+                <button
+                  onClick={() => setSelectedCategory(null)}
+                  className="w-full px-4 py-3 min-h-[44px] bg-dark-700 border border-dark-600 rounded-lg text-sm text-slate-400 hover:text-white transition-colors touch-manipulation"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* Desktop Filters */
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search tools..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <select
+              value={selectedCategory || ''}
+              onChange={(e) => setSelectedCategory(e.target.value || null)}
+              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
             >
-              {config?.label || category} ({count})
-            </button>
-          ))}
+              <option value="">All Categories</option>
+              {Object.entries(ToolCategory).map(([key, value]) => (
+                <option key={value} value={value}>
+                  {categoryConfig[value]?.label || key} ({categoryCounts[value] || 0})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
+
+      {/* Category Tabs - Scrollable on mobile */}
+      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex items-center gap-2 min-w-max md:flex-wrap">
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={cn(
+              'px-3 py-2 md:py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap touch-manipulation min-h-[40px] md:min-h-0',
+              !selectedCategory
+                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
+            )}
+          >
+            All ({tools.length})
+          </button>
+          {Object.entries(ToolCategory)
+            .map(([_, value]) => ({
+              category: value,
+              count: categoryCounts[value] || 0,
+              config: categoryConfig[value],
+            }))
+            .filter((item) => item.count > 0)
+            .sort((a, b) => b.count - a.count)
+            .map(({ category, count, config }) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={cn(
+                  'px-3 py-2 md:py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap touch-manipulation min-h-[40px] md:min-h-0',
+                  selectedCategory === category
+                    ? `${config?.bg || 'bg-slate-500/20'} ${config?.color || 'text-slate-400'} border border-current/30`
+                    : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
+                )}
+              >
+                {config?.label || category} ({count})
+              </button>
+            ))}
+        </div>
       </div>
 
       {/* Loading State */}
@@ -333,7 +422,7 @@ export default function ToolsPage() {
 
       {/* Tools Grid */}
       {!loading && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
           {filteredTools.map((tool, index) => {
             const installStatus = getInstallationStatus(tool);
             const statusConfig = installationStatusConfig[installStatus];
@@ -348,29 +437,30 @@ export default function ToolsPage() {
                 className="group relative"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
-                <div className="relative p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors h-full flex flex-col">
+                <div className="relative p-4 md:p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors h-full flex flex-col">
                   {/* Header */}
                   <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-primary-500/20 rounded-lg">
-                        <Wrench className="w-5 h-5 text-primary-400" />
+                    <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+                      <div className="p-1.5 md:p-2 bg-primary-500/20 rounded-lg flex-shrink-0">
+                        <Wrench className="w-4 h-4 md:w-5 md:h-5 text-primary-400" />
                       </div>
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <Link
                           href={`/dashboard/tools/${tool._id}`}
-                          className="text-lg font-semibold text-white hover:text-primary-400 transition-colors"
+                          className="text-base md:text-lg font-semibold text-white hover:text-primary-400 transition-colors block truncate"
                         >
                           {tool.displayName}
                         </Link>
-                        <p className="text-xs text-slate-500">@{tool.name}</p>
+                        <p className="text-xs text-slate-500 truncate">@{tool.name}</p>
                       </div>
                     </div>
                     <a
                       href={tool.githubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
                       title="View on GitHub"
+                      aria-label="View on GitHub"
                     >
                       <Github className="w-4 h-4" />
                     </a>
@@ -383,7 +473,7 @@ export default function ToolsPage() {
 
                   {/* Categories */}
                   <div className="flex items-center gap-1.5 flex-wrap mb-4">
-                    {tool.categories.slice(0, 3).map((cat) => {
+                    {tool.categories.slice(0, 2).map((cat) => {
                       const config = categoryConfig[cat];
                       return (
                         <span
@@ -398,8 +488,8 @@ export default function ToolsPage() {
                         </span>
                       );
                     })}
-                    {tool.categories.length > 3 && (
-                      <span className="text-xs text-slate-500">+{tool.categories.length - 3}</span>
+                    {tool.categories.length > 2 && (
+                      <span className="text-xs text-slate-500">+{tool.categories.length - 2}</span>
                     )}
                   </div>
 
@@ -417,7 +507,7 @@ export default function ToolsPage() {
                     </span>
                     <Link
                       href={`/dashboard/tools/${tool._id}`}
-                      className="flex items-center gap-1 text-xs text-primary-400 hover:text-primary-300 transition-colors"
+                      className="flex items-center justify-center gap-1 min-h-[44px] px-3 text-xs text-primary-400 hover:text-primary-300 transition-colors touch-manipulation"
                     >
                       View Details
                       <ExternalLink className="w-3 h-3" />
@@ -463,10 +553,10 @@ export default function ToolsPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-md bg-dark-900 rounded-xl border border-dark-700 overflow-hidden"
+              className="w-full max-w-md bg-dark-900 rounded-xl border border-dark-700 overflow-hidden max-h-[90vh] flex flex-col"
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 border-b border-dark-800">
+              <div className="flex items-center justify-between p-4 border-b border-dark-800 flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-primary-500/20 rounded-lg">
                     <Upload className="w-5 h-5 text-primary-400" />
@@ -476,7 +566,8 @@ export default function ToolsPage() {
                 {!importing && (
                   <button
                     onClick={closeImportModal}
-                    className="p-2 text-slate-400 hover:text-white transition-colors"
+                    className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
+                    aria-label="Close"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -484,7 +575,7 @@ export default function ToolsPage() {
               </div>
 
               {/* Modal Content */}
-              <div className="p-6">
+              <div className="p-4 md:p-6 overflow-y-auto flex-1">
                 {importing ? (
                   <div className="text-center py-8">
                     <Loader2 className="w-12 h-12 text-primary-400 animate-spin mx-auto mb-4" />
@@ -496,16 +587,16 @@ export default function ToolsPage() {
                 ) : importResult ? (
                   <div className="space-y-4">
                     {/* Summary */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg text-center">
-                        <CheckCircle className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                        <p className="text-2xl font-bold text-green-400">{importResult.successCount}</p>
-                        <p className="text-sm text-green-400/80">Succeeded</p>
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <div className="p-3 md:p-4 bg-green-500/10 border border-green-500/30 rounded-lg text-center">
+                        <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-400 mx-auto mb-2" />
+                        <p className="text-xl md:text-2xl font-bold text-green-400">{importResult.successCount}</p>
+                        <p className="text-xs md:text-sm text-green-400/80">Succeeded</p>
                       </div>
-                      <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
-                        <XCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-                        <p className="text-2xl font-bold text-red-400">{importResult.failureCount}</p>
-                        <p className="text-sm text-red-400/80">Failed</p>
+                      <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+                        <XCircle className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-xl md:text-2xl font-bold text-red-400">{importResult.failureCount}</p>
+                        <p className="text-xs md:text-sm text-red-400/80">Failed</p>
                       </div>
                     </div>
 
@@ -539,7 +630,7 @@ export default function ToolsPage() {
                     {/* Close Button */}
                     <button
                       onClick={closeImportModal}
-                      className="w-full py-2 bg-dark-800 hover:bg-dark-700 text-white rounded-lg transition-colors"
+                      className="w-full py-3 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-white rounded-lg transition-colors touch-manipulation"
                     >
                       Close
                     </button>

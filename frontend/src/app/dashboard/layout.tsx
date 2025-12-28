@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -31,9 +31,12 @@ import {
   Database,
   Brain,
   Loader2,
+  Menu,
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi, authApi } from '@/lib/api';
+import { useIsMobile, useMobileNav, useIsSmallMobile } from '@/hooks';
+import { MobileSidebar } from '@/components/MobileSidebar';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -82,6 +85,45 @@ export default function DashboardLayout({
   const notificationRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   const router = useRouter();
+  
+  // Mobile navigation state
+  const isMobile = useIsMobile();
+  const isSmallMobile = useIsSmallMobile();
+  const { isOpen: isMobileMenuOpen, openMobileMenu, closeMobileMenu } = useMobileNav();
+  
+  // Mobile search expansion state
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  
+  // Handle search expansion toggle
+  const toggleSearch = useCallback(() => {
+    setIsSearchExpanded(prev => !prev);
+  }, []);
+  
+  // Auto-focus search input when expanded on mobile
+  useEffect(() => {
+    if (isSearchExpanded && isMobile && searchInputRef.current) {
+      // Small delay to ensure the input is visible before focusing
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isSearchExpanded, isMobile]);
+  
+  // Close search when clicking outside on mobile
+  const searchContainerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isMobile || !isSearchExpanded) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchExpanded(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobile, isSearchExpanded]);
 
   // Check authentication on mount
   useEffect(() => {
@@ -182,12 +224,20 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-dark-950 flex">
-      {/* Sidebar */}
+      {/* Mobile Sidebar Overlay */}
+      <MobileSidebar
+        isOpen={isMobileMenuOpen}
+        onClose={closeMobileMenu}
+        navigation={navigation}
+        documentsSection={documentsSection}
+      />
+
+      {/* Desktop Sidebar - hidden on mobile */}
       <motion.aside
         initial={false}
         animate={{ width: sidebarCollapsed ? 80 : 256 }}
         transition={{ duration: 0.2 }}
-        className="fixed left-0 top-0 h-screen bg-dark-900/50 backdrop-blur-xl border-r border-dark-800 z-40 flex flex-col"
+        className="fixed left-0 top-0 h-screen bg-dark-900/50 backdrop-blur-xl border-r border-dark-800 z-40 flex-col hidden md:flex"
       >
         {/* Logo */}
         <div className="p-4 border-b border-dark-800">
@@ -364,28 +414,113 @@ export default function DashboardLayout({
       {/* Main content */}
       <div className={clsx(
         'flex-1 transition-all duration-200',
-        sidebarCollapsed ? 'ml-20' : 'ml-64'
+        'ml-0 md:ml-64',
+        !isMobile && sidebarCollapsed && 'md:ml-20',
+        !isMobile && !sidebarCollapsed && 'md:ml-64'
       )}>
         {/* Top bar */}
-        <header className="sticky top-0 z-30 bg-dark-950/80 backdrop-blur-xl border-b border-dark-800">
-          <div className="flex items-center justify-between px-6 py-4">
-            {/* Search */}
-            <div className="relative max-w-md flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-              <input
-                type="text"
-                placeholder="Search domains, vulnerabilities..."
-                className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
-              />
+        <header 
+          className="sticky top-0 z-30 bg-dark-950/80 backdrop-blur-xl border-b border-dark-800"
+          data-testid="dashboard-header"
+        >
+          <div className={clsx(
+            "flex items-center justify-between py-3 transition-all",
+            // Responsive padding: smaller on mobile, larger on desktop
+            "px-3 sm:px-4 md:px-6"
+          )}>
+            {/* Mobile hamburger menu button */}
+            <button
+              onClick={openMobileMenu}
+              className="md:hidden p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors touch-manipulation mr-2"
+              aria-label="Open navigation menu"
+              aria-expanded={isMobileMenuOpen}
+              data-testid="hamburger-menu-button"
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+
+            {/* Search - Responsive: icon on mobile, full input on desktop */}
+            <div 
+              ref={searchContainerRef}
+              className={clsx(
+                "relative transition-all duration-200",
+                // On mobile: show icon button or expanded full-width input
+                isMobile ? (
+                  isSearchExpanded 
+                    ? "flex-1 max-w-full" 
+                    : "flex-shrink-0"
+                ) : "max-w-md flex-1"
+              )}
+              data-testid="search-container"
+            >
+              {/* Mobile: Search icon button (when collapsed) */}
+              {isMobile && !isSearchExpanded && (
+                <button
+                  onClick={toggleSearch}
+                  className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors touch-manipulation"
+                  aria-label="Open search"
+                  data-testid="search-icon-button"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
+              )}
+              
+              {/* Search input - always visible on desktop, expandable on mobile */}
+              {(!isMobile || isSearchExpanded) && (
+                <motion.div
+                  initial={isMobile ? { opacity: 0, width: 0 } : false}
+                  animate={{ opacity: 1, width: '100%' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="relative w-full"
+                  data-testid="search-input-container"
+                >
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder={isSmallMobile ? "Search..." : "Search domains, vulnerabilities..."}
+                    className={clsx(
+                      "w-full pl-10 pr-4 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors",
+                      // Responsive padding: smaller on mobile
+                      "py-2 sm:py-2"
+                    )}
+                    data-testid="search-input"
+                  />
+                  {/* Close button for mobile expanded search */}
+                  {isMobile && isSearchExpanded && (
+                    <button
+                      onClick={() => setIsSearchExpanded(false)}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-white transition-colors"
+                      aria-label="Close search"
+                      data-testid="search-close-button"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </motion.div>
+              )}
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-4">
+            {/* Actions - hide some on mobile when search is expanded */}
+            <div className={clsx(
+              "flex items-center transition-all",
+              // Responsive gap: smaller on mobile
+              "gap-2 sm:gap-3 md:gap-4",
+              // Hide actions when search is expanded on mobile
+              isMobile && isSearchExpanded && "hidden"
+            )}>
               {/* Notifications */}
               <div className="relative" ref={notificationRef}>
                 <button 
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
-                  className="relative p-2 text-slate-400 hover:text-white transition-colors"
+                  className={clsx(
+                    "relative text-slate-400 hover:text-white transition-colors touch-manipulation",
+                    // Ensure minimum touch target on mobile
+                    "p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  )}
+                  aria-label="Notifications"
+                  data-testid="notifications-button"
                 >
                   <Bell className="w-5 h-5" />
                   {notifications.length > 0 && (
@@ -399,7 +534,11 @@ export default function DashboardLayout({
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute right-0 top-full mt-2 w-80 bg-dark-900 border border-dark-700 rounded-xl shadow-xl z-50 overflow-hidden"
+                      className={clsx(
+                        "absolute right-0 top-full mt-2 bg-dark-900 border border-dark-700 rounded-xl shadow-xl z-50 overflow-hidden",
+                        // Responsive width: smaller on mobile
+                        "w-72 sm:w-80"
+                      )}
                     >
                       <div className="p-3 border-b border-dark-700 flex items-center justify-between">
                         <h3 className="text-sm font-medium text-white">Recent Activity</h3>
@@ -453,16 +592,25 @@ export default function DashboardLayout({
                 </AnimatePresence>
               </div>
               
-              <div className="h-8 w-px bg-dark-700" />
+              {/* Divider - hide on small mobile */}
+              <div className="h-8 w-px bg-dark-700 hidden sm:block" />
               
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-primary-500/20 rounded-lg flex items-center justify-center">
+              {/* User profile and logout */}
+              <div className="flex items-center gap-2 sm:gap-3">
+                {/* User avatar - hide on small mobile */}
+                <div className="w-8 h-8 bg-primary-500/20 rounded-lg items-center justify-center hidden sm:flex">
                   <span className="text-sm font-medium text-primary-400">U</span>
                 </div>
                 <button 
                   onClick={handleLogout}
-                  className="p-2 text-slate-400 hover:text-red-400 transition-colors"
+                  className={clsx(
+                    "text-slate-400 hover:text-red-400 transition-colors touch-manipulation",
+                    // Ensure minimum touch target on mobile
+                    "p-2 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  )}
                   title="Logout"
+                  aria-label="Logout"
+                  data-testid="logout-button"
                 >
                   <LogOut className="w-5 h-5" />
                 </button>
@@ -472,7 +620,7 @@ export default function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="p-6">
+        <main className="p-4 sm:p-5 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
           {children}
         </main>
       </div>

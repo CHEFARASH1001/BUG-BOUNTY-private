@@ -21,10 +21,14 @@ import {
   Shield,
   Server,
   Eye,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { cn, formatDateTime, formatDuration } from '@/lib/utils';
 import { scansApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
 
 interface ScanData {
   _id: string;
@@ -77,11 +81,14 @@ const scanTypes: Record<string, { color: string; label: string }> = {
 };
 
 export default function ScansPage() {
+  const router = useRouter();
+  const isMobile = useIsMobile();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [scans, setScans] = useState<ScanData[]>([]);
   const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -130,27 +137,27 @@ export default function ScansPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Scan className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <Scan className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Scans
           </h1>
-          <p className="text-slate-400 mt-1">Monitor and manage your security scans</p>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Monitor and manage your security scans</p>
         </div>
         <Link
           href="/dashboard/scans/new"
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors min-h-[44px]"
         >
           <Plus className="w-4 h-4" />
-          New Scan
+          <span>New Scan</span>
         </Link>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: 'Total Scans', value: scans.length, icon: Scan, color: 'text-primary-400' },
           { label: 'Running', value: scans.filter(s => s.status === 'running').length, icon: Loader2, color: 'text-blue-400' },
@@ -162,46 +169,86 @@ export default function ScansPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+            className="p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                <p className="text-slate-400 text-xs md:text-sm">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-bold text-white mt-1">{stat.value}</p>
               </div>
-              <stat.icon className={cn('w-8 h-8', stat.color, stat.label === 'Running' && 'animate-spin')} />
+              <stat.icon className={cn('w-6 h-6 md:w-8 md:h-8', stat.color, stat.label === 'Running' && 'animate-spin')} />
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="space-y-3">
+        {/* Search - always visible */}
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search by domain..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            className="w-full pl-10 pr-4 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
           />
         </div>
 
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <select
-            value={selectedStatus || ''}
-            onChange={(e) => setSelectedStatus(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+        {/* Filter toggle button - mobile only */}
+        {isMobile && (
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3',
+              'bg-dark-800 border border-dark-700 rounded-lg',
+              'text-sm text-slate-300 font-medium',
+              'transition-colors hover:bg-dark-700',
+              'min-h-[44px]'
+            )}
+            aria-expanded={filtersExpanded}
           >
-            <option value="">All Status</option>
-            <option value="running">Running</option>
-            <option value="completed">Completed</option>
-            <option value="queued">Queued</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span>Filters</span>
+              {selectedStatus && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  1
+                </span>
+              )}
+            </div>
+            {filtersExpanded ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+        )}
+
+        {/* Filter controls - collapsible on mobile */}
+        {(!isMobile || filtersExpanded) && (
+          <div className={cn(
+            'flex gap-2',
+            isMobile ? 'flex-col p-4 bg-dark-800/50 border border-dark-700 rounded-lg' : 'flex-row items-center'
+          )}>
+            {!isMobile && <Filter className="w-4 h-4 text-slate-400" />}
+            <select
+              value={selectedStatus || ''}
+              onChange={(e) => setSelectedStatus(e.target.value || null)}
+              className={cn(
+                'px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50',
+                isMobile && 'w-full min-h-[44px]'
+              )}
+            >
+              <option value="">All Status</option>
+              <option value="running">Running</option>
+              <option value="completed">Completed</option>
+              <option value="queued">Queued</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Loading State */}
@@ -212,7 +259,7 @@ export default function ScansPage() {
       ) : (
         <>
           {/* Scans List */}
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {filteredScans.map((scan, index) => {
               const status = statusConfig[scan.status] || statusConfig.pending;
               const StatusIcon = status.icon;
@@ -227,25 +274,40 @@ export default function ScansPage() {
                   className="group relative"
                 >
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
-                  <div className="relative p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
+                  <div 
+                    className={cn(
+                      "relative p-4 md:p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors",
+                      isMobile && "cursor-pointer active:bg-dark-800"
+                    )}
+                    onClick={() => isMobile && router.push(`/dashboard/scans/${scan._id}`)}
+                    role={isMobile ? "button" : undefined}
+                    tabIndex={isMobile ? 0 : undefined}
+                    onKeyDown={(e) => {
+                      if (isMobile && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        router.push(`/dashboard/scans/${scan._id}`);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary-500/20 rounded-xl">
-                          <Globe className="w-6 h-6 text-primary-400" />
+                      <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
+                        <div className="p-2 md:p-3 bg-primary-500/20 rounded-xl shrink-0">
+                          <Globe className="w-5 h-5 md:w-6 md:h-6 text-primary-400" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 md:gap-3 flex-wrap">
                             <Link
                               href={`/dashboard/scans/${scan._id}`}
-                              className="text-lg font-semibold text-white hover:text-primary-400 transition-colors"
+                              className="text-base md:text-lg font-semibold text-white hover:text-primary-400 transition-colors truncate"
+                              onClick={(e) => isMobile && e.stopPropagation()}
                             >
                               {scan.target}
                             </Link>
-                            <span className={cn('px-2 py-0.5 rounded text-xs', scanType.color)}>
+                            <span className={cn('px-2 py-0.5 rounded text-xs shrink-0', scanType.color)}>
                               {scanType.label}
                             </span>
                             <span className={cn(
-                              'flex items-center gap-1 px-2 py-0.5 rounded text-xs',
+                              'flex items-center gap-1 px-2 py-0.5 rounded text-xs shrink-0',
                               status.bg,
                               status.color
                             )}>
@@ -253,51 +315,53 @@ export default function ScansPage() {
                               {status.label}
                             </span>
                           </div>
-                          <div className="flex items-center gap-4 mt-1 text-sm text-slate-400">
+                          <div className="flex items-center gap-2 md:gap-4 mt-1 text-xs md:text-sm text-slate-400 flex-wrap">
                             {scan.startedAt && (
-                              <span>Started: {formatDateTime(scan.startedAt)}</span>
+                              <span className="truncate">Started: {formatDateTime(scan.startedAt)}</span>
                             )}
                             {!scan.startedAt && scan.createdAt && (
-                              <span>Created: {formatDateTime(scan.createdAt)}</span>
+                              <span className="truncate">Created: {formatDateTime(scan.createdAt)}</span>
                             )}
-                            {scan.completedAt && scan.startedAt && (
+                            {scan.completedAt && scan.startedAt && !isMobile && (
                               <span>Duration: {formatDuration(new Date(scan.startedAt), new Date(scan.completedAt))}</span>
                             )}
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {scan.status === 'running' && (
-                          <button 
-                            onClick={() => handleCancel(scan._id)}
-                            className="p-2 text-slate-400 hover:text-red-400 transition-colors" 
-                            title="Cancel"
+                      {!isMobile && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          {scan.status === 'running' && (
+                            <button 
+                              onClick={() => handleCancel(scan._id)}
+                              className="p-2 text-slate-400 hover:text-red-400 transition-colors" 
+                              title="Cancel"
+                            >
+                              <Square className="w-4 h-4" />
+                            </button>
+                          )}
+                          {(scan.status === 'completed' || scan.status === 'failed') && (
+                            <button 
+                              onClick={() => handleRetry(scan._id)}
+                              className="p-2 text-slate-400 hover:text-primary-400 transition-colors" 
+                              title="Re-run"
+                            >
+                              <RefreshCw className="w-4 h-4" />
+                            </button>
+                          )}
+                          <Link
+                            href={`/dashboard/scans/${scan._id}`}
+                            className="p-2 text-slate-400 hover:text-white transition-colors"
+                            title="View Details"
                           >
-                            <Square className="w-4 h-4" />
-                          </button>
-                        )}
-                        {(scan.status === 'completed' || scan.status === 'failed') && (
-                          <button 
-                            onClick={() => handleRetry(scan._id)}
-                            className="p-2 text-slate-400 hover:text-primary-400 transition-colors" 
-                            title="Re-run"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                        )}
-                        <Link
-                          href={`/dashboard/scans/${scan._id}`}
-                          className="p-2 text-slate-400 hover:text-white transition-colors"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Link>
-                      </div>
+                            <Eye className="w-4 h-4" />
+                          </Link>
+                        </div>
+                      )}
                     </div>
 
                     {/* Progress Bar */}
                     <div className="mb-4">
-                      <div className="flex items-center justify-between text-sm mb-1">
+                      <div className="flex items-center justify-between text-xs md:text-sm mb-1">
                         <span className="text-slate-400">Progress</span>
                         <span className="text-white font-medium">{scan.progress || 0}%</span>
                       </div>
@@ -314,9 +378,9 @@ export default function ScansPage() {
                       </div>
                     </div>
 
-                    {/* Stages */}
-                    {scan.stages && (
-                      <div className="flex items-center gap-2 mb-4">
+                    {/* Stages - hide on mobile */}
+                    {scan.stages && !isMobile && (
+                      <div className="flex items-center gap-2 mb-4 flex-wrap">
                         {Object.entries(scan.stages).map(([stage, stageStatus]) => {
                           const stageInfo = stageConfig[stageStatus as string] || stageConfig.pending;
                           return (
@@ -330,31 +394,38 @@ export default function ScansPage() {
                     )}
 
                     {/* Results */}
-                    <div className="grid grid-cols-4 gap-4 pt-4 border-t border-dark-800">
+                    <div className={cn(
+                      "grid gap-3 md:gap-4 pt-4 border-t border-dark-800",
+                      isMobile ? "grid-cols-2" : "grid-cols-4"
+                    )}>
                       <div className="flex items-center gap-2">
-                        <Layers className="w-4 h-4 text-slate-500" />
-                        <span className="text-sm text-slate-400">
-                          <span className="text-white font-medium">{scan.results?.subdomains || 0}</span> subdomains
+                        <Layers className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span className="text-xs md:text-sm text-slate-400">
+                          <span className="text-white font-medium">{scan.results?.subdomains || 0}</span>
+                          <span className="hidden sm:inline"> subdomains</span>
+                          <span className="sm:hidden"> subs</span>
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Server className="w-4 h-4 text-slate-500" />
-                        <span className="text-sm text-slate-400">
+                        <Server className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span className="text-xs md:text-sm text-slate-400">
                           <span className="text-white font-medium">{scan.results?.ports || 0}</span> ports
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-slate-500" />
-                        <span className="text-sm text-slate-400">
+                        <Shield className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span className="text-xs md:text-sm text-slate-400">
                           <span className={cn('font-medium', (scan.results?.vulnerabilities || 0) > 0 ? 'text-red-400' : 'text-white')}>
                             {scan.results?.vulnerabilities || 0}
                           </span> vulns
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-slate-500" />
-                        <span className="text-sm text-slate-400">
-                          <span className="text-white font-medium">{scan.results?.endpoints || 0}</span> endpoints
+                        <Globe className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span className="text-xs md:text-sm text-slate-400">
+                          <span className="text-white font-medium">{scan.results?.endpoints || 0}</span>
+                          <span className="hidden sm:inline"> endpoints</span>
+                          <span className="sm:hidden"> eps</span>
                         </span>
                       </div>
                     </div>

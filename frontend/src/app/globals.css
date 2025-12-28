@@ -41,10 +41,95 @@ body {
   background-color: var(--dark-bg);
   color: #e2e8f0;
   font-family: 'JetBrains Mono', monospace;
+  /* Mobile-first typography: ensure minimum 14px body text */
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Responsive Typography - Mobile First */
+@layer base {
+  /* Headings with minimum sizes for mobile */
+  h1 {
+    font-size: 1.5rem; /* 24px minimum on mobile */
+    line-height: 1.3;
+    font-weight: 700;
+  }
+  
+  h2 {
+    font-size: 1.25rem; /* 20px minimum on mobile */
+    line-height: 1.35;
+    font-weight: 600;
+  }
+  
+  h3 {
+    font-size: 1.125rem; /* 18px minimum on mobile */
+    line-height: 1.4;
+    font-weight: 600;
+  }
+  
+  /* Scale up headings on larger screens */
+  @media (min-width: 640px) {
+    h1 {
+      font-size: 1.875rem; /* 30px */
+    }
+    
+    h2 {
+      font-size: 1.5rem; /* 24px */
+    }
+    
+    h3 {
+      font-size: 1.25rem; /* 20px */
+    }
+  }
+  
+  @media (min-width: 1024px) {
+    h1 {
+      font-size: 2.25rem; /* 36px */
+    }
+    
+    h2 {
+      font-size: 1.875rem; /* 30px */
+    }
+    
+    h3 {
+      font-size: 1.5rem; /* 24px */
+    }
+  }
+  
+  /* Body text with proper line height for readability */
+  p, li, span, div {
+    line-height: 1.5;
+  }
+  
+  /* Ensure minimum font sizes for small text */
+  small, .text-xs {
+    font-size: max(12px, 0.75rem);
+  }
+  
+  .text-sm {
+    font-size: max(14px, 0.875rem);
+  }
 }
 
 /* Custom utility classes */
 @layer utilities {
+  /* Responsive spacing utilities for mobile-first design */
+  .responsive-spacing {
+    @apply space-y-4 sm:space-y-5 md:space-y-6;
+  }
+  
+  .responsive-gap {
+    @apply gap-3 sm:gap-4 md:gap-6;
+  }
+  
+  .responsive-padding {
+    @apply p-3 sm:p-4 md:p-5;
+  }
+  
+  .responsive-padding-lg {
+    @apply p-4 sm:p-5 md:p-6;
+  }
+
   .text-glow {
     text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
   }
@@ -159,4 +244,200 @@ body {
 .status-dot.offline { background-color: #ef4444; }
 .status-dot.pending { background-color: #f59e0b; animation: pulse 2s infinite; }
 .status-dot.scanning { background-color: #3b82f6; animation: pulse 1s infinite; }
+
+/* Touch Interaction Improvements */
+/* Task 14.1: Active states for touch feedback */
+@layer utilities {
+  /* Touch-friendly active states for interactive elements */
+  .touch-active {
+    @apply active:scale-[0.98] active:opacity-80;
+    transition: transform 0.1s ease, opacity 0.1s ease;
+  }
+  
+  /* More subtle active state for buttons */
+  .touch-active-subtle {
+    @apply active:bg-opacity-80 active:brightness-95;
+    transition: background-color 0.1s ease, filter 0.1s ease;
+  }
+}
+
+/* Global active states for common interactive elements */
+button:not(:disabled):active,
+a:active,
+[role="button"]:not(:disabled):active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* Task 14.2: Prevent double-tap zoom on interactive elements */
+/* Apply touch-action: manipulation to all interactive elements */
+button,
+a,
+input,
+select,
+textarea,
+[role="button"],
+[role="link"],
+[tabindex]:not([tabindex="-1"]),
+.touch-manipulation {
+  touch-action: manipulation;
+}
+
+/* Task 14.3: Enable smooth momentum scrolling */
+/* Apply smooth scrolling behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Momentum scrolling for scrollable containers */
+.scroll-smooth {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Apply momentum scrolling to common scrollable elements */
+[data-scroll-container],
+.overflow-y-auto,
+.overflow-x-auto,
+.overflow-auto,
+nav,
+aside {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Task 16.1: Reduce animations on mobile for better performance */
+/* Shorten animation durations on mobile devices */
+@media (max-width: 767px) {
+  /* Reduce transition durations on mobile */
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.15s !important;
+  }
+  
+  /* Shorten animation durations */
+  .animate-slideIn {
+    animation-duration: 0.2s;
+  }
+  
+  .animate-fadeIn {
+    animation-duration: 0.15s;
+  }
+  
+  /* Disable non-essential decorative animations on mobile */
+  .animate-pulse-slow,
+  .animate-glow,
+  .animate-scan {
+    animation: none !important;
+  }
+  
+  /* Reduce hover-lift effect on mobile */
+  .hover-lift {
+    transition-duration: 0.15s !important;
+  }
+  
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+  
+  /* Simplify status dot animations */
+  .status-dot.pending,
+  .status-dot.scanning {
+    animation-duration: 3s;
+  }
+  
+  /* Reduce terminal cursor blink frequency */
+  .terminal-cursor::after {
+    animation-duration: 1.5s;
+  }
+  
+  /* Disable text glow effects on mobile for performance */
+  .text-glow {
+    text-shadow: none;
+  }
+  
+  /* Simplify border glow on mobile */
+  .border-glow {
+    box-shadow: 0 0 3px var(--accent-green);
+  }
+  
+  /* Reduce card glow intensity */
+  .card-glow {
+    box-shadow: 0 0 10px rgba(34, 197, 94, 0.05);
+  }
+}
+
+/* Task 16.2: Respect prefers-reduced-motion preference */
+/* Disable all non-essential animations when user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  /* Disable smooth scrolling */
+  html {
+    scroll-behavior: auto;
+  }
+  
+  /* Disable all animations and transitions globally */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  
+  /* Disable active state transforms */
+  button:not(:disabled):active,
+  a:active,
+  [role="button"]:not(:disabled):active {
+    transform: none;
+  }
+  
+  .touch-active {
+    transform: none !important;
+  }
+  
+  /* Disable all custom animations */
+  .animate-slideIn,
+  .animate-fadeIn,
+  .animate-pulse-slow,
+  .animate-glow,
+  .animate-scan {
+    animation: none !important;
+  }
+  
+  /* Disable hover effects that involve motion */
+  .hover-lift:hover {
+    transform: none;
+  }
+  
+  /* Disable status dot animations */
+  .status-dot.pending,
+  .status-dot.scanning {
+    animation: none !important;
+  }
+  
+  /* Disable terminal cursor blink */
+  .terminal-cursor::after {
+    animation: none !important;
+    opacity: 1;
+  }
+  
+  /* Disable glow effects (they can be distracting) */
+  .text-glow {
+    text-shadow: none;
+  }
+  
+  .border-glow {
+    box-shadow: none;
+  }
+  
+  .card-glow {
+    box-shadow: none;
+  }
+  
+  /* Ensure backdrop-filter doesn't cause issues */
+  .glass {
+    backdrop-filter: none;
+  }
+}
 

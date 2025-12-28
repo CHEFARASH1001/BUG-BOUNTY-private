@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
 
 interface CronConfig {
   _id: string;
@@ -137,6 +138,7 @@ export default function CronJobsPage() {
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPagination, setHistoryPagination] = useState<{ total: number; totalPages: number } | null>(null);
   const historyLimit = 20;
+  const isMobile = useIsMobile();
 
   const fetchData = async () => {
     try {
@@ -322,16 +324,16 @@ export default function CronJobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold text-white">Cron Jobs</h1>
-          <p className="text-slate-400 mt-1">Manage scheduled tasks and view execution history</p>
+          <h1 className="text-xl md:text-2xl font-display font-bold text-white">Cron Jobs</h1>
+          <p className="text-sm md:text-base text-slate-400 mt-1">Manage scheduled tasks and view execution history</p>
         </div>
         <button
           onClick={fetchData}
-          className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 border border-dark-700 rounded-lg text-sm text-slate-300 transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-dark-800 hover:bg-dark-700 border border-dark-700 rounded-lg text-sm text-slate-300 transition-colors touch-manipulation w-full sm:w-auto"
         >
           <RefreshCw className="w-4 h-4" />
           Refresh
@@ -345,16 +347,16 @@ export default function CronJobsPage() {
           animate={{ opacity: 1, y: 0 }}
           className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4"
         >
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-500/20 rounded-lg">
+              <div className="p-2 bg-blue-500/20 rounded-lg shrink-0">
                 <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-sm font-medium text-blue-400">
                   {runningJobs.length} job{runningJobs.length > 1 ? 's' : ''} currently running
                 </h3>
-                <p className="text-xs text-blue-300/70 mt-0.5">
+                <p className="text-xs text-blue-300/70 mt-0.5 truncate">
                   {runningJobs.map(j => j.jobName).join(', ')}
                 </p>
               </div>
@@ -363,7 +365,7 @@ export default function CronJobsPage() {
               onClick={handleCleanupStaleJobs}
               disabled={cleaningUp}
               className={clsx(
-                'flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors',
+                'flex items-center justify-center gap-2 px-3 py-2 min-h-[44px] text-xs font-medium rounded-lg transition-colors touch-manipulation w-full sm:w-auto',
                 cleaningUp
                   ? 'bg-dark-700 text-slate-500 cursor-not-allowed'
                   : 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30 border border-orange-500/30'
@@ -381,11 +383,11 @@ export default function CronJobsPage() {
       )}
 
       {/* Tabs */}
-      <div className="flex gap-2 border-b border-dark-800 pb-0">
+      <div className="flex gap-2 border-b border-dark-800 pb-0 overflow-x-auto">
         <button
           onClick={() => setSelectedTab('jobs')}
           className={clsx(
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+            'px-4 py-2 min-h-[44px] text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap touch-manipulation',
             selectedTab === 'jobs'
               ? 'border-primary-500 text-primary-400'
               : 'border-transparent text-slate-400 hover:text-white'
@@ -399,7 +401,7 @@ export default function CronJobsPage() {
         <button
           onClick={() => setSelectedTab('history')}
           className={clsx(
-            'px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px',
+            'px-4 py-2 min-h-[44px] text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap touch-manipulation',
             selectedTab === 'history'
               ? 'border-primary-500 text-primary-400'
               : 'border-transparent text-slate-400 hover:text-white'
@@ -443,17 +445,17 @@ export default function CronJobsPage() {
                 >
                   {/* Job Header */}
                   <div className="p-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex items-start gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="flex items-start gap-3 sm:gap-4 min-w-0">
                         <div className={clsx(
-                          'p-3 rounded-xl',
+                          'p-2 sm:p-3 rounded-xl shrink-0',
                           config.enabled ? 'bg-dark-800' : 'bg-dark-800/50'
                         )}>
-                          <JobIcon className={clsx('w-5 h-5', jobInfo.color)} />
+                          <JobIcon className={clsx('w-4 h-4 sm:w-5 sm:h-5', jobInfo.color)} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-3">
-                            <h3 className="text-base font-semibold text-white">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-sm sm:text-base font-semibold text-white">
                               {config.jobName.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
                             </h3>
                             {isRunning && (
@@ -468,10 +470,10 @@ export default function CronJobsPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-sm text-slate-400 mt-1">
+                          <p className="text-xs sm:text-sm text-slate-400 mt-1">
                             {jobInfo.description}
                           </p>
-                          <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 mt-2 text-xs text-slate-500">
                             <span className="flex items-center gap-1">
                               <Calendar className="w-3 h-3" />
                               {config.schedule}
@@ -497,12 +499,12 @@ export default function CronJobsPage() {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
                         <button
                           onClick={() => handleTriggerJob(config.jobName)}
                           disabled={triggeringJob === config.jobName || isRunning}
                           className={clsx(
-                            'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all',
+                            'flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all touch-manipulation',
                             triggeringJob === config.jobName || isRunning
                               ? 'bg-dark-700 text-slate-500 cursor-not-allowed'
                               : 'bg-primary-500/20 text-primary-400 hover:bg-primary-500/30 border border-primary-500/30'
@@ -520,7 +522,7 @@ export default function CronJobsPage() {
                           onClick={() => handleToggleJob(config.jobName, config.enabled)}
                           disabled={togglingJob === config.jobName}
                           className={clsx(
-                            'p-2 rounded-lg transition-all',
+                            'p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg transition-all touch-manipulation',
                             config.enabled
                               ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30 border border-green-500/30'
                               : 'bg-dark-700 text-slate-400 hover:bg-dark-600 border border-dark-600'
@@ -538,7 +540,7 @@ export default function CronJobsPage() {
 
                         <button
                           onClick={() => setExpandedJob(isExpanded ? null : config.jobName)}
-                          className="p-2 rounded-lg bg-dark-800 text-slate-400 hover:text-white transition-colors"
+                          className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg bg-dark-800 text-slate-400 hover:text-white transition-colors touch-manipulation"
                         >
                           {isExpanded ? (
                             <ChevronUp className="w-4 h-4" />
@@ -568,7 +570,7 @@ export default function CronJobsPage() {
                               .map((execution) => (
                                 <div
                                   key={execution._id}
-                                  className="flex items-center justify-between p-3 bg-dark-900/50 rounded-lg"
+                                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-dark-900/50 rounded-lg"
                                 >
                                   <div className="flex items-center gap-3">
                                     {getStatusIcon(execution.status)}
@@ -581,10 +583,10 @@ export default function CronJobsPage() {
                                       </p>
                                     </div>
                                   </div>
-                                  <div className="flex items-center gap-3">
+                                  <div className="flex items-center justify-between sm:justify-end gap-3">
                                     <button
                                       onClick={() => handleViewLogs(execution)}
-                                      className="flex items-center gap-1.5 px-2 py-1 bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors"
+                                      className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors touch-manipulation"
                                     >
                                       <Terminal className="w-3 h-3" />
                                       Logs
@@ -627,99 +629,162 @@ export default function CronJobsPage() {
             exit={{ opacity: 0, x: -20 }}
             className="bg-dark-900/50 border border-dark-800 rounded-xl overflow-hidden"
           >
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-dark-800">
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Job</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Status</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Trigger</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Started</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Duration</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Error</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">Logs</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {executions.map((execution) => (
-                    <tr key={execution._id} className="border-b border-dark-800/50 hover:bg-dark-800/30">
-                      <td className="p-4">
-                        <span className="text-sm font-medium text-white">
-                          {execution.jobName.replace(/_/g, ' ')}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={clsx(
-                          'inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full border',
-                          getStatusColor(execution.status)
-                        )}>
-                          {getStatusIcon(execution.status)}
-                          {execution.status}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <span className={clsx(
-                          'px-2 py-0.5 text-xs rounded-full',
-                          execution.trigger === 'manual'
-                            ? 'bg-purple-500/20 text-purple-400'
-                            : 'bg-slate-500/20 text-slate-400'
-                        )}>
-                          {execution.trigger}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm text-slate-300">
-                        {formatDate(execution.startedAt)}
-                      </td>
-                      <td className="p-4 text-sm text-slate-400">
-                        {execution.duration ? formatDuration(execution.duration) : '-'}
-                      </td>
-                      <td className="p-4">
-                        {execution.error ? (
-                          <span className="text-xs text-red-400 truncate max-w-[200px] block" title={execution.error}>
-                            {execution.error}
+            {/* Mobile Card View */}
+            {isMobile ? (
+              <div className="divide-y divide-dark-800">
+                {executions.map((execution) => (
+                  <div key={execution._id} className="p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-white">
+                        {execution.jobName.replace(/_/g, ' ')}
+                      </span>
+                      <span className={clsx(
+                        'inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full border',
+                        getStatusColor(execution.status)
+                      )}>
+                        {getStatusIcon(execution.status)}
+                        {execution.status}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400">
+                      <span className={clsx(
+                        'px-2 py-0.5 rounded-full',
+                        execution.trigger === 'manual'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : 'bg-slate-500/20 text-slate-400'
+                      )}>
+                        {execution.trigger}
+                      </span>
+                      <span>{formatDate(execution.startedAt)}</span>
+                      {execution.duration && (
+                        <span>{formatDuration(execution.duration)}</span>
+                      )}
+                    </div>
+                    {execution.error && (
+                      <p className="text-xs text-red-400 truncate">{execution.error}</p>
+                    )}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleViewLogs(execution)}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors touch-manipulation"
+                      >
+                        <Terminal className="w-3 h-3" />
+                        View Logs
+                      </button>
+                      {execution.status === 'running' && (
+                        <button
+                          onClick={() => handleCancelJob(execution._id)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition-colors border border-red-500/30 touch-manipulation"
+                        >
+                          <X className="w-3 h-3" />
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {executions.length === 0 && (
+                  <div className="p-8 text-center text-slate-500">
+                    No executions found
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Desktop Table View */
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-dark-800">
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Job</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Status</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Trigger</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Started</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Duration</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Error</th>
+                      <th className="text-left p-4 text-sm font-medium text-slate-400">Logs</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {executions.map((execution) => (
+                      <tr key={execution._id} className="border-b border-dark-800/50 hover:bg-dark-800/30">
+                        <td className="p-4">
+                          <span className="text-sm font-medium text-white">
+                            {execution.jobName.replace(/_/g, ' ')}
                           </span>
-                        ) : (
-                          <span className="text-slate-500">-</span>
-                        )}
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleViewLogs(execution)}
-                            className="flex items-center gap-1.5 px-2 py-1 bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors"
-                          >
-                            <Terminal className="w-3 h-3" />
-                            Logs
-                          </button>
-                          {execution.status === 'running' && (
-                            <button
-                              onClick={() => handleCancelJob(execution._id)}
-                              className="flex items-center gap-1.5 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition-colors border border-red-500/30"
-                              title="Cancel job"
-                            >
-                              <X className="w-3 h-3" />
-                              Cancel
-                            </button>
+                        </td>
+                        <td className="p-4">
+                          <span className={clsx(
+                            'inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full border',
+                            getStatusColor(execution.status)
+                          )}>
+                            {getStatusIcon(execution.status)}
+                            {execution.status}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <span className={clsx(
+                            'px-2 py-0.5 text-xs rounded-full',
+                            execution.trigger === 'manual'
+                              ? 'bg-purple-500/20 text-purple-400'
+                              : 'bg-slate-500/20 text-slate-400'
+                          )}>
+                            {execution.trigger}
+                          </span>
+                        </td>
+                        <td className="p-4 text-sm text-slate-300">
+                          {formatDate(execution.startedAt)}
+                        </td>
+                        <td className="p-4 text-sm text-slate-400">
+                          {execution.duration ? formatDuration(execution.duration) : '-'}
+                        </td>
+                        <td className="p-4">
+                          {execution.error ? (
+                            <span className="text-xs text-red-400 truncate max-w-[200px] block" title={execution.error}>
+                              {execution.error}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">-</span>
                           )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                  {executions.length === 0 && (
-                    <tr>
-                      <td colSpan={7} className="p-8 text-center text-slate-500">
-                        No executions found
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleViewLogs(execution)}
+                              className="flex items-center gap-1.5 px-2 py-1 bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors"
+                            >
+                              <Terminal className="w-3 h-3" />
+                              Logs
+                            </button>
+                            {execution.status === 'running' && (
+                              <button
+                                onClick={() => handleCancelJob(execution._id)}
+                                className="flex items-center gap-1.5 px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs rounded-lg transition-colors border border-red-500/30"
+                                title="Cancel job"
+                              >
+                                <X className="w-3 h-3" />
+                                Cancel
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {executions.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="p-8 text-center text-slate-500">
+                          No executions found
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
             
             {/* Pagination */}
             {historyPagination && historyPagination.totalPages > 1 && (
-              <div className="flex items-center justify-between p-4 border-t border-dark-800">
-                <div className="text-sm text-slate-400">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 border-t border-dark-800">
+                <div className="text-sm text-slate-400 text-center sm:text-left">
                   Showing {((historyPage - 1) * historyLimit) + 1} - {Math.min(historyPage * historyLimit, historyPagination.total)} of {historyPagination.total} executions
                 </div>
                 <div className="flex items-center gap-2">
@@ -727,7 +792,7 @@ export default function CronJobsPage() {
                     onClick={() => setHistoryPage(p => Math.max(1, p - 1))}
                     disabled={historyPage === 1}
                     className={clsx(
-                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                      'px-3 py-2 min-h-[44px] text-sm rounded-lg transition-colors touch-manipulation',
                       historyPage === 1
                         ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
                         : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
@@ -735,14 +800,14 @@ export default function CronJobsPage() {
                   >
                     Previous
                   </button>
-                  <span className="text-sm text-slate-400">
+                  <span className="text-sm text-slate-400 px-2">
                     Page {historyPage} of {historyPagination.totalPages}
                   </span>
                   <button
                     onClick={() => setHistoryPage(p => Math.min(historyPagination.totalPages, p + 1))}
                     disabled={historyPage === historyPagination.totalPages}
                     className={clsx(
-                      'px-3 py-1.5 text-sm rounded-lg transition-colors',
+                      'px-3 py-2 min-h-[44px] text-sm rounded-lg transition-colors touch-manipulation',
                       historyPage === historyPagination.totalPages
                         ? 'bg-dark-800 text-slate-500 cursor-not-allowed'
                         : 'bg-dark-800 text-slate-300 hover:bg-dark-700'
@@ -764,34 +829,34 @@ export default function CronJobsPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70"
             onClick={handleCloseLogs}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="w-full max-w-4xl max-h-[80vh] bg-dark-900 border border-dark-700 rounded-xl shadow-2xl overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0, y: isMobile ? 100 : 0 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: isMobile ? 100 : 0 }}
+              className="w-full sm:max-w-4xl max-h-[90vh] sm:max-h-[80vh] bg-dark-900 border-t sm:border border-dark-700 rounded-t-xl sm:rounded-xl shadow-2xl overflow-hidden"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 border-b border-dark-700">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-dark-800 rounded-lg">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 bg-dark-800 rounded-lg shrink-0">
                     <Terminal className="w-5 h-5 text-primary-400" />
                   </div>
-                  <div>
-                    <h2 className="text-lg font-semibold text-white">
+                  <div className="min-w-0">
+                    <h2 className="text-base sm:text-lg font-semibold text-white truncate">
                       Execution Logs
                     </h2>
-                    <p className="text-sm text-slate-400">
+                    <p className="text-xs sm:text-sm text-slate-400 truncate">
                       {selectedExecution.jobName.replace(/_/g, ' ')} • {formatDate(selectedExecution.startedAt)}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                   {logsAutoRefresh && (
-                    <span className="flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full border border-blue-500/30">
+                    <span className="hidden sm:flex items-center gap-2 px-3 py-1 bg-blue-500/20 text-blue-400 text-xs rounded-full border border-blue-500/30">
                       <Loader2 className="w-3 h-3 animate-spin" />
                       Live updating
                     </span>
@@ -801,11 +866,11 @@ export default function CronJobsPage() {
                     getStatusColor(selectedExecution.status)
                   )}>
                     {getStatusIcon(selectedExecution.status)}
-                    {selectedExecution.status}
+                    <span className="hidden sm:inline">{selectedExecution.status}</span>
                   </span>
                   <button
                     onClick={handleCloseLogs}
-                    className="p-2 hover:bg-dark-800 rounded-lg transition-colors"
+                    className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-dark-800 rounded-lg transition-colors touch-manipulation"
                   >
                     <X className="w-5 h-5 text-slate-400" />
                   </button>
@@ -813,7 +878,7 @@ export default function CronJobsPage() {
               </div>
 
               {/* Logs Content */}
-              <div className="p-4 overflow-auto max-h-[calc(80vh-140px)]">
+              <div className="p-4 overflow-auto max-h-[calc(90vh-140px)] sm:max-h-[calc(80vh-140px)]">
                 {loadingLogs ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-primary-400" />
@@ -824,7 +889,7 @@ export default function CronJobsPage() {
                     <p>No logs available yet</p>
                   </div>
                 ) : (
-                  <div className="bg-dark-950 rounded-lg p-4 font-mono text-sm">
+                  <div className="bg-dark-950 rounded-lg p-3 sm:p-4 font-mono text-xs sm:text-sm overflow-x-auto">
                     {executionLogs.map((log, index) => {
                       const isError = log.includes('ERROR');
                       const isSuccess = log.includes('completed') || log.includes('NEW:');
@@ -834,7 +899,7 @@ export default function CronJobsPage() {
                         <div
                           key={index}
                           className={clsx(
-                            'py-1 px-2 -mx-2 rounded',
+                            'py-1 px-2 -mx-2 rounded break-all',
                             isError && 'bg-red-500/10 text-red-400',
                             isSuccess && 'text-green-400',
                             isInfo && 'text-blue-400',

@@ -48,6 +48,7 @@ const navigation = [
   { name: 'Scans', href: '/dashboard/scans', icon: Scan },
   { name: 'Tools', href: '/dashboard/tools', icon: Terminal },
   { name: 'HexStrike AI', href: '/dashboard/hexstrike', icon: Brain },
+  { name: 'XSS Scanner', href: '/dashboard/xss', icon: Shield },
   { name: 'Fuzzing', href: '/dashboard/fuzzing', icon: Zap },
   { name: 'DNS Brute', href: '/dashboard/dns-brute', icon: Database },
   { name: 'Cron Jobs', href: '/dashboard/cron', icon: Clock },
@@ -60,7 +61,7 @@ const documentsSection = {
   name: 'Documents',
   icon: BookOpen,
   items: [
-    { name: 'XSS Encodings', href: '/dashboard/xss-encodings', icon: Shield },
+    { name: 'XSS - Narutow Live 4', href: '/dashboard/xss-narutow-live-4', icon: Shield },
   ],
 };
 

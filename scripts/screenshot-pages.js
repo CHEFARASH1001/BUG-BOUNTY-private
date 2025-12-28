@@ -34,7 +34,7 @@ const PAGES = [
   { path: '/dashboard/subdomains', name: 'dashboard-subdomains', requiresAuth: true },
   { path: '/dashboard/tools', name: 'dashboard-tools', requiresAuth: true },
   { path: '/dashboard/vulnerabilities', name: 'dashboard-vulnerabilities', requiresAuth: true },
-  { path: '/dashboard/xss-encodings', name: 'dashboard-xss-encodings', requiresAuth: true },
+  { path: '/dashboard/xss-narutow-live-4', name: 'dashboard-xss-narutow-live-4', requiresAuth: true },
 ];
 
 async function login(page) {

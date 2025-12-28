@@ -226,7 +226,7 @@ describe('Feature: mobile-responsive, Property 4: Navigation Auto-Close', () => 
       '/dashboard/alerts',
       '/dashboard/reports',
       '/dashboard/settings',
-      '/dashboard/xss-encodings',
+      '/dashboard/xss-narutow-live-4',
     ];
 
     fc.assert(

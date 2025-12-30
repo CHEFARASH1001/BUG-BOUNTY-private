@@ -34,7 +34,8 @@ export interface RepoMetrics {
 // Minimum star threshold for tool legitimacy
 const MIN_STARS_THRESHOLD = 100;
 // Maximum months since last commit for tool to be considered active
-const MAX_INACTIVE_MONTHS = 12;
+// Set to 120 months (10 years) to allow stable, mature tools that don't need frequent updates
+const MAX_INACTIVE_MONTHS = 120;
 
 @Injectable()
 export class ValidationService {

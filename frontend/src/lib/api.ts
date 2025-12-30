@@ -622,6 +622,12 @@ export const toolsApi = {
   
   // Get available installation methods for a tool
   getInstallMethods: (id: string) => api.get(`/tools/${id}/install-methods`),
+
+  // Install all tools that are not currently installed
+  installAll: () => api.post('/tools/install-all'),
+
+  // Refresh installation status of all tools
+  refreshStatus: () => api.post('/tools/refresh-status'),
 };
 
 

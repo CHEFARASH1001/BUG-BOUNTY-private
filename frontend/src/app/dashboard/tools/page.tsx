@@ -19,6 +19,7 @@ import {
   Upload,
   ChevronDown,
   ChevronUp,
+  Star,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -106,6 +107,11 @@ export default function ToolsPage() {
     failureCount: number;
     failures?: Array<{ name: string; reason: string }>;
   } | null>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installModalOpen, setInstallModalOpen] = useState(false);
+  const [installResult, setInstallResult] = useState<{
+    results: Array<{ name: string; success: boolean; method?: string; error?: string }>;
+  } | null>(null);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
   const isMobile = useIsMobile();
 
@@ -189,6 +195,30 @@ export default function ToolsPage() {
     setImportResult(null);
   };
 
+  // Handle install all tools
+  const handleInstallAll = async () => {
+    setInstalling(true);
+    setInstallResult(null);
+    setInstallModalOpen(true);
+    try {
+      const response = await toolsApi.installAll();
+      setInstallResult(response.data);
+      fetchTools();
+    } catch (err: any) {
+      console.error('Install all failed:', err);
+      setInstallResult({
+        results: [{ name: 'Install All', success: false, error: err.response?.data?.message || 'Installation failed' }],
+      });
+    } finally {
+      setInstalling(false);
+    }
+  };
+
+  const closeInstallModal = () => {
+    setInstallModalOpen(false);
+    setInstallResult(null);
+  };
+
   // Stats
   const installedCount = tools.filter((t) => t.installation?.isInstalled).length;
   const activeCount = tools.filter((t) => t.isActive).length;
@@ -227,6 +257,19 @@ export default function ToolsPage() {
             <span className="hidden xs:inline">Import Tools</span>
             <span className="xs:hidden">Import</span>
           </button>
+          <button
+            onClick={handleInstallAll}
+            disabled={installing || tools.length === 0}
+            className="flex items-center justify-center gap-2 min-h-[44px] px-3 md:px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {installing ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Play className="w-4 h-4" />
+            )}
+            <span className="hidden xs:inline">Install All</span>
+            <span className="xs:hidden">Install</span>
+          </button>
         </div>
       </div>
 
@@ -238,26 +281,29 @@ export default function ToolsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+      <div className="grid grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         {[
-          { label: 'Total Tools', value: tools.length, icon: Wrench, color: 'text-primary-400' },
-          { label: 'Installed', value: installedCount, icon: CheckCircle, color: 'text-green-400' },
-          { label: 'Active', value: activeCount, icon: Play, color: 'text-blue-400' },
-          { label: 'Categories', value: Object.keys(categoryCounts).length, icon: Filter, color: 'text-yellow-400' },
+          { label: 'Total', fullLabel: 'Total Tools', value: tools.length, icon: Wrench, color: 'text-primary-400' },
+          { label: 'Installed', fullLabel: 'Installed', value: installedCount, icon: CheckCircle, color: 'text-green-400' },
+          { label: 'Active', fullLabel: 'Active', value: activeCount, icon: Play, color: 'text-blue-400' },
+          { label: 'Categories', fullLabel: 'Categories', value: Object.keys(categoryCounts).length, icon: Filter, color: 'text-yellow-400' },
         ].map((stat, index) => (
           <motion.div
             key={stat.label}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+            className="p-2 sm:p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-lg sm:rounded-xl border border-dark-800"
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-slate-400 text-xs md:text-sm">{stat.label}</p>
-                <p className="text-lg md:text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+              <div className="flex items-center gap-2">
+                <stat.icon className={cn('w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6', stat.color)} />
+                <p className="text-slate-400 text-[10px] sm:text-xs md:text-sm truncate">
+                  <span className="sm:hidden">{stat.label}</span>
+                  <span className="hidden sm:inline">{stat.fullLabel}</span>
+                </p>
               </div>
-              <stat.icon className={cn('w-6 h-6 md:w-8 md:h-8', stat.color)} />
+              <p className="text-lg sm:text-xl md:text-2xl font-bold text-white">{loading ? '...' : stat.value}</p>
             </div>
           </motion.div>
         ))}
@@ -373,43 +419,41 @@ export default function ToolsPage() {
         </div>
       )}
 
-      {/* Category Tabs - Scrollable on mobile */}
-      <div className="overflow-x-auto -mx-4 px-4 md:mx-0 md:px-0">
-        <div className="flex items-center gap-2 min-w-max md:flex-wrap">
-          <button
-            onClick={() => setSelectedCategory(null)}
-            className={cn(
-              'px-3 py-2 md:py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap touch-manipulation min-h-[40px] md:min-h-0',
-              !selectedCategory
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
-            )}
-          >
-            All ({tools.length})
-          </button>
-          {Object.entries(ToolCategory)
-            .map(([_, value]) => ({
-              category: value,
-              count: categoryCounts[value] || 0,
-              config: categoryConfig[value],
-            }))
-            .filter((item) => item.count > 0)
-            .sort((a, b) => b.count - a.count)
-            .map(({ category, count, config }) => (
-              <button
-                key={category}
-                onClick={() => setSelectedCategory(category)}
-                className={cn(
-                  'px-3 py-2 md:py-1.5 rounded-lg text-sm font-medium transition-colors whitespace-nowrap touch-manipulation min-h-[40px] md:min-h-0',
-                  selectedCategory === category
-                    ? `${config?.bg || 'bg-slate-500/20'} ${config?.color || 'text-slate-400'} border border-current/30`
-                    : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
-                )}
-              >
-                {config?.label || category} ({count})
-              </button>
-            ))}
-        </div>
+      {/* Category Tabs - Wrap on all screens */}
+      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+        <button
+          onClick={() => setSelectedCategory(null)}
+          className={cn(
+            'px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap touch-manipulation',
+            !selectedCategory
+              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+              : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
+          )}
+        >
+          All ({tools.length})
+        </button>
+        {Object.entries(ToolCategory)
+          .map(([_, value]) => ({
+            category: value,
+            count: categoryCounts[value] || 0,
+            config: categoryConfig[value],
+          }))
+          .filter((item) => item.count > 0)
+          .sort((a, b) => b.count - a.count)
+          .map(({ category, count, config }) => (
+            <button
+              key={category}
+              onClick={() => setSelectedCategory(category)}
+              className={cn(
+                'px-2 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap touch-manipulation',
+                selectedCategory === category
+                  ? `${config?.bg || 'bg-slate-500/20'} ${config?.color || 'text-slate-400'} border border-current/30`
+                  : 'bg-dark-800 text-slate-400 hover:text-white border border-dark-700'
+              )}
+            >
+              {config?.label || category} ({count})
+            </button>
+          ))}
       </div>
 
       {/* Loading State */}
@@ -422,7 +466,7 @@ export default function ToolsPage() {
 
       {/* Tools Grid */}
       {!loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3 md:gap-4">
           {filteredTools.map((tool, index) => {
             const installStatus = getInstallationStatus(tool);
             const statusConfig = installationStatusConfig[installStatus];
@@ -437,49 +481,59 @@ export default function ToolsPage() {
                 className="group relative"
               >
                 <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
-                <div className="relative p-4 md:p-5 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors h-full flex flex-col">
+                <div className="relative p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors h-full flex flex-col">
                   {/* Header */}
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
-                      <div className="p-1.5 md:p-2 bg-primary-500/20 rounded-lg flex-shrink-0">
-                        <Wrench className="w-4 h-4 md:w-5 md:h-5 text-primary-400" />
+                  <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <div className="p-1.5 bg-primary-500/20 rounded-lg flex-shrink-0">
+                        <Wrench className="w-4 h-4 text-primary-400" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <Link
                           href={`/dashboard/tools/${tool._id}`}
-                          className="text-base md:text-lg font-semibold text-white hover:text-primary-400 transition-colors block truncate"
+                          className="text-sm sm:text-base font-semibold text-white hover:text-primary-400 transition-colors block truncate"
                         >
                           {tool.displayName}
                         </Link>
-                        <p className="text-xs text-slate-500 truncate">@{tool.name}</p>
+                        <p className="text-[10px] sm:text-xs text-slate-500 truncate">@{tool.name}</p>
                       </div>
                     </div>
-                    <a
-                      href={tool.githubUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
-                      title="View on GitHub"
-                      aria-label="View on GitHub"
-                    >
-                      <Github className="w-4 h-4" />
-                    </a>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      {tool.validation?.stars && (
+                        <span className="hidden sm:flex items-center gap-1 text-xs text-yellow-400">
+                          <Star className="w-3 h-3" />
+                          {tool.validation.stars >= 1000 
+                            ? `${(tool.validation.stars / 1000).toFixed(1)}k` 
+                            : tool.validation.stars}
+                        </span>
+                      )}
+                      <a
+                        href={tool.githubUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-2 text-slate-400 hover:text-white transition-colors touch-manipulation"
+                        title="View on GitHub"
+                        aria-label="View on GitHub"
+                      >
+                        <Github className="w-4 h-4" />
+                      </a>
+                    </div>
                   </div>
 
                   {/* Description */}
-                  <p className="text-sm text-slate-400 mb-4 line-clamp-2 flex-grow">
+                  <p className="text-xs sm:text-sm text-slate-400 mb-3 line-clamp-2 flex-grow">
                     {tool.description}
                   </p>
 
                   {/* Categories */}
-                  <div className="flex items-center gap-1.5 flex-wrap mb-4">
-                    {tool.categories.slice(0, 2).map((cat) => {
+                  <div className="flex items-center gap-1 flex-wrap mb-3">
+                    {tool.categories.slice(0, isMobile ? 1 : 2).map((cat) => {
                       const config = categoryConfig[cat];
                       return (
                         <span
                           key={cat}
                           className={cn(
-                            'px-2 py-0.5 rounded text-xs font-medium',
+                            'px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-medium',
                             config?.bg || 'bg-slate-500/20',
                             config?.color || 'text-slate-400'
                           )}
@@ -488,30 +542,44 @@ export default function ToolsPage() {
                         </span>
                       );
                     })}
-                    {tool.categories.length > 2 && (
-                      <span className="text-xs text-slate-500">+{tool.categories.length - 2}</span>
+                    {tool.categories.length > (isMobile ? 1 : 2) && (
+                      <span className="text-[10px] sm:text-xs text-slate-500">
+                        +{tool.categories.length - (isMobile ? 1 : 2)}
+                      </span>
                     )}
                   </div>
 
                   {/* Footer */}
-                  <div className="flex items-center justify-between pt-3 border-t border-dark-800">
+                  <div className="flex items-center justify-between pt-3 border-t border-dark-800 gap-2">
                     <span
                       className={cn(
-                        'flex items-center gap-1.5 px-2 py-1 rounded text-xs font-medium',
+                        'flex items-center gap-1 px-1.5 sm:px-2 py-1 rounded text-[10px] sm:text-xs font-medium',
                         statusConfig.bg,
                         statusConfig.color
                       )}
                     >
-                      <StatusIcon className="w-3.5 h-3.5" />
-                      {statusConfig.label}
+                      <StatusIcon className="w-3 h-3" />
+                      <span className="hidden xs:inline">{statusConfig.label}</span>
+                      <span className="xs:hidden">{installStatus === 'installed' ? '✓' : '✗'}</span>
                     </span>
-                    <Link
-                      href={`/dashboard/tools/${tool._id}`}
-                      className="flex items-center justify-center gap-1 min-h-[44px] px-3 text-xs text-primary-400 hover:text-primary-300 transition-colors touch-manipulation"
-                    >
-                      View Details
-                      <ExternalLink className="w-3 h-3" />
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      {installStatus === 'installed' && (
+                        <Link
+                          href={`/dashboard/tools/${tool._id}/execute`}
+                          className="flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] sm:text-xs bg-primary-600 hover:bg-primary-500 text-white rounded transition-colors touch-manipulation"
+                        >
+                          <Play className="w-3 h-3" />
+                          <span className="hidden sm:inline">Run</span>
+                        </Link>
+                      )}
+                      <Link
+                        href={`/dashboard/tools/${tool._id}`}
+                        className="flex items-center justify-center gap-1 px-2 py-1.5 text-[10px] sm:text-xs text-slate-400 hover:text-white bg-dark-800 hover:bg-dark-700 rounded transition-colors touch-manipulation"
+                      >
+                        <span className="hidden sm:inline">Details</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </motion.div>
@@ -630,6 +698,125 @@ export default function ToolsPage() {
                     {/* Close Button */}
                     <button
                       onClick={closeImportModal}
+                      className="w-full py-3 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-white rounded-lg transition-colors touch-manipulation"
+                    >
+                      Close
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Install All Modal */}
+      <AnimatePresence>
+        {installModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-lg bg-dark-900 rounded-xl border border-dark-700 overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-dark-800 flex-shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/20 rounded-lg">
+                    <Download className="w-5 h-5 text-green-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Install All Tools</h3>
+                </div>
+                {!installing && (
+                  <button
+                    onClick={closeInstallModal}
+                    className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
+                    aria-label="Close"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-4 md:p-6 overflow-y-auto flex-1">
+                {installing ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-12 h-12 text-green-400 animate-spin mx-auto mb-4" />
+                    <p className="text-white font-medium">Installing tools...</p>
+                    <p className="text-sm text-slate-400 mt-2">
+                      This may take several minutes depending on the number of tools
+                    </p>
+                  </div>
+                ) : installResult ? (
+                  <div className="space-y-4">
+                    {/* Summary */}
+                    <div className="grid grid-cols-2 gap-3 md:gap-4">
+                      <div className="p-3 md:p-4 bg-green-500/10 border border-green-500/30 rounded-lg text-center">
+                        <CheckCircle className="w-6 h-6 md:w-8 md:h-8 text-green-400 mx-auto mb-2" />
+                        <p className="text-xl md:text-2xl font-bold text-green-400">
+                          {installResult.results.filter(r => r.success).length}
+                        </p>
+                        <p className="text-xs md:text-sm text-green-400/80">Succeeded</p>
+                      </div>
+                      <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/30 rounded-lg text-center">
+                        <XCircle className="w-6 h-6 md:w-8 md:h-8 text-red-400 mx-auto mb-2" />
+                        <p className="text-xl md:text-2xl font-bold text-red-400">
+                          {installResult.results.filter(r => !r.success).length}
+                        </p>
+                        <p className="text-xs md:text-sm text-red-400/80">Failed</p>
+                      </div>
+                    </div>
+
+                    {/* Results List */}
+                    <div>
+                      <h4 className="text-sm font-medium text-slate-300 mb-2">Installation Results</h4>
+                      <div className="max-h-60 overflow-y-auto space-y-2">
+                        {installResult.results.map((result, index) => (
+                          <div
+                            key={index}
+                            className={cn(
+                              'p-2 rounded-lg border',
+                              result.success
+                                ? 'bg-green-500/10 border-green-500/20'
+                                : 'bg-red-500/10 border-red-500/20'
+                            )}
+                          >
+                            <div className="flex items-center justify-between">
+                              <p className={cn(
+                                'text-sm font-medium',
+                                result.success ? 'text-green-400' : 'text-red-400'
+                              )}>
+                                {result.name}
+                              </p>
+                              {result.success ? (
+                                <CheckCircle className="w-4 h-4 text-green-400" />
+                              ) : (
+                                <XCircle className="w-4 h-4 text-red-400" />
+                              )}
+                            </div>
+                            {result.method && result.method !== 'already_installed' && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                Installed via: {result.method}
+                              </p>
+                            )}
+                            {result.method === 'already_installed' && (
+                              <p className="text-xs text-slate-400 mt-1">
+                                Already installed
+                              </p>
+                            )}
+                            {result.error && (
+                              <p className="text-xs text-red-400/70 mt-1">{result.error}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Close Button */}
+                    <button
+                      onClick={closeInstallModal}
                       className="w-full py-3 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-white rounded-lg transition-colors touch-manipulation"
                     >
                       Close

@@ -75,8 +75,17 @@ export class ExecutorService {
     
     try {
       // Use 'which' on Unix-like systems, 'where' on Windows
+      // Include common tool installation paths in PATH
       const command = process.platform === 'win32' ? 'where' : 'which';
-      execSync(`${command} ${binary}`, { stdio: 'pipe' });
+      const extraPaths = [
+        '/usr/local/bin',
+        '/usr/bin',
+        `${process.env.HOME}/go/bin`,
+        `${process.env.HOME}/.local/bin`,
+        `${process.env.HOME}/.cargo/bin`,
+      ].join(':');
+      const env = { ...process.env, PATH: `${extraPaths}:${process.env.PATH}` };
+      execSync(`${command} ${binary}`, { stdio: 'pipe', env });
       return true;
     } catch {
       return false;

@@ -86,6 +86,7 @@ export class ToolsController {
    * Requirements: 7.1, 7.2, 7.3
    */
   @Post('bulk-import')
+  @Public()
   @ApiOperation({ summary: 'Bulk import predefined security tools' })
   @ApiResponse({
     status: 201,

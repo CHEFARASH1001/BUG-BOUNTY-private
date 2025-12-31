@@ -317,6 +317,7 @@ export class ToolsService {
         binaryName: tool.binaryName,
         lastChecked: new Date(),
         installCommands: tool.installCommands || [],
+        containerName: tool.containerName,
       },
     });
 
@@ -378,11 +379,12 @@ export class ToolsService {
         const existingTool = await this.toolModel.findOne({ name: predefinedTool.name.toLowerCase() });
         
         if (existingTool) {
-          // Update the tool with latest predefined data (especially installCommands)
+          // Update the tool with latest predefined data (especially installCommands and containerName)
           existingTool.installation = {
             ...existingTool.installation,
             binaryName: predefinedTool.binaryName,
             installCommands: predefinedTool.installCommands || [],
+            containerName: predefinedTool.containerName,
             lastChecked: existingTool.installation?.lastChecked || new Date(),
             isInstalled: existingTool.installation?.isInstalled || false,
           };
@@ -416,11 +418,12 @@ export class ToolsService {
     for (const tool of tools) {
       try {
         const binaryName = tool.installation?.binaryName || tool.name;
-        const isInstalled = await this.executorService.isInstalled(tool.name, binaryName);
+        const containerName = tool.installation?.containerName;
+        const isInstalled = await this.executorService.isInstalled(tool.name, binaryName, containerName);
         let version: string | undefined;
 
         if (isInstalled) {
-          version = await this.executorService.getVersion(tool.name, binaryName) || undefined;
+          version = await this.executorService.getVersion(tool.name, binaryName, containerName) || undefined;
           result.installed++;
         } else {
           result.notInstalled++;

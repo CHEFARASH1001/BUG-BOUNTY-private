@@ -26,6 +26,8 @@ export interface PredefinedTool {
   categories: ToolCategory[];
   binaryName: string;
   installCommands?: InstallCommand[];
+  /** Docker container name for containerized tools (e.g., 'bb-katana') */
+  containerName?: string;
 }
 
 /**
@@ -69,6 +71,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     githubUrl: 'https://github.com/projectdiscovery/httpx',
     categories: [ToolCategory.HTTP_PROBING],
     binaryName: 'httpx',
+    containerName: 'bb-httpx',
     installCommands: [
       { method: 'go', command: 'go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest' },
       { method: 'brew', command: 'brew install httpx' },
@@ -95,6 +98,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     githubUrl: 'https://github.com/projectdiscovery/katana',
     categories: [ToolCategory.WEB_CRAWLING, ToolCategory.URL_DISCOVERY],
     binaryName: 'katana',
+    containerName: 'bb-katana',
     installCommands: [
       { method: 'go', command: 'go install github.com/projectdiscovery/katana/cmd/katana@latest' },
       { method: 'brew', command: 'brew install katana' },
@@ -107,6 +111,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     githubUrl: 'https://github.com/projectdiscovery/subfinder',
     categories: [ToolCategory.SUBDOMAIN_ENUMERATION],
     binaryName: 'subfinder',
+    containerName: 'bb-subfinder',
     installCommands: [
       { method: 'go', command: 'go install -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest' },
       { method: 'brew', command: 'brew install subfinder' },
@@ -321,6 +326,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     githubUrl: 'https://github.com/projectdiscovery/nuclei',
     categories: [ToolCategory.VULNERABILITY_SCANNING],
     binaryName: 'nuclei',
+    containerName: 'bb-nuclei',
     installCommands: [
       { method: 'go', command: 'go install -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest' },
       { method: 'brew', command: 'brew install nuclei' },

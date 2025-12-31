@@ -62,16 +62,27 @@ export class ExecutorService {
   ) {}
 
   /**
-   * Checks if a tool binary exists in PATH.
+   * Checks if a tool binary exists in PATH or in its Docker container.
    * 
    * Requirements: 3.1, 3.2
    * 
    * @param toolName - The name of the tool
    * @param binaryName - Optional binary name (defaults to toolName)
+   * @param containerName - Optional Docker container name for containerized tools
    * @returns Promise<boolean> - True if the tool is installed
    */
-  async isInstalled(toolName: string, binaryName?: string): Promise<boolean> {
+  async isInstalled(toolName: string, binaryName?: string, containerName?: string): Promise<boolean> {
     const binary = binaryName || toolName;
+    
+    // If containerized, check if the container exists and tool is available
+    if (containerName) {
+      try {
+        execSync(`docker exec ${containerName} which ${binary}`, { stdio: 'pipe' });
+        return true;
+      } catch {
+        return false;
+      }
+    }
     
     try {
       // Use 'which' on Unix-like systems, 'where' on Windows
@@ -90,13 +101,14 @@ export class ExecutorService {
    * 
    * @param toolName - The name of the tool
    * @param binaryName - Optional binary name (defaults to toolName)
+   * @param containerName - Optional Docker container name for containerized tools
    * @returns Promise<string | null> - Version string or null if not installed/version unavailable
    */
-  async getVersion(toolName: string, binaryName?: string): Promise<string | null> {
+  async getVersion(toolName: string, binaryName?: string, containerName?: string): Promise<string | null> {
     const binary = binaryName || toolName;
     
     // Check if installed first
-    const installed = await this.isInstalled(toolName, binaryName);
+    const installed = await this.isInstalled(toolName, binaryName, containerName);
     if (!installed) {
       return null;
     }
@@ -106,7 +118,10 @@ export class ExecutorService {
     
     for (const flag of versionFlags) {
       try {
-        const output = execSync(`${binary} ${flag}`, { 
+        const command = containerName 
+          ? `docker exec ${containerName} ${binary} ${flag}`
+          : `${binary} ${flag}`;
+        const output = execSync(command, { 
           stdio: 'pipe',
           timeout: 5000, // 5 second timeout
         }).toString().trim();
@@ -163,7 +178,8 @@ export class ExecutorService {
    */
   async getInstallationStatus(tool: ToolDocument, latestVersion?: string): Promise<ToolStatus> {
     const binaryName = tool.installation?.binaryName || tool.name;
-    const isInstalled = await this.isInstalled(tool.name, binaryName);
+    const containerName = tool.installation?.containerName;
+    const isInstalled = await this.isInstalled(tool.name, binaryName, containerName);
     
     if (!isInstalled) {
       return {
@@ -173,7 +189,7 @@ export class ExecutorService {
       };
     }
 
-    const version = await this.getVersion(tool.name, binaryName);
+    const version = await this.getVersion(tool.name, binaryName, containerName);
     
     // Check for updates if we have both versions
     let hasUpdate = false;
@@ -244,9 +260,10 @@ export class ExecutorService {
     options?: ExecuteOptions,
   ): Promise<ToolExecutionDocument> {
     const binaryName = tool.installation?.binaryName || tool.name;
+    const containerName = tool.installation?.containerName;
     
     // Requirement 4.1: Validate tool is installed before proceeding
-    const isInstalled = await this.isInstalled(tool.name, binaryName);
+    const isInstalled = await this.isInstalled(tool.name, binaryName, containerName);
     if (!isInstalled) {
       throw new BadRequestException(
         `Tool '${tool.displayName}' is not installed. Please install it first.`
@@ -271,6 +288,24 @@ export class ExecutorService {
 
     const startTime = Date.now();
 
+    // Determine if we should run via docker exec or directly
+    if (containerName) {
+      return this.executeInContainer(execution, containerName, binaryName, args, options, startTime);
+    }
+
+    return this.executeDirectly(execution, binaryName, args, options, startTime);
+  }
+
+  /**
+   * Executes a tool directly on the host system.
+   */
+  private executeDirectly(
+    execution: ToolExecutionDocument,
+    binaryName: string,
+    args: string[],
+    options: ExecuteOptions | undefined,
+    startTime: number,
+  ): Promise<ToolExecutionDocument> {
     return new Promise((resolve) => {
       const childProcess = spawn(binaryName, args, {
         cwd: options?.workingDir,
@@ -321,6 +356,95 @@ export class ExecutorService {
         } else {
           execution.status = ExecutionStatus.FAILED;
           // Requirement 4.4: Provide error message on failure
+          execution.errorMessage = stderr || `Tool exited with code ${code}`;
+        }
+
+        await execution.save();
+        resolve(execution);
+      });
+
+      childProcess.on('error', async (error) => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        execution.stdout = stdout;
+        execution.stderr = stderr;
+        execution.exitCode = -1;
+        execution.completedAt = new Date();
+        execution.duration = duration;
+        execution.status = ExecutionStatus.FAILED;
+        execution.errorMessage = error.message;
+
+        await execution.save();
+        resolve(execution);
+      });
+    });
+  }
+
+  /**
+   * Executes a tool inside a Docker container.
+   */
+  private executeInContainer(
+    execution: ToolExecutionDocument,
+    containerName: string,
+    binaryName: string,
+    args: string[],
+    options: ExecuteOptions | undefined,
+    startTime: number,
+  ): Promise<ToolExecutionDocument> {
+    return new Promise((resolve) => {
+      // Build docker exec command
+      const dockerArgs = ['exec', containerName, binaryName, ...args];
+      const childProcess = spawn('docker', dockerArgs, {
+        env: { ...process.env, ...options?.env },
+        shell: false,
+      });
+
+      let stdout = '';
+      let stderr = '';
+      let timeoutId: NodeJS.Timeout | undefined;
+
+      // Set up timeout if specified
+      if (options?.timeout) {
+        timeoutId = setTimeout(() => {
+          childProcess.kill('SIGTERM');
+          execution.status = ExecutionStatus.FAILED;
+          execution.errorMessage = `Tool execution timed out after ${options.timeout}ms`;
+        }, options.timeout);
+      }
+
+      // Capture stdout
+      childProcess.stdout?.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      // Capture stderr
+      childProcess.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      childProcess.on('close', async (code) => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
+
+        const endTime = Date.now();
+        const duration = endTime - startTime;
+
+        execution.stdout = stdout;
+        execution.stderr = stderr;
+        execution.exitCode = code ?? -1;
+        execution.completedAt = new Date();
+        execution.duration = duration;
+
+        if (code === 0) {
+          execution.status = ExecutionStatus.COMPLETED;
+        } else {
+          execution.status = ExecutionStatus.FAILED;
           execution.errorMessage = stderr || `Tool exited with code ${code}`;
         }
 

@@ -4,19 +4,56 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Theme System CSS Variables
+ * These variables are dynamically updated by the ThemeProvider
+ * Default values match the cyberpunk theme
+ * 
+ * Requirements: 3.1, 3.3
+ */
 :root {
-  --accent-cyan: #00f5ff;
-  --accent-green: #22c55e;
-  --accent-purple: #a855f7;
-  --accent-pink: #ec4899;
-  --dark-bg: #0a0a0f;
-  --dark-card: #111118;
-  --dark-border: #1e293b;
+  /* Primary accent colors */
+  --accent-primary: #22c55e;
+  --accent-primary-hover: #16a34a;
+  
+  /* Secondary accent colors */
+  --accent-secondary: #00f5ff;
+  --accent-tertiary: #a855f7;
+  --accent-quaternary: #ec4899;
+  
+  /* Background colors */
+  --bg-primary: #0a0a0f;
+  --bg-card: #111118;
+  --bg-hover: #1a1a24;
+  
+  /* Border and effect colors */
+  --border-primary: #1e293b;
+  --glow-color: #22c55e;
+  
+  /* Scrollbar colors - Requirements: 5.5, 6.3 */
+  --scrollbar-thumb: #22c55e;
+  --scrollbar-thumb-hover: #16a34a;
+  
+  /* Grid pattern color - Requirements: 6.4 */
+  --grid-pattern-color: #22c55e;
+  
+  /* Legacy variable aliases for backward compatibility */
+  --accent-cyan: var(--accent-secondary);
+  --accent-green: var(--accent-primary);
+  --accent-purple: var(--accent-tertiary);
+  --accent-pink: var(--accent-quaternary);
+  --dark-bg: var(--bg-primary);
+  --dark-card: var(--bg-card);
+  --dark-border: var(--border-primary);
 }
 
+/**
+ * Scrollbar Styling - Requirements: 5.5, 6.3
+ * Uses CSS variables for theme-aware scrollbar colors
+ */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--accent-green) var(--dark-bg);
+  scrollbar-color: var(--scrollbar-thumb) var(--bg-primary);
 }
 
 *::-webkit-scrollbar {
@@ -25,52 +62,61 @@
 }
 
 *::-webkit-scrollbar-track {
-  background: var(--dark-bg);
+  background: var(--bg-primary);
 }
 
 *::-webkit-scrollbar-thumb {
-  background: var(--accent-green);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
-  background: #16a34a;
+  background: var(--scrollbar-thumb-hover);
 }
 
 body {
-  background-color: var(--dark-bg);
+  background-color: var(--bg-primary);
   color: #e2e8f0;
   font-family: 'JetBrains Mono', monospace;
 }
 
-/* Custom utility classes */
+/**
+ * Custom utility classes with theme-aware CSS variables
+ * Requirements: 6.1, 6.2, 6.3, 6.4
+ */
 @layer utilities {
   .text-glow {
     text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
   }
 
+  /* Glow effects using CSS variables - Requirements: 5.4, 6.2 */
   .border-glow {
-    box-shadow: 0 0 5px var(--accent-green), inset 0 0 5px rgba(34, 197, 94, 0.1);
+    box-shadow: 0 0 5px var(--glow-color), inset 0 0 5px color-mix(in srgb, var(--glow-color) 10%, transparent);
   }
 
   .card-glow {
-    box-shadow: 0 0 20px rgba(34, 197, 94, 0.1);
+    box-shadow: 0 0 20px color-mix(in srgb, var(--glow-color) 10%, transparent);
   }
 
+  /* Grid pattern using CSS variable - Requirements: 6.4 */
   .bg-grid {
-    background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%2322c55e' fill-opacity='0.03'%3E%3Cpath d='M0 0h40v40H0V0zm1 1v38h38V1H1z'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: linear-gradient(color-mix(in srgb, var(--grid-pattern-color) 3%, transparent) 1px, transparent 1px),
+                      linear-gradient(90deg, color-mix(in srgb, var(--grid-pattern-color) 3%, transparent) 1px, transparent 1px);
+    background-size: 40px 40px;
   }
 
+  /* Glass effect using theme variables */
   .glass {
-    background: rgba(17, 17, 24, 0.8);
+    background: color-mix(in srgb, var(--bg-card) 80%, transparent);
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(34, 197, 94, 0.2);
+    border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
   }
 
+  /* Cyber border using theme variables - Requirements: 6.1 */
   .cyber-border {
     border: 1px solid transparent;
-    background: linear-gradient(var(--dark-card), var(--dark-card)) padding-box,
-                linear-gradient(135deg, var(--accent-green), transparent, var(--accent-cyan)) border-box;
+    background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
+                linear-gradient(135deg, var(--accent-primary), transparent, var(--accent-secondary)) border-box;
   }
 }
 
@@ -147,7 +193,7 @@ body {
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
 }
 
-/* Status indicators */
+/* Status indicators - using theme-aware colors */
 .status-dot {
   width: 8px;
   height: 8px;
@@ -155,7 +201,7 @@ body {
   display: inline-block;
 }
 
-.status-dot.online { background-color: #22c55e; box-shadow: 0 0 10px #22c55e; }
+.status-dot.online { background-color: var(--accent-primary); box-shadow: 0 0 10px var(--accent-primary); }
 .status-dot.offline { background-color: #ef4444; }
 .status-dot.pending { background-color: #f59e0b; animation: pulse 2s infinite; }
 .status-dot.scanning { background-color: #3b82f6; animation: pulse 1s infinite; }

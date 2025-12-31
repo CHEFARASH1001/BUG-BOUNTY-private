@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import { cronApi, authApi } from '@/lib/api';
+import { ThemeToggle } from '@/components/ThemeToggle';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -381,6 +382,9 @@ export default function DashboardLayout({
 
             {/* Actions */}
             <div className="flex items-center gap-4">
+              {/* Theme Toggle */}
+              <ThemeToggle />
+              
               {/* Notifications */}
               <div className="relative" ref={notificationRef}>
                 <button 

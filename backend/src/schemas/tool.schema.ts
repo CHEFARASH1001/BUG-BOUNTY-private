@@ -70,6 +70,8 @@ export interface ToolInstallation {
   binaryName: string;
   lastChecked: Date;
   installCommands?: InstallCommand[];
+  /** Docker container name for containerized tools (e.g., 'bb-katana') */
+  containerName?: string;
 }
 
 @Schema({ timestamps: true })

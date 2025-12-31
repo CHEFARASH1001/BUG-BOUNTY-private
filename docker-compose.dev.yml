@@ -148,6 +148,17 @@ services:
     networks:
       - bb-network
 
+  # Katana - Web Crawling/Spidering Tool
+  katana:
+    image: projectdiscovery/katana:latest
+    container_name: bb-katana
+    restart: unless-stopped
+    entrypoint: ["tail", "-f", "/dev/null"]
+    volumes:
+      - scan_results:/results
+    networks:
+      - bb-network
+
   # HexStrike AI - AI-Powered Penetration Testing Framework
   #hexstrike-ai:
     # build:
@@ -193,6 +204,8 @@ services:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
       - ./frontend/package.json:/app/package.json
+      - ./frontend/tailwind.config.ts:/app/tailwind.config.ts
+      - ./frontend/postcss.config.js:/app/postcss.config.js
     depends_on:
       - backend
     networks:

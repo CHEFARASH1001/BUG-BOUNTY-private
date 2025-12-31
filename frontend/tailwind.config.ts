@@ -9,25 +9,27 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Cyberpunk-inspired dark theme
+        // Theme-aware primary colors using CSS variables
         primary: {
           50: '#f0fdf4',
           100: '#dcfce7',
           200: '#bbf7d0',
           300: '#86efac',
-          400: '#4ade80',
-          500: '#22c55e',
-          600: '#16a34a',
+          400: 'var(--accent-primary)',
+          500: 'var(--accent-primary)',
+          600: 'var(--accent-primary-hover)',
           700: '#15803d',
           800: '#166534',
           900: '#14532d',
         },
+        // Theme-aware accent colors using CSS variables
         accent: {
-          cyan: '#00f5ff',
-          purple: '#a855f7',
-          pink: '#ec4899',
+          cyan: 'var(--accent-secondary)',
+          purple: 'var(--accent-tertiary)',
+          pink: 'var(--accent-quaternary)',
           orange: '#f97316',
         },
+        // Theme-aware dark colors using CSS variables
         dark: {
           50: '#f8fafc',
           100: '#f1f5f9',
@@ -36,10 +38,10 @@ const config: Config = {
           400: '#94a3b8',
           500: '#64748b',
           600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
+          700: 'var(--border-primary)',
+          800: 'var(--bg-hover)',
+          900: 'var(--bg-card)',
+          950: 'var(--bg-primary)',
         },
       },
       fontFamily: {
@@ -48,7 +50,6 @@ const config: Config = {
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'grid-pattern': `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%2322c55e' fill-opacity='0.03'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -57,8 +58,8 @@ const config: Config = {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 5px #22c55e, 0 0 10px #22c55e, 0 0 15px #22c55e' },
-          '100%': { boxShadow: '0 0 10px #22c55e, 0 0 20px #22c55e, 0 0 30px #22c55e' },
+          '0%': { boxShadow: '0 0 5px var(--glow-color), 0 0 10px var(--glow-color), 0 0 15px var(--glow-color)' },
+          '100%': { boxShadow: '0 0 10px var(--glow-color), 0 0 20px var(--glow-color), 0 0 30px var(--glow-color)' },
         },
         scan: {
           '0%, 100%': { opacity: '0.3' },

@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { cn, formatDateTime } from '@/lib/utils';
 import { alertsApi, programsApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
 
 // Types matching backend schema
 type AlertConditionType = 'status_change' | 'title_match' | 'tech_change' | 'favicon_change' | 'abuse_score';
@@ -86,9 +87,10 @@ interface AlertRuleFormProps {
   onSave: (data: any) => Promise<void>;
   onCancel: () => void;
   saving: boolean;
+  isMobile?: boolean;
 }
 
-function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFormProps) {
+function AlertRuleForm({ rule, programs, onSave, onCancel, saving, isMobile }: AlertRuleFormProps) {
   const [name, setName] = useState(rule?.name || '');
   const [conditionType, setConditionType] = useState<AlertConditionType>(rule?.condition.type || 'status_change');
   const [operator, setOperator] = useState<AlertConditionOperator>(rule?.condition.operator || 'equals');
@@ -172,7 +174,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g., Alert on 403 to 200 change"
-          className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50"
+          className="w-full px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 touch-manipulation"
           required
         />
       </div>
@@ -185,7 +187,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
         <select
           value={conditionType}
           onChange={(e) => setConditionType(e.target.value as AlertConditionType)}
-          className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50"
+          className="w-full px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50 touch-manipulation"
         >
           {Object.entries(conditionTypeLabels).map(([key, label]) => (
             <option key={key} value={key}>{label}</option>
@@ -201,7 +203,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
         <select
           value={operator}
           onChange={(e) => setOperator(e.target.value as AlertConditionOperator)}
-          className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50"
+          className="w-full px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50 touch-manipulation"
         >
           {validOperators.map((op) => (
             <option key={op} value={op}>{operatorLabels[op]}</option>
@@ -224,7 +226,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
             conditionType === 'title_match' ? 'e.g., index, welcome' :
             'Enter value'
           }
-          className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50"
+          className="w-full px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 touch-manipulation"
           required
         />
         {conditionType === 'title_match' && operator === 'regex' && (
@@ -235,7 +237,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
       {/* Severity */}
       <div>
         <label className="block text-sm font-medium text-slate-300 mb-1">Severity</label>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           {(Object.keys(severityConfig) as AlertSeverity[]).map((sev) => {
             const config = severityConfig[sev];
             return (
@@ -244,7 +246,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
                 type="button"
                 onClick={() => setSeverity(sev)}
                 className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border transition-colors',
+                  'flex-1 flex items-center justify-center gap-2 px-3 py-2 min-h-[44px] rounded-lg border transition-colors touch-manipulation',
                   severity === sev
                     ? `${config.bg} ${config.color} border-current`
                     : 'bg-dark-800 border-dark-700 text-slate-400 hover:border-dark-600'
@@ -268,7 +270,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
               type="button"
               onClick={() => toggleChannel(channel)}
               className={cn(
-                'px-3 py-1.5 rounded-lg border text-sm transition-colors',
+                'px-3 py-2 min-h-[44px] rounded-lg border text-sm transition-colors touch-manipulation',
                 channels.includes(channel)
                   ? 'bg-primary-500/20 border-primary-500/50 text-primary-400'
                   : 'bg-dark-800 border-dark-700 text-slate-400 hover:border-dark-600'
@@ -289,7 +291,7 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
         <select
           value={programId}
           onChange={(e) => setProgramId(e.target.value)}
-          className="w-full px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50"
+          className="w-full px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50 touch-manipulation"
         >
           <option value="">All Programs</option>
           {programs.map((program) => (
@@ -300,30 +302,30 @@ function AlertRuleForm({ rule, programs, onSave, onCancel, saving }: AlertRuleFo
       </div>
 
       {/* Enabled Toggle */}
-      <div className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg">
+      <div className="flex items-center justify-between p-3 bg-dark-800/50 rounded-lg min-h-[44px]">
         <span className="text-sm text-slate-300">Rule Enabled</span>
         <button
           type="button"
           onClick={() => setEnabled(!enabled)}
-          className={cn('transition-colors', enabled ? 'text-green-400' : 'text-slate-500')}
+          className={cn('transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center touch-manipulation', enabled ? 'text-green-400' : 'text-slate-500')}
         >
           {enabled ? <ToggleRight className="w-8 h-8" /> : <ToggleLeft className="w-8 h-8" />}
         </button>
       </div>
 
       {/* Form Actions */}
-      <div className="flex gap-3 pt-4 border-t border-dark-700">
+      <div className="flex flex-col-reverse sm:flex-row gap-3 pt-4 border-t border-dark-700">
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 transition-colors"
+          className="flex-1 px-4 py-2 min-h-[44px] bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 transition-colors touch-manipulation"
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving || !name || !value || channels.length === 0}
-          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-dark-700 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition-colors"
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary-600 hover:bg-primary-500 disabled:bg-dark-700 disabled:cursor-not-allowed rounded-lg text-sm text-white font-medium transition-colors touch-manipulation"
         >
           {saving ? (
             <>
@@ -350,6 +352,7 @@ export default function AlertsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterEnabled, setFilterEnabled] = useState<boolean | null>(null);
   const [mounted, setMounted] = useState(false);
+  const isMobile = useIsMobile();
 
   // Fetch rules and programs on mount
   useEffect(() => {
@@ -444,19 +447,19 @@ export default function AlertsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Bell className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <Bell className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Alert Rules
           </h1>
-          <p className="text-slate-400 mt-1">Configure alerts for HTTP changes and abuse detection</p>
+          <p className="text-sm md:text-base text-slate-400 mt-1">Configure alerts for HTTP changes and abuse detection</p>
         </div>
         <button
           onClick={() => { setShowForm(true); setEditingRule(null); }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation w-full sm:w-auto"
         >
           <Plus className="w-4 h-4" />
           New Rule
@@ -464,7 +467,7 @@ export default function AlertsPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         {[
           { label: 'Total Rules', value: stats.total, icon: Bell, color: 'text-primary-400' },
           { label: 'Enabled', value: stats.enabled, icon: CheckCircle, color: 'text-green-400' },
@@ -476,25 +479,25 @@ export default function AlertsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+            className="p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">{stat.value}</p>
+                <p className="text-slate-400 text-xs md:text-sm">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-bold text-white mt-1">{stat.value}</p>
               </div>
-              <stat.icon className={cn('w-8 h-8', stat.color)} />
+              <stat.icon className={cn('w-6 h-6 md:w-8 md:h-8', stat.color)} />
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* Main Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         {/* Rules List */}
-        <div className={cn('lg:col-span-2', showForm && 'lg:col-span-1')}>
+        <div className={cn('lg:col-span-2', showForm && !isMobile && 'lg:col-span-1')}>
           {/* Filters */}
-          <div className="flex gap-3 mb-4">
+          <div className="flex flex-col sm:flex-row gap-3 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
               <input
@@ -502,13 +505,13 @@ export default function AlertsPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search rules..."
-                className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50"
+                className="w-full pl-10 pr-4 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 touch-manipulation"
               />
             </div>
             <select
               value={filterEnabled === null ? '' : filterEnabled.toString()}
               onChange={(e) => setFilterEnabled(e.target.value === '' ? null : e.target.value === 'true')}
-              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50"
+              className="px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white focus:outline-none focus:border-primary-500/50 touch-manipulation"
             >
               <option value="">All Status</option>
               <option value="true">Enabled</option>
@@ -531,7 +534,7 @@ export default function AlertsPage() {
                 {rules.length === 0 && (
                   <button
                     onClick={() => setShowForm(true)}
-                    className="mt-4 text-primary-400 hover:text-primary-300 text-sm"
+                    className="mt-4 text-primary-400 hover:text-primary-300 text-sm min-h-[44px] touch-manipulation"
                   >
                     Create your first rule
                   </button>
@@ -552,23 +555,23 @@ export default function AlertsPage() {
                         !rule.enabled && 'opacity-60'
                       )}
                     >
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-sm font-medium text-white truncate">{rule.name}</h3>
                             <span className={cn('flex items-center gap-1 px-2 py-0.5 rounded text-xs', severityConf.bg, severityConf.color)}>
                               <SeverityIcon className="w-3 h-3" />
                               {severityConf.label}
                             </span>
                           </div>
-                          <div className="flex items-center gap-2 mt-1 text-xs text-slate-500">
+                          <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
                             <span>{conditionTypeLabels[rule.condition.type]}</span>
                             <span>•</span>
                             <span>{operatorLabels[rule.condition.operator]}</span>
                             <span>•</span>
                             <span className="text-slate-400">{rule.condition.value}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-2">
+                          <div className="flex flex-wrap items-center gap-2 mt-2">
                             {rule.channels.map(channel => (
                               <span key={channel} className="px-2 py-0.5 bg-dark-700 rounded text-xs text-slate-400">
                                 {channelLabels[channel]}
@@ -582,24 +585,24 @@ export default function AlertsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 self-end sm:self-start">
                           <button
                             onClick={() => handleToggleEnabled(rule)}
-                            className={cn('transition-colors', rule.enabled ? 'text-green-400' : 'text-slate-500')}
+                            className={cn('min-w-[44px] min-h-[44px] flex items-center justify-center transition-colors touch-manipulation', rule.enabled ? 'text-green-400' : 'text-slate-500')}
                             title={rule.enabled ? 'Disable' : 'Enable'}
                           >
                             {rule.enabled ? <ToggleRight className="w-6 h-6" /> : <ToggleLeft className="w-6 h-6" />}
                           </button>
                           <button
                             onClick={() => handleEdit(rule)}
-                            className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
                             title="Edit"
                           >
                             <Edit2 className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => handleDelete(rule._id)}
-                            className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                            className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-red-400 transition-colors touch-manipulation"
                             title="Delete"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -617,33 +620,70 @@ export default function AlertsPage() {
         {/* Form Panel */}
         <AnimatePresence>
           {showForm && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="lg:col-span-2"
-            >
-              <div className="p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-lg font-semibold text-white">
-                    {editingRule ? 'Edit Alert Rule' : 'New Alert Rule'}
-                  </h2>
-                  <button
-                    onClick={handleCancel}
-                    className="p-1 text-slate-400 hover:text-white transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
-                </div>
-                <AlertRuleForm
-                  rule={editingRule}
-                  programs={programs}
-                  onSave={handleSave}
-                  onCancel={handleCancel}
-                  saving={saving}
-                />
-              </div>
-            </motion.div>
+            <>
+              {/* Mobile: Full screen overlay */}
+              {isMobile ? (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="fixed inset-0 z-50 bg-dark-950"
+                >
+                  <div className="flex flex-col h-full">
+                    <div className="flex items-center justify-between p-4 border-b border-dark-800">
+                      <h2 className="text-lg font-semibold text-white">
+                        {editingRule ? 'Edit Alert Rule' : 'New Alert Rule'}
+                      </h2>
+                      <button
+                        onClick={handleCancel}
+                        className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-4">
+                      <AlertRuleForm
+                        rule={editingRule}
+                        programs={programs}
+                        onSave={handleSave}
+                        onCancel={handleCancel}
+                        saving={saving}
+                        isMobile={isMobile}
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              ) : (
+                /* Desktop: Side panel */
+                <motion.div
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  className="lg:col-span-2"
+                >
+                  <div className="p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-white">
+                        {editingRule ? 'Edit Alert Rule' : 'New Alert Rule'}
+                      </h2>
+                      <button
+                        onClick={handleCancel}
+                        className="p-1 text-slate-400 hover:text-white transition-colors"
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
+                    </div>
+                    <AlertRuleForm
+                      rule={editingRule}
+                      programs={programs}
+                      onSave={handleSave}
+                      onCancel={handleCancel}
+                      saving={saving}
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </>
           )}
         </AnimatePresence>
       </div>

@@ -21,11 +21,15 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { cn, formatDate } from '@/lib/utils';
 import { programsApi } from '@/lib/api';
 import { useDebounce } from '@/hooks/useDebounce';
+import { useIsMobile } from '@/hooks';
 
 interface Program {
   _id: string;
@@ -87,6 +91,8 @@ const dataSourceConfig: Record<string, { label: string; color: string }> = {
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 200];
 
 export default function ProgramsPage() {
+  const router = useRouter();
+  const isMobile = useIsMobile();
   const [programs, setPrograms] = useState<Program[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -102,6 +108,7 @@ export default function ProgramsPage() {
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [selectedDataSource, setSelectedDataSource] = useState<string | null>(null);
   const [selectedProgramType, setSelectedProgramType] = useState<string | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   const debouncedSearch = useDebounce(searchQuery, 300);
 
@@ -199,31 +206,31 @@ export default function ProgramsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Building2 className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-3">
+            <Building2 className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Programs
           </h1>
-          <p className="text-slate-400 mt-1">Manage your bug bounty programs</p>
+          <p className="text-slate-400 mt-1 text-sm md:text-base">Manage your bug bounty programs</p>
         </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => fetchPrograms(pagination.page, pagination.limit)}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700"
+            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors border border-dark-700 min-h-[44px]"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
-            Refresh
+            <span className="hidden sm:inline">Refresh</span>
           </button>
           <Link
             href="/dashboard/programs/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+            className="flex items-center gap-2 px-3 md:px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors min-h-[44px]"
           >
             <Plus className="w-4 h-4" />
-            Add Program
+            <span className="hidden sm:inline">Add Program</span>
           </Link>
         </div>
       </div>
@@ -235,7 +242,7 @@ export default function ProgramsPage() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
         {[
           { label: 'Total Programs', value: dashboardStats?.totalPrograms ?? pagination.total, icon: Building2, color: 'text-primary-400' },
           { label: 'Active', value: dashboardStats?.activePrograms ?? pageActiveCount, icon: CheckCircle, color: 'text-green-400' },
@@ -248,111 +255,163 @@ export default function ProgramsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
-            className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
+            className="p-3 md:p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-slate-400 text-sm">{stat.label}</p>
-                <p className="text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
+                <p className="text-slate-400 text-xs md:text-sm">{stat.label}</p>
+                <p className="text-xl md:text-2xl font-bold text-white mt-1">{loading ? '...' : stat.value}</p>
               </div>
-              <stat.icon className={cn('w-8 h-8', stat.color)} />
+              <stat.icon className={cn('w-6 h-6 md:w-8 md:h-8', stat.color)} />
             </div>
           </motion.div>
         ))}
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 max-w-md">
+      <div className="space-y-3">
+        {/* Search - always visible */}
+        <div className="relative w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search programs by name or handle..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            className="w-full pl-10 pr-4 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 p-1"
             >
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <select
-            value={selectedStatus || ''}
-            onChange={(e) => setSelectedStatus(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+        {/* Filter toggle button - mobile only */}
+        {isMobile && (
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3',
+              'bg-dark-800 border border-dark-700 rounded-lg',
+              'text-sm text-slate-300 font-medium',
+              'transition-colors hover:bg-dark-700',
+              'min-h-[44px]'
+            )}
+            aria-expanded={filtersExpanded}
           >
-            <option value="">All Status</option>
-            <option value="active">Active</option>
-            <option value="open">Open</option>
-            <option value="public_mode">Public</option>
-            <option value="paused">Paused</option>
-            <option value="archived">Archived</option>
-            <option value="closed">Closed</option>
-          </select>
-          <select
-            value={selectedPlatform || ''}
-            onChange={(e) => setSelectedPlatform(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-          >
-            <option value="">All Platforms</option>
-            <option value="hackerone">HackerOne</option>
-            <option value="bugcrowd">Bugcrowd</option>
-            <option value="intigriti">Intigriti</option>
-            <option value="yeswehack">YesWeHack</option>
-            <option value="synack">Synack</option>
-            <option value="federacy">Federacy</option>
-            <option value="github">GitHub</option>
-            <option value="custom">Custom</option>
-          </select>
-          <select
-            value={selectedProgramType || ''}
-            onChange={(e) => setSelectedProgramType(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-          >
-            <option value="">All Types</option>
-            <option value="bbp">BBP (Bounty)</option>
-            <option value="vdp">VDP (No Bounty)</option>
-          </select>
-          <select
-            value={selectedDataSource || ''}
-            onChange={(e) => setSelectedDataSource(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-          >
-            <option value="">All Sources</option>
-            <option value="hackerone-api">HackerOne API</option>
-            <option value="bugcrowd-api">Bugcrowd API</option>
-            <option value="chaos">Chaos</option>
-            <option value="bounty-targets">Bounty Targets</option>
-          </select>
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span>Filters</span>
+              {hasActiveFilters && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  Active
+                </span>
+              )}
+            </div>
+            {filtersExpanded ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+        )}
 
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors"
+        {/* Filter controls - collapsible on mobile */}
+        {(!isMobile || filtersExpanded) && (
+          <div className={cn(
+            'flex gap-2',
+            isMobile ? 'flex-col p-4 bg-dark-800/50 border border-dark-700 rounded-lg' : 'flex-row flex-wrap items-center'
+          )}>
+            {!isMobile && <Filter className="w-4 h-4 text-slate-400" />}
+            <select
+              value={selectedStatus || ''}
+              onChange={(e) => setSelectedStatus(e.target.value || null)}
+              className={cn(
+                'px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50',
+                isMobile && 'w-full min-h-[44px]'
+              )}
             >
-              <X className="w-3 h-3" />
-              Clear
-            </button>
-          )}
-        </div>
+              <option value="">All Status</option>
+              <option value="active">Active</option>
+              <option value="open">Open</option>
+              <option value="public_mode">Public</option>
+              <option value="paused">Paused</option>
+              <option value="archived">Archived</option>
+              <option value="closed">Closed</option>
+            </select>
+            <select
+              value={selectedPlatform || ''}
+              onChange={(e) => setSelectedPlatform(e.target.value || null)}
+              className={cn(
+                'px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50',
+                isMobile && 'w-full min-h-[44px]'
+              )}
+            >
+              <option value="">All Platforms</option>
+              <option value="hackerone">HackerOne</option>
+              <option value="bugcrowd">Bugcrowd</option>
+              <option value="intigriti">Intigriti</option>
+              <option value="yeswehack">YesWeHack</option>
+              <option value="synack">Synack</option>
+              <option value="federacy">Federacy</option>
+              <option value="github">GitHub</option>
+              <option value="custom">Custom</option>
+            </select>
+            <select
+              value={selectedProgramType || ''}
+              onChange={(e) => setSelectedProgramType(e.target.value || null)}
+              className={cn(
+                'px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50',
+                isMobile && 'w-full min-h-[44px]'
+              )}
+            >
+              <option value="">All Types</option>
+              <option value="bbp">BBP (Bounty)</option>
+              <option value="vdp">VDP (No Bounty)</option>
+            </select>
+            <select
+              value={selectedDataSource || ''}
+              onChange={(e) => setSelectedDataSource(e.target.value || null)}
+              className={cn(
+                'px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50',
+                isMobile && 'w-full min-h-[44px]'
+              )}
+            >
+              <option value="">All Sources</option>
+              <option value="hackerone-api">HackerOne API</option>
+              <option value="bugcrowd-api">Bugcrowd API</option>
+              <option value="chaos">Chaos</option>
+              <option value="bounty-targets">Bounty Targets</option>
+            </select>
+
+            {hasActiveFilters && (
+              <button
+                onClick={clearFilters}
+                className={cn(
+                  'flex items-center justify-center gap-1 px-3 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-400 transition-colors',
+                  isMobile && 'w-full min-h-[44px]'
+                )}
+              >
+                <X className="w-3 h-3" />
+                Clear Filters
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {hasActiveFilters && (
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-slate-400 flex-wrap">
           <span>Filtered: {pagination.total} programs</span>
-          {debouncedSearch && <span className="px-2 py-0.5 bg-dark-800 rounded">Search: &quot;{debouncedSearch}&quot;</span>}
-          {selectedStatus && <span className="px-2 py-0.5 bg-dark-800 rounded">Status: {selectedStatus}</span>}
-          {selectedPlatform && <span className="px-2 py-0.5 bg-dark-800 rounded">Platform: {selectedPlatform}</span>}
-          {selectedProgramType && <span className="px-2 py-0.5 bg-dark-800 rounded">Type: {selectedProgramType.toUpperCase()}</span>}
-          {selectedDataSource && <span className="px-2 py-0.5 bg-dark-800 rounded">Source: {selectedDataSource}</span>}
+          {debouncedSearch && <span className="px-2 py-0.5 bg-dark-800 rounded text-xs">Search: &quot;{debouncedSearch}&quot;</span>}
+          {selectedStatus && <span className="px-2 py-0.5 bg-dark-800 rounded text-xs">Status: {selectedStatus}</span>}
+          {selectedPlatform && <span className="px-2 py-0.5 bg-dark-800 rounded text-xs">Platform: {selectedPlatform}</span>}
+          {selectedProgramType && <span className="px-2 py-0.5 bg-dark-800 rounded text-xs">Type: {selectedProgramType.toUpperCase()}</span>}
+          {selectedDataSource && <span className="px-2 py-0.5 bg-dark-800 rounded text-xs">Source: {selectedDataSource}</span>}
         </div>
       )}
 
@@ -365,7 +424,7 @@ export default function ProgramsPage() {
 
       {!loading && (
         <>
-          <div className="space-y-4">
+          <div className="space-y-3 md:space-y-4">
             {programs.map((program, index) => {
               const status = statusConfig[program.status] || statusConfig.active;
               const platformColor = platformColors[program.platform] || 'bg-slate-500/20 text-slate-400';
@@ -379,35 +438,50 @@ export default function ProgramsPage() {
                   className="group relative"
                 >
                   <div className="absolute -inset-0.5 bg-gradient-to-r from-primary-600/50 to-accent-cyan/50 rounded-xl blur opacity-0 group-hover:opacity-20 transition duration-300" />
-                  <div className="relative p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors">
+                  <div 
+                    className={cn(
+                      "relative p-4 md:p-6 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-dark-700 transition-colors",
+                      isMobile && "cursor-pointer active:bg-dark-800"
+                    )}
+                    onClick={() => isMobile && router.push(`/dashboard/programs/${program._id}`)}
+                    role={isMobile ? "button" : undefined}
+                    tabIndex={isMobile ? 0 : undefined}
+                    onKeyDown={(e) => {
+                      if (isMobile && (e.key === 'Enter' || e.key === ' ')) {
+                        e.preventDefault();
+                        router.push(`/dashboard/programs/${program._id}`);
+                      }
+                    }}
+                  >
                     <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-4">
-                        <div className="p-3 bg-primary-500/20 rounded-xl">
-                          <Building2 className="w-6 h-6 text-primary-400" />
+                      <div className="flex items-start gap-3 md:gap-4 flex-1 min-w-0">
+                        <div className="p-2 md:p-3 bg-primary-500/20 rounded-xl shrink-0">
+                          <Building2 className="w-5 h-5 md:w-6 md:h-6 text-primary-400" />
                         </div>
-                        <div>
-                          <div className="flex items-center gap-3 mb-1 flex-wrap">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 md:gap-3 mb-1 flex-wrap">
                             <Link
                               href={`/dashboard/programs/${program._id}`}
-                              className="text-lg font-semibold text-white hover:text-primary-400 transition-colors"
+                              className="text-base md:text-lg font-semibold text-white hover:text-primary-400 transition-colors truncate"
+                              onClick={(e) => isMobile && e.stopPropagation()}
                             >
                               {program.name}
                             </Link>
-                            <span className={cn('px-2 py-0.5 rounded text-xs font-medium', status.bg, status.color)}>
+                            <span className={cn('px-2 py-0.5 rounded text-xs font-medium shrink-0', status.bg, status.color)}>
                               {status.label}
                             </span>
                             {program.offersBounties ? (
-                              <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400">BBP</span>
+                              <span className="px-2 py-0.5 rounded text-xs bg-yellow-500/20 text-yellow-400 shrink-0">BBP</span>
                             ) : (
-                              <span className="px-2 py-0.5 rounded text-xs bg-slate-500/20 text-slate-400">VDP</span>
+                              <span className="px-2 py-0.5 rounded text-xs bg-slate-500/20 text-slate-400 shrink-0">VDP</span>
                             )}
                           </div>
-                          <p className="text-sm text-slate-500 mb-3">@{program.handle}</p>
-                          <div className="flex items-center gap-4 text-sm flex-wrap">
+                          <p className="text-sm text-slate-500 mb-2 md:mb-3">@{program.handle}</p>
+                          <div className="flex items-center gap-2 md:gap-4 text-sm flex-wrap">
                             <span className={cn('px-2 py-1 rounded text-xs capitalize', platformColor)}>
                               {program.platform}
                             </span>
-                            {program.dataSources && program.dataSources.length > 0 && (
+                            {program.dataSources && program.dataSources.length > 0 && !isMobile && (
                               <div className="flex items-center gap-1">
                                 {program.dataSources.map((source) => {
                                   const config = dataSourceConfig[source] || {
@@ -430,18 +504,19 @@ export default function ProgramsPage() {
                               <Globe className="w-4 h-4" />
                               {program.scopeCount || program.scopes?.length || 0} scopes
                             </span>
-                            {program.url && (
+                            {program.url && !isMobile && (
                               <a
                                 href={program.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center gap-1 text-primary-400 hover:text-primary-300"
+                                onClick={(e) => e.stopPropagation()}
                               >
                                 <ExternalLink className="w-4 h-4" />
                                 View Program
                               </a>
                             )}
-                            {program.createdAt && (
+                            {program.createdAt && !isMobile && (
                               <span className="flex items-center gap-1 text-slate-400">
                                 <Calendar className="w-4 h-4" />
                                 {formatDate(program.createdAt)}
@@ -450,21 +525,23 @@ export default function ProgramsPage() {
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          href={`/dashboard/programs/${program._id}`}
-                          className="p-2 text-slate-400 hover:text-primary-400 transition-colors"
-                          title="View Details"
-                        >
-                          <ExternalLink className="w-4 h-4" />
-                        </Link>
-                        <button className="p-2 text-slate-400 hover:text-white transition-colors">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </button>
-                      </div>
+                      {!isMobile && (
+                        <div className="flex items-center gap-2 shrink-0">
+                          <Link
+                            href={`/dashboard/programs/${program._id}`}
+                            className="p-2 text-slate-400 hover:text-primary-400 transition-colors"
+                            title="View Details"
+                          >
+                            <ExternalLink className="w-4 h-4" />
+                          </Link>
+                          <button className="p-2 text-slate-400 hover:text-white transition-colors">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
                     </div>
 
-                    {program.scopes && program.scopes.length > 0 && (
+                    {program.scopes && program.scopes.length > 0 && !isMobile && (
                       <div className="mt-4 pt-4 border-t border-dark-800">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs text-slate-500">Scope:</span>
@@ -487,85 +564,113 @@ export default function ProgramsPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-6 p-4 bg-dark-900/80 rounded-xl border border-dark-800">
-              <div className="flex items-center gap-4 text-sm text-slate-400">
-                <span>
-                  Showing {(pagination.page - 1) * pagination.limit + 1}-
-                  {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} programs
-                </span>
-                <div className="flex items-center gap-2">
-                  <span>Per page:</span>
-                  <select
-                    value={pagination.limit}
-                    onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                    className="px-2 py-1 bg-dark-800 border border-dark-700 rounded text-slate-300 focus:outline-none focus:border-primary-500/50"
-                  >
-                    {PAGE_SIZE_OPTIONS.map((size) => (
-                      <option key={size} value={size}>
-                        {size}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handlePageChange(1)}
-                  disabled={pagination.page === 1}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="First page"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={pagination.page === 1}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Previous page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-
-                <div className="flex items-center gap-1 mx-2">
-                  {getPageNumbers().map((pageNum, idx) =>
-                    pageNum === '...' ? (
-                      <span key={`ellipsis-${idx}`} className="px-2 text-slate-500">
-                        ...
-                      </span>
-                    ) : (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum as number)}
-                        className={cn(
-                          'min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors',
-                          pagination.page === pageNum
-                            ? 'bg-primary-600 text-white'
-                            : 'text-slate-400 hover:text-white hover:bg-dark-700'
-                        )}
-                      >
-                        {pageNum}
-                      </button>
-                    )
-                  )}
+            <div className="flex flex-col gap-4 mt-6 p-4 bg-dark-900/80 rounded-xl border border-dark-800">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-sm text-slate-400">
+                  <span className="text-center sm:text-left">
+                    Showing {(pagination.page - 1) * pagination.limit + 1}-
+                    {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span>Per page:</span>
+                    <select
+                      value={pagination.limit}
+                      onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                      className="px-2 py-1 bg-dark-800 border border-dark-700 rounded text-slate-300 focus:outline-none focus:border-primary-500/50 min-h-[36px]"
+                    >
+                      {PAGE_SIZE_OPTIONS.map((size) => (
+                        <option key={size} value={size}>
+                          {size}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={pagination.page === pagination.totalPages}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Next page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.totalPages)}
-                  disabled={pagination.page === pagination.totalPages}
-                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                  title="Last page"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </button>
+                {/* Mobile: Simple prev/next */}
+                {isMobile ? (
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      Prev
+                    </button>
+                    <span className="px-3 py-2 text-sm text-slate-300">
+                      {pagination.page} / {pagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-4 py-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]"
+                    >
+                      Next
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  /* Desktop: Full pagination */
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handlePageChange(1)}
+                      disabled={pagination.page === 1}
+                      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="First page"
+                    >
+                      <ChevronsLeft className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(pagination.page - 1)}
+                      disabled={pagination.page === 1}
+                      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Previous page"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex items-center gap-1 mx-2">
+                      {getPageNumbers().map((pageNum, idx) =>
+                        pageNum === '...' ? (
+                          <span key={`ellipsis-${idx}`} className="px-2 text-slate-500">
+                            ...
+                          </span>
+                        ) : (
+                          <button
+                            key={pageNum}
+                            onClick={() => handlePageChange(pageNum as number)}
+                            className={cn(
+                              'min-w-[36px] h-9 px-3 rounded-lg text-sm font-medium transition-colors',
+                              pagination.page === pageNum
+                                ? 'bg-primary-600 text-white'
+                                : 'text-slate-400 hover:text-white hover:bg-dark-700'
+                            )}
+                          >
+                            {pageNum}
+                          </button>
+                        )
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => handlePageChange(pagination.page + 1)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Next page"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(pagination.totalPages)}
+                      disabled={pagination.page === pagination.totalPages}
+                      className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-dark-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      title="Last page"
+                    >
+                      <ChevronsRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           )}

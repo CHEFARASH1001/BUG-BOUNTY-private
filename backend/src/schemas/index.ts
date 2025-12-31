@@ -18,3 +18,4 @@ export * from './wordlist.schema';
 export * from './chaos-sync.schema';
 export * from './tool.schema';
 export * from './tool-execution.schema';
+export * from './xss-scan.schema';

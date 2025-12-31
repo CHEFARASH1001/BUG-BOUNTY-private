@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime, formatDate } from '@/lib/utils';
+import { useIsMobile } from '@/hooks';
 
 // Mock data
 const reports = [
@@ -103,6 +104,7 @@ export default function ReportsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [selectedFormat, setSelectedFormat] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   const filteredReports = reports.filter((report) => {
     const matchesSearch = report.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -113,19 +115,19 @@ export default function ReportsPage() {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <FileText className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <FileText className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Reports
           </h1>
-          <p className="text-slate-400 mt-1">Generate and download security reports</p>
+          <p className="text-sm md:text-base text-slate-400 mt-1">Generate and download security reports</p>
         </div>
         <Link
           href="/dashboard/reports/new"
-          className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation w-full sm:w-auto"
         >
           <FileText className="w-4 h-4" />
           Generate Report
@@ -133,15 +135,15 @@ export default function ReportsPage() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
         <motion.button
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group"
+          className="p-4 min-h-[44px] bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group touch-manipulation"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-red-500/20 rounded-lg group-hover:bg-red-500/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-red-500/20 rounded-lg group-hover:bg-red-500/30 transition-colors shrink-0">
               <File className="w-5 h-5 text-red-400" />
             </div>
             <div>
@@ -154,10 +156,10 @@ export default function ReportsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group"
+          className="p-4 min-h-[44px] bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group touch-manipulation"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-green-500/20 rounded-lg group-hover:bg-green-500/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-green-500/20 rounded-lg group-hover:bg-green-500/30 transition-colors shrink-0">
               <FileSpreadsheet className="w-5 h-5 text-green-400" />
             </div>
             <div>
@@ -170,10 +172,10 @@ export default function ReportsPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-4 bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group"
+          className="p-4 min-h-[44px] bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 hover:border-primary-500/50 transition-colors text-left group touch-manipulation"
         >
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:bg-yellow-500/30 transition-colors">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-yellow-500/20 rounded-lg group-hover:bg-yellow-500/30 transition-colors shrink-0">
               <FileJson className="w-5 h-5 text-yellow-400" />
             </div>
             <div>
@@ -185,24 +187,24 @@ export default function ReportsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4">
+        <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
           <input
             type="text"
             placeholder="Search reports..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            className="w-full pl-10 pr-4 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors touch-manipulation"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
+          <Filter className="w-4 h-4 text-slate-400 hidden sm:block" />
           <select
             value={selectedType || ''}
             onChange={(e) => setSelectedType(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            className="flex-1 sm:flex-none px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
           >
             <option value="">All Types</option>
             <option value="full">Full Report</option>
@@ -214,7 +216,7 @@ export default function ReportsPage() {
           <select
             value={selectedFormat || ''}
             onChange={(e) => setSelectedFormat(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            className="flex-1 sm:flex-none px-3 py-2 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
           >
             <option value="">All Formats</option>
             <option value="pdf">PDF</option>
@@ -226,120 +228,213 @@ export default function ReportsPage() {
 
       {/* Reports List */}
       <div className="bg-dark-900/80 backdrop-blur rounded-xl border border-dark-800 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-dark-800">
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Report</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Type</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Format</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Stats</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Created</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Size</th>
-                <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredReports.map((report, index) => {
-                const FormatIcon = formatConfig[report.format].icon;
-                
-                return (
-                  <motion.tr
-                    key={report.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: index * 0.02 }}
-                    className="border-b border-dark-800/50 hover:bg-dark-800/30 transition-colors"
-                  >
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className={cn(
-                          'p-2 rounded-lg',
-                          report.format === 'pdf' ? 'bg-red-500/20' :
-                          report.format === 'csv' ? 'bg-green-500/20' :
-                          'bg-yellow-500/20'
-                        )}>
-                          <FormatIcon className={cn('w-4 h-4', formatConfig[report.format].color)} />
-                        </div>
-                        <div>
-                          <div className="font-medium text-white">{report.title}</div>
-                          <div className="flex items-center gap-1 text-xs text-slate-500">
-                            <Globe className="w-3 h-3" />
-                            {report.domain}
+        {/* Mobile Card View */}
+        {isMobile ? (
+          <div className="divide-y divide-dark-800">
+            {filteredReports.map((report, index) => {
+              const FormatIcon = formatConfig[report.format].icon;
+              
+              return (
+                <motion.div
+                  key={report.id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: index * 0.02 }}
+                  className="p-4 space-y-3"
+                >
+                  <div className="flex items-start gap-3">
+                    <div className={cn(
+                      'p-2 rounded-lg shrink-0',
+                      report.format === 'pdf' ? 'bg-red-500/20' :
+                      report.format === 'csv' ? 'bg-green-500/20' :
+                      'bg-yellow-500/20'
+                    )}>
+                      <FormatIcon className={cn('w-4 h-4', formatConfig[report.format].color)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-white text-sm">{report.title}</div>
+                      <div className="flex items-center gap-1 text-xs text-slate-500 mt-0.5">
+                        <Globe className="w-3 h-3" />
+                        {report.domain}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={cn('px-2 py-1 rounded text-xs', typeConfig[report.type].color)}>
+                      {typeConfig[report.type].label}
+                    </span>
+                    <span className={cn('text-xs font-medium', formatConfig[report.format].color)}>
+                      {formatConfig[report.format].label}
+                    </span>
+                  </div>
+                  
+                  <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400">
+                    <span className="flex items-center gap-1">
+                      <Shield className="w-3 h-3" />
+                      {report.vulnerabilities} vulns
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Globe className="w-3 h-3" />
+                      {report.subdomains} subs
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {formatDate(report.createdAt)}
+                    </span>
+                    {report.status === 'generating' ? (
+                      <span className="flex items-center gap-1 text-yellow-400">
+                        <Clock className="w-3 h-3 animate-spin" />
+                        Generating...
+                      </span>
+                    ) : (
+                      <span>{report.size}</span>
+                    )}
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {report.status === 'ready' && (
+                      <>
+                        <button
+                          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 min-h-[44px] bg-dark-800 hover:bg-dark-700 text-slate-300 text-xs rounded-lg transition-colors touch-manipulation"
+                        >
+                          <Download className="w-4 h-4" />
+                          Download
+                        </button>
+                        <button
+                          className="flex items-center justify-center p-2 min-w-[44px] min-h-[44px] bg-dark-800 hover:bg-dark-700 text-slate-400 hover:text-white rounded-lg transition-colors touch-manipulation"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      </>
+                    )}
+                    <button
+                      className="flex items-center justify-center p-2 min-w-[44px] min-h-[44px] bg-dark-800 hover:bg-dark-700 text-slate-400 hover:text-red-400 rounded-lg transition-colors touch-manipulation"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        ) : (
+          /* Desktop Table View */
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-dark-800">
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Report</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Type</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Format</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Stats</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Created</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Size</th>
+                  <th className="text-left px-4 py-3 text-sm font-medium text-slate-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredReports.map((report, index) => {
+                  const FormatIcon = formatConfig[report.format].icon;
+                  
+                  return (
+                    <motion.tr
+                      key={report.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: index * 0.02 }}
+                      className="border-b border-dark-800/50 hover:bg-dark-800/30 transition-colors"
+                    >
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn(
+                            'p-2 rounded-lg',
+                            report.format === 'pdf' ? 'bg-red-500/20' :
+                            report.format === 'csv' ? 'bg-green-500/20' :
+                            'bg-yellow-500/20'
+                          )}>
+                            <FormatIcon className={cn('w-4 h-4', formatConfig[report.format].color)} />
+                          </div>
+                          <div>
+                            <div className="font-medium text-white">{report.title}</div>
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
+                              <Globe className="w-3 h-3" />
+                              {report.domain}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={cn('px-2 py-1 rounded text-xs', typeConfig[report.type].color)}>
-                        {typeConfig[report.type].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <span className={cn('text-sm font-medium', formatConfig[report.format].color)}>
-                        {formatConfig[report.format].label}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="flex items-center gap-1 text-slate-400">
-                          <Shield className="w-3 h-3" />
-                          {report.vulnerabilities}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={cn('px-2 py-1 rounded text-xs', typeConfig[report.type].color)}>
+                          {typeConfig[report.type].label}
                         </span>
-                        <span className="flex items-center gap-1 text-slate-400">
-                          <Globe className="w-3 h-3" />
-                          {report.subdomains}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={cn('text-sm font-medium', formatConfig[report.format].color)}>
+                          {formatConfig[report.format].label}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1 text-sm text-slate-400">
-                        <Calendar className="w-3 h-3" />
-                        {formatDate(report.createdAt)}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4">
-                      {report.status === 'generating' ? (
-                        <span className="flex items-center gap-1 text-sm text-yellow-400">
-                          <Clock className="w-3 h-3 animate-spin" />
-                          Generating...
-                        </span>
-                      ) : (
-                        <span className="text-sm text-slate-300">{report.size}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-1">
-                        {report.status === 'ready' && (
-                          <>
-                            <button
-                              className="p-1.5 text-slate-400 hover:text-green-400 transition-colors"
-                              title="Download"
-                            >
-                              <Download className="w-4 h-4" />
-                            </button>
-                            <button
-                              className="p-1.5 text-slate-400 hover:text-white transition-colors"
-                              title="Preview"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                          </>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Shield className="w-3 h-3" />
+                            {report.vulnerabilities}
+                          </span>
+                          <span className="flex items-center gap-1 text-slate-400">
+                            <Globe className="w-3 h-3" />
+                            {report.subdomains}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1 text-sm text-slate-400">
+                          <Calendar className="w-3 h-3" />
+                          {formatDate(report.createdAt)}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        {report.status === 'generating' ? (
+                          <span className="flex items-center gap-1 text-sm text-yellow-400">
+                            <Clock className="w-3 h-3 animate-spin" />
+                            Generating...
+                          </span>
+                        ) : (
+                          <span className="text-sm text-slate-300">{report.size}</span>
                         )}
-                        <button
-                          className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1">
+                          {report.status === 'ready' && (
+                            <>
+                              <button
+                                className="p-1.5 text-slate-400 hover:text-green-400 transition-colors"
+                                title="Download"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                              <button
+                                className="p-1.5 text-slate-400 hover:text-white transition-colors"
+                                title="Preview"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          <button
+                            className="p-1.5 text-slate-400 hover:text-red-400 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </motion.tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {filteredReports.length === 0 && (
@@ -349,7 +444,7 @@ export default function ReportsPage() {
           <p className="text-slate-400 mb-4">Generate a new report to get started</p>
           <Link
             href="/dashboard/reports/new"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+            className="inline-flex items-center justify-center gap-2 px-4 py-2 min-h-[44px] bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation"
           >
             <FileText className="w-4 h-4" />
             Generate Report

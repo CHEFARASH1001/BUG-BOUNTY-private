@@ -622,8 +622,49 @@ export const toolsApi = {
   
   // Get available installation methods for a tool
   getInstallMethods: (id: string) => api.get(`/tools/${id}/install-methods`),
+
+  // Install all tools that are not currently installed
+  installAll: () => api.post('/tools/install-all'),
+
+  // Refresh installation status of all tools
+  refreshStatus: () => api.post('/tools/refresh-status'),
 };
 
+
+// XSS API - Cross-Site Scripting scanning
+export const xssApi = {
+  // Start a new XSS scan
+  start: (config: {
+    url: string;
+    tools?: string[];
+    customPayloads?: string[];
+    crawl?: boolean;
+    depth?: number;
+    threads?: number;
+    timeout?: number;
+    wafBypass?: boolean;
+    blindXss?: string;
+    headers?: Record<string, string>;
+    cookies?: string;
+    programId?: string;
+  }) => api.post('/xss', config),
+  
+  // Get scan status and results
+  getScan: (id: string) => api.get(`/xss/${id}`),
+  
+  // Cancel a running scan
+  cancel: (id: string) => api.delete(`/xss/${id}`),
+  
+  // Get available XSS tools
+  getTools: () => api.get('/xss/tools'),
+  
+  // Get XSS payloads
+  getPayloads: (type?: 'basic' | 'waf-bypass' | 'all') => 
+    api.get('/xss/payloads', { params: type ? { type } : {} }),
+  
+  // Get user's scans
+  getScans: () => api.get('/xss'),
+};
 
 // HexStrike AI API - AI-powered penetration testing framework
 export const hexstrikeApi = {

@@ -1,0 +1,306 @@
+# Implementation Plan: Mobile Responsive
+
+## Overview
+
+This implementation plan transforms the BB.AUTO dashboard into a fully mobile-responsive application. The approach prioritizes core navigation and layout changes first, then progressively enhances individual page components. Implementation uses TypeScript with React hooks and Tailwind CSS responsive utilities.
+
+## Tasks
+
+- [x] 1. Create responsive utility hooks
+  - [x] 1.1 Create useMediaQuery hook for viewport detection
+    - Implement SSR-safe media query matching
+    - Handle hydration mismatch gracefully
+    - _Requirements: 1.1, 2.1, 3.1_
+  - [x] 1.2 Create useIsMobile and useIsDesktop convenience hooks
+    - Wrap useMediaQuery with common breakpoints
+    - Export from hooks/index.ts
+    - _Requirements: 1.1, 2.1_
+  - [x] 1.3 Create useMobileNav hook for navigation state
+    - Manage isOpen state with open/close/toggle functions
+    - Handle body scroll lock when menu is open
+    - _Requirements: 1.2, 1.5_
+  - [x] 1.4 Write property tests for useMediaQuery hook
+    - **Property 2: Sidebar Visibility Toggle**
+    - **Validates: Requirements 1.1, 1.2**
+
+- [x] 2. Implement mobile navigation in dashboard layout
+  - [x] 2.1 Add hamburger menu button to header on mobile
+    - Show only on viewports < 768px
+    - Ensure 44x44px minimum touch target
+    - _Requirements: 1.1, 1.6_
+  - [x] 2.2 Create MobileSidebar overlay component
+    - Full-screen slide-in animation from left
+    - Semi-transparent backdrop
+    - Close on backdrop tap
+    - _Requirements: 1.2, 1.3_
+  - [x] 2.3 Update sidebar to hide on mobile by default
+    - Use Tailwind hidden/block responsive classes
+    - Maintain desktop sidebar behavior unchanged
+    - _Requirements: 1.1_
+  - [x] 2.4 Implement navigation item auto-close on mobile
+    - Close sidebar after navigation selection
+    - Preserve navigation functionality
+    - _Requirements: 1.4_
+  - [x] 2.5 Write property tests for mobile navigation
+    - **Property 3: Backdrop Close Behavior**
+    - **Property 4: Navigation Auto-Close**
+    - **Property 5: Body Scroll Lock**
+    - **Validates: Requirements 1.3, 1.4, 1.5**
+
+- [x] 3. Checkpoint - Mobile navigation complete
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 4. Make header responsive
+  - [x] 4.1 Collapse search bar to icon on mobile
+    - Show search icon button on viewports < 768px
+    - Expand to full-width input on tap
+    - Auto-focus when expanded
+    - _Requirements: 2.1, 2.2_
+  - [x] 4.2 Adjust header padding and spacing for mobile
+    - Reduce padding on viewports < 640px
+    - Stack or hide non-essential elements
+    - _Requirements: 2.3, 2.5_
+  - [x] 4.3 Ensure header sticky positioning works on mobile
+    - Verify position:sticky with top:0
+    - Test with iOS Safari rubber-banding
+    - _Requirements: 2.4_
+  - [x] 4.4 Write property tests for responsive header
+    - **Property 9: Header Sticky Positioning**
+    - **Property 10: Search Expansion State**
+    - **Validates: Requirements 2.1, 2.2, 2.4**
+
+- [x] 5. Make dashboard stats grid responsive
+  - [x] 5.1 Update stats grid to 2 columns on tablet, 1 on phone
+    - Use Tailwind grid-cols-1 sm:grid-cols-2 lg:grid-cols-4
+    - Maintain card aspect ratios
+    - _Requirements: 3.1, 3.2_
+  - [x] 5.2 Adjust stat card padding and font sizes for mobile
+    - Reduce padding on smaller screens
+    - Ensure minimum 14px for values, 12px for labels
+    - _Requirements: 3.3, 3.4_
+  - [x] 5.3 Write property tests for responsive stats grid
+    - **Property 6: Responsive Grid Columns**
+    - **Validates: Requirements 3.1, 3.2**
+
+- [x] 6. Make data tables responsive (Programs, Scans, etc.)
+  - [x] 6.1 Create ResponsiveTable component with card mode
+    - Detect mobile viewport and switch to card layout
+    - Show high-priority columns (name, status, date) on cards
+    - _Requirements: 4.1, 4.2_
+  - [x] 6.2 Add horizontal scroll indicators for wide tables
+    - Show gradient fade on scrollable edges
+    - Provide visual cue for more content
+    - _Requirements: 4.4_
+  - [x] 6.3 Stack filter controls vertically on mobile
+    - Use flex-col on viewports < 768px
+    - Make inputs full-width
+    - _Requirements: 4.5_
+  - [x] 6.4 Update Programs page to use responsive patterns
+    - Apply ResponsiveTable or card layout
+    - Ensure tap navigates to detail view
+    - _Requirements: 4.1, 4.3_
+  - [x] 6.5 Update Scans page to use responsive patterns
+    - Apply card layout for scan items
+    - Maintain progress bar visibility
+    - _Requirements: 4.1, 4.3_
+  - [x] 6.6 Write property tests for responsive tables
+    - **Property 11: Table to Card Transformation**
+    - **Validates: Requirements 4.1, 4.2**
+
+- [x] 7. Checkpoint - Core pages responsive
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 8. Make forms and inputs responsive
+  - [x] 8.1 Update form inputs to full-width on mobile
+    - Apply w-full on viewports < 768px
+    - Maintain desktop inline layouts
+    - _Requirements: 5.1_
+  - [x] 8.2 Ensure form buttons meet touch target requirements
+    - Minimum 44px height on mobile
+    - Full-width on small screens
+    - _Requirements: 5.2_
+  - [x] 8.3 Position form labels above inputs on mobile
+    - Use flex-col layout on mobile
+    - Keep inline labels on desktop
+    - _Requirements: 5.4_
+  - [x] 8.4 Create collapsible filter panel for mobile
+    - Collapse filters behind "Filters" button
+    - Expand to show all filter options
+    - _Requirements: 5.5_
+  - [x] 8.5 Write property tests for responsive forms
+    - **Property 8: Form Layout Adaptation**
+    - **Validates: Requirements 5.1, 5.4, 5.5**
+
+- [x] 9. Make action buttons and controls responsive
+  - [x] 9.1 Ensure all buttons meet 44x44px touch target
+    - Audit all button components
+    - Add min-h-[44px] min-w-[44px] where needed
+    - _Requirements: 6.1_
+  - [x] 9.2 Stack action button groups vertically on small screens
+    - Use flex-col on viewports < 480px
+    - Maintain horizontal layout on larger screens
+    - _Requirements: 6.2_
+  - [x] 9.3 Add labels or tooltips to icon-only buttons
+    - Ensure accessibility with aria-label
+    - Consider showing text labels on mobile
+    - _Requirements: 6.3_
+  - [x] 9.4 Simplify pagination to prev/next on mobile
+    - Hide page number buttons on small screens
+    - Show current page indicator
+    - _Requirements: 6.4_
+  - [x] 9.5 Write property tests for touch targets
+    - **Property 1: Touch Target Minimum Size**
+    - **Property 12: Button Stacking on Small Screens**
+    - **Validates: Requirements 1.6, 5.2, 6.1, 6.2, 8.2**
+
+- [x] 10. Make charts responsive
+  - [x] 10.1 Ensure charts resize to container width
+    - Use ResponsiveContainer from recharts
+    - Set width="100%" height={appropriate value}
+    - _Requirements: 7.1_
+  - [x] 10.2 Adjust chart legends for mobile
+    - Move legends below chart on small screens
+    - Reduce legend font size
+    - _Requirements: 7.2_
+  - [x] 10.3 Make chart tooltips touch-friendly
+    - Ensure tooltips don't overflow viewport
+    - Position tooltips appropriately on touch
+    - _Requirements: 7.3_
+
+- [x] 11. Make modals responsive
+  - [x] 11.1 Update modals to full-screen on mobile
+    - Use w-full h-full or near-full dimensions
+    - Maintain desktop centered modal behavior
+    - _Requirements: 8.1_
+  - [x] 11.2 Ensure modal close button is accessible
+    - Position in top-right corner
+    - Minimum 44x44px touch target
+    - _Requirements: 8.2_
+  - [x] 11.3 Implement internal scrolling for modal content
+    - Use overflow-y-auto on modal body
+    - Lock body scroll when modal is open
+    - _Requirements: 8.3_
+  - [x] 11.4 Write property tests for responsive modals
+    - **Property 13: Modal Full-Screen on Mobile**
+    - **Validates: Requirements 8.1**
+
+- [x] 12. Checkpoint - Components responsive
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [x] 13. Update typography and spacing for mobile
+  - [x] 13.1 Ensure minimum font sizes on mobile
+    - Body text >= 14px
+    - Headings: h1 >= 24px, h2 >= 20px, h3 >= 18px
+    - _Requirements: 9.1, 9.2_
+  - [x] 13.2 Set appropriate line heights for readability
+    - Body text line-height >= 1.5
+    - Apply leading-relaxed or leading-loose
+    - _Requirements: 9.3_
+  - [x] 13.3 Reduce horizontal padding on mobile
+    - Use px-4 (16px) on mobile viewports
+    - Maintain larger padding on desktop
+    - _Requirements: 9.4_
+  - [x] 13.4 Adjust vertical spacing between sections
+    - Reduce gap/margin on mobile
+    - Use responsive spacing utilities
+    - _Requirements: 9.5_
+  - [x] 13.5 Write property tests for typography
+    - **Property 7: Typography Minimum Sizes**
+    - **Validates: Requirements 9.1, 9.2, 9.3**
+
+- [x] 14. Implement touch interaction improvements
+  - [x] 14.1 Add active states for touch feedback
+    - Apply :active styles to interactive elements
+    - Use Tailwind active: modifier
+    - _Requirements: 10.1_
+  - [x] 14.2 Prevent double-tap zoom on interactive elements
+    - Add touch-action: manipulation CSS
+    - Apply to buttons, links, form controls
+    - _Requirements: 10.2_
+  - [x] 14.3 Enable smooth momentum scrolling
+    - Apply -webkit-overflow-scrolling: touch
+    - Use scroll-behavior: smooth where appropriate
+    - _Requirements: 10.3_
+  - [x] 14.4 Write property tests for touch interactions
+    - **Property 15: Double-Tap Zoom Prevention**
+    - **Validates: Requirements 10.2**
+
+- [x] 15. Make login and auth pages responsive
+  - [x] 15.1 Center and size login form for mobile
+    - Use max-w-md with responsive padding
+    - Ensure form is centered on all screen sizes
+    - _Requirements: 11.1_
+  - [x] 15.2 Use appropriate input types for mobile keyboards
+    - type="email" for email inputs
+    - type="password" for password inputs
+    - _Requirements: 11.2_
+  - [x] 15.3 Make social login buttons full-width on mobile
+    - Apply w-full on small screens
+    - Maintain adequate touch targets
+    - _Requirements: 11.4_
+  - [x] 15.4 Optimize background effects for mobile performance
+    - Reduce particle count on mobile
+    - Simplify or disable complex animations
+    - _Requirements: 11.3_
+
+- [x] 16. Implement performance optimizations
+  - [x] 16.1 Reduce animations on mobile
+    - Shorten animation durations
+    - Disable non-essential animations
+    - _Requirements: 12.1_
+  - [x] 16.2 Respect prefers-reduced-motion preference
+    - Use @media (prefers-reduced-motion: reduce)
+    - Disable animations when preference is set
+    - _Requirements: 12.2_
+  - [x] 16.3 Write property tests for reduced motion
+    - **Property 14: Reduced Motion Preference**
+    - **Validates: Requirements 12.2**
+
+- [x] 17. Update remaining dashboard pages
+  - [x] 17.1 Make Domains page responsive
+    - Apply responsive table/card patterns
+    - Stack filters vertically on mobile
+    - _Requirements: 4.1, 4.5_
+  - [x] 17.2 Make Subdomains page responsive
+    - Apply responsive patterns
+    - Ensure long subdomain names wrap properly
+    - _Requirements: 4.1_
+  - [x] 17.3 Make Vulnerabilities page responsive
+    - Apply card layout for vulnerability items
+    - Maintain severity color coding
+    - _Requirements: 4.1_
+  - [x] 17.4 Make Tools page responsive
+    - Apply responsive grid for tool cards
+    - Ensure tool execution works on mobile
+    - _Requirements: 3.1, 4.1_
+  - [x] 17.5 Make Settings page responsive
+    - Stack form sections vertically
+    - Ensure all inputs are accessible
+    - _Requirements: 5.1, 5.4_
+  - [x] 17.6 Make Cron Jobs page responsive
+    - Apply card layout for job items
+    - Ensure run/stop buttons are accessible
+    - _Requirements: 4.1, 6.1_
+  - [x] 17.7 Make Alerts page responsive
+    - Apply responsive patterns
+    - Ensure alert actions are accessible
+    - _Requirements: 4.1, 6.1_
+  - [x] 17.8 Make Reports page responsive
+    - Apply responsive patterns
+    - Ensure report generation works on mobile
+    - _Requirements: 4.1_
+
+- [x] 18. Final checkpoint - All pages responsive
+  - Ensure all tests pass, ask the user if questions arise.
+  - Test on real mobile devices if possible
+  - Verify no horizontal overflow on any page
+
+## Notes
+
+- All tasks are required for comprehensive mobile responsive implementation
+- Each task references specific requirements for traceability
+- Checkpoints ensure incremental validation
+- Property tests validate universal correctness properties
+- Unit tests validate specific examples and edge cases
+- Implementation uses Tailwind CSS responsive utilities (sm:, md:, lg:, xl:)
+- Testing framework: Jest with React Testing Library and fast-check for property tests

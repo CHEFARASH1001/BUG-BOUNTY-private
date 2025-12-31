@@ -14,11 +14,13 @@ import {
   Flag,
   ArrowUpRight,
   ChevronDown,
+  ChevronUp,
   Cpu,
   Wrench,
 } from 'lucide-react';
 import { cn, getSeverityBgColor, timeAgo } from '@/lib/utils';
 import { vulnerabilitiesApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
 
 // Vulnerability interface matching backend schema
 interface Vulnerability {
@@ -51,6 +53,8 @@ export default function VulnerabilitiesPage() {
   const [selectedStatus, setSelectedStatus] = useState<string | null>(null);
   const [selectedSourceTool, setSelectedSourceTool] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   // Fetch source tools on mount
   useEffect(() => {
@@ -137,27 +141,27 @@ export default function VulnerabilitiesPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <AlertTriangle className="w-7 h-7 text-red-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <AlertTriangle className="w-6 h-6 md:w-7 md:h-7 text-red-400" />
             Vulnerabilities
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-sm md:text-base text-slate-400 mt-1">
             {loading ? 'Loading...' : `${filteredVulns.length} vulnerabilities found`}
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 hover:bg-dark-700 transition-colors">
+          <button className="flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 hover:bg-dark-700 transition-colors touch-manipulation">
             Export CSV
           </button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-3 md:grid-cols-5 gap-2 md:gap-4">
         {['critical', 'high', 'medium', 'low', 'info'].map((sev) => {
           const count = vulnerabilities.filter((v) => v.severity === sev).length;
           return (
@@ -166,59 +170,158 @@ export default function VulnerabilitiesPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               className={cn(
-                'p-4 rounded-xl border cursor-pointer transition-all',
+                'p-3 md:p-4 rounded-xl border cursor-pointer transition-all touch-manipulation',
                 getSeverityBgColor(sev),
                 selectedSeverity === sev && 'ring-2 ring-white/20'
               )}
               onClick={() => setSelectedSeverity(selectedSeverity === sev ? null : sev)}
             >
-              <div className="text-2xl font-bold">{count}</div>
-              <div className="text-sm capitalize opacity-80">{sev}</div>
+              <div className="text-lg md:text-2xl font-bold">{count}</div>
+              <div className="text-xs md:text-sm capitalize opacity-80">{sev}</div>
             </motion.div>
           );
         })}
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search vulnerabilities..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
-          />
+      {isMobile ? (
+        <div className="space-y-3">
+          {/* Search - always visible */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search vulnerabilities..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors touch-manipulation"
+            />
+          </div>
+          
+          {/* Collapsible filter button */}
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3 min-h-[44px]',
+              'bg-dark-800 border border-dark-700 rounded-lg',
+              'text-sm text-slate-300 font-medium',
+              'transition-colors hover:bg-dark-700 touch-manipulation',
+              filtersExpanded && 'border-primary-500/30 bg-dark-700'
+            )}
+            aria-expanded={filtersExpanded}
+          >
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span>Filters</span>
+              {(selectedStatus || selectedSourceTool) && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  {[selectedStatus, selectedSourceTool].filter(Boolean).length}
+                </span>
+              )}
+            </div>
+            {filtersExpanded ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+          
+          {/* Expandable filter panel */}
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-200 ease-in-out',
+              filtersExpanded ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
+            )}
+          >
+            <div className="p-4 bg-dark-800/50 border border-dark-700 rounded-lg space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Status</label>
+                <select
+                  value={selectedStatus || ''}
+                  onChange={(e) => setSelectedStatus(e.target.value || null)}
+                  className="w-full px-3 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
+                >
+                  <option value="">All Status</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status} className="capitalize">
+                      {status.replace('_', ' ')}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Source Tool</label>
+                <select
+                  value={selectedSourceTool || ''}
+                  onChange={(e) => setSelectedSourceTool(e.target.value || null)}
+                  className="w-full px-3 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
+                >
+                  <option value="">All Sources</option>
+                  {sourceTools.map((tool) => (
+                    <option key={tool} value={tool}>
+                      {tool.includes('hexstrike') ? 'HexStrike AI' : tool.charAt(0).toUpperCase() + tool.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              {(selectedStatus || selectedSourceTool) && (
+                <button
+                  onClick={() => {
+                    setSelectedStatus(null);
+                    setSelectedSourceTool(null);
+                  }}
+                  className="w-full px-4 py-3 min-h-[44px] bg-dark-700 border border-dark-600 rounded-lg text-sm text-slate-400 hover:text-white transition-colors touch-manipulation"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
         </div>
+      ) : (
+        /* Desktop Filters */
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search vulnerabilities..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            />
+          </div>
 
-        <select
-          value={selectedStatus || ''}
-          onChange={(e) => setSelectedStatus(e.target.value || null)}
-          className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-        >
-          <option value="">All Status</option>
-          {statusOptions.map((status) => (
-            <option key={status} value={status} className="capitalize">
-              {status.replace('_', ' ')}
-            </option>
-          ))}
-        </select>
+          <select
+            value={selectedStatus || ''}
+            onChange={(e) => setSelectedStatus(e.target.value || null)}
+            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+          >
+            <option value="">All Status</option>
+            {statusOptions.map((status) => (
+              <option key={status} value={status} className="capitalize">
+                {status.replace('_', ' ')}
+              </option>
+            ))}
+          </select>
 
-        {/* Source Tool Filter */}
-        <select
-          value={selectedSourceTool || ''}
-          onChange={(e) => setSelectedSourceTool(e.target.value || null)}
-          className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
-        >
-          <option value="">All Sources</option>
-          {sourceTools.map((tool) => (
-            <option key={tool} value={tool}>
-              {tool.includes('hexstrike') ? 'HexStrike AI' : tool.charAt(0).toUpperCase() + tool.slice(1)}
-            </option>
-          ))}
-        </select>
-      </div>
+          {/* Source Tool Filter */}
+          <select
+            value={selectedSourceTool || ''}
+            onChange={(e) => setSelectedSourceTool(e.target.value || null)}
+            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+          >
+            <option value="">All Sources</option>
+            {sourceTools.map((tool) => (
+              <option key={tool} value={tool}>
+                {tool.includes('hexstrike') ? 'HexStrike AI' : tool.charAt(0).toUpperCase() + tool.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Loading State */}
       {loading && (
@@ -240,12 +343,12 @@ export default function VulnerabilitiesPage() {
             >
               {/* Main row */}
               <div
-                className="p-4 flex items-center gap-4 cursor-pointer hover:bg-dark-800/50 transition-colors"
+                className="p-3 md:p-4 flex items-start md:items-center gap-3 md:gap-4 cursor-pointer hover:bg-dark-800/50 transition-colors touch-manipulation active:bg-dark-800/70"
                 onClick={() => setExpandedId(expandedId === vuln._id ? null : vuln._id)}
               >
                 {/* Severity indicator */}
                 <div className={cn(
-                  'w-1 h-12 rounded-full self-stretch',
+                  'w-1 min-h-[60px] md:h-12 rounded-full self-stretch flex-shrink-0',
                   vuln.severity === 'critical' && 'bg-red-500',
                   vuln.severity === 'high' && 'bg-orange-500',
                   vuln.severity === 'medium' && 'bg-yellow-500',
@@ -255,7 +358,7 @@ export default function VulnerabilitiesPage() {
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-1 flex-wrap">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
                     <span className={cn(
                       'px-2 py-0.5 text-xs font-medium rounded border uppercase',
                       getSeverityBadge(vuln.severity)
@@ -268,24 +371,31 @@ export default function VulnerabilitiesPage() {
                     )}>
                       {vuln.status.replace('_', ' ')}
                     </span>
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-500 hidden sm:inline">
                       {vuln.type}
                     </span>
-                    {/* Source Tool Badge */}
+                    {/* Source Tool Badge - hidden on mobile in collapsed state */}
+                    <span className="hidden md:flex">
+                      {getSourceTool(vuln) && getSourceToolBadge(getSourceTool(vuln))}
+                    </span>
+                  </div>
+                  <h3 className="text-white font-medium text-sm md:text-base line-clamp-2 md:truncate">{vuln.title}</h3>
+                  <p className="text-xs md:text-sm text-slate-500 truncate">{vuln.target}</p>
+                  {/* Mobile-only: show type and source tool */}
+                  <div className="flex items-center gap-2 mt-1 md:hidden flex-wrap">
+                    <span className="text-xs text-slate-500">{vuln.type}</span>
                     {getSourceTool(vuln) && getSourceToolBadge(getSourceTool(vuln))}
                   </div>
-                  <h3 className="text-white font-medium truncate">{vuln.title}</h3>
-                  <p className="text-sm text-slate-500 truncate">{vuln.target}</p>
                 </div>
 
                 {/* Meta */}
                 <div className="text-right shrink-0">
-                  {vuln.cvss && <div className="text-sm text-slate-400">CVSS: {vuln.cvss}</div>}
+                  {vuln.cvss && <div className="text-xs md:text-sm text-slate-400">CVSS: {vuln.cvss}</div>}
                   <div className="text-xs text-slate-500">{timeAgo(vuln.createdAt)}</div>
                 </div>
 
                 <ChevronDown className={cn(
-                  'w-5 h-5 text-slate-500 transition-transform',
+                  'w-5 h-5 text-slate-500 transition-transform flex-shrink-0',
                   expandedId === vuln._id && 'rotate-180'
                 )} />
               </div>
@@ -296,16 +406,16 @@ export default function VulnerabilitiesPage() {
                   initial={{ height: 0, opacity: 0 }}
                   animate={{ height: 'auto', opacity: 1 }}
                   exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-dark-800 p-4 bg-dark-800/30"
+                  className="border-t border-dark-800 p-3 md:p-4 bg-dark-800/30"
                 >
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 md:gap-4 mb-4">
                     <div>
                       <div className="text-xs text-slate-500 mb-1">CWE</div>
                       <div className="text-sm text-white">{vuln.cwe || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">Template</div>
-                      <div className="text-sm text-white">{vuln.template || 'N/A'}</div>
+                      <div className="text-sm text-white truncate">{vuln.template || 'N/A'}</div>
                     </div>
                     <div>
                       <div className="text-xs text-slate-500 mb-1">CVSS Score</div>
@@ -337,15 +447,16 @@ export default function VulnerabilitiesPage() {
                   <div className="mb-4">
                     <div className="text-xs text-slate-500 mb-1">Target URL</div>
                     <div className="flex items-center gap-2">
-                      <code className="flex-1 px-3 py-2 bg-dark-900 rounded text-sm text-primary-400 overflow-x-auto">
+                      <code className="flex-1 px-3 py-2 bg-dark-900 rounded text-xs md:text-sm text-primary-400 overflow-x-auto break-all">
                         {vuln.target}
                       </code>
                       <button 
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
                         onClick={(e) => {
                           e.stopPropagation();
                           navigator.clipboard.writeText(vuln.target);
                         }}
+                        aria-label="Copy URL"
                       >
                         <Copy className="w-4 h-4" />
                       </button>
@@ -353,24 +464,25 @@ export default function VulnerabilitiesPage() {
                         href={vuln.target}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="p-2 text-slate-400 hover:text-white transition-colors"
+                        className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white transition-colors touch-manipulation"
                         onClick={(e) => e.stopPropagation()}
+                        aria-label="Open URL"
                       >
                         <ExternalLink className="w-4 h-4" />
                       </a>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <button className="px-3 py-1.5 bg-green-500/20 text-green-400 text-sm rounded-lg hover:bg-green-500/30 transition-colors flex items-center gap-1">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <button className="px-3 py-2 min-h-[44px] bg-green-500/20 text-green-400 text-sm rounded-lg hover:bg-green-500/30 transition-colors flex items-center justify-center gap-1 touch-manipulation">
                       <CheckCircle className="w-4 h-4" />
                       Confirm
                     </button>
-                    <button className="px-3 py-1.5 bg-red-500/20 text-red-400 text-sm rounded-lg hover:bg-red-500/30 transition-colors flex items-center gap-1">
+                    <button className="px-3 py-2 min-h-[44px] bg-red-500/20 text-red-400 text-sm rounded-lg hover:bg-red-500/30 transition-colors flex items-center justify-center gap-1 touch-manipulation">
                       <XCircle className="w-4 h-4" />
                       False Positive
                     </button>
-                    <button className="px-3 py-1.5 bg-purple-500/20 text-purple-400 text-sm rounded-lg hover:bg-purple-500/30 transition-colors flex items-center gap-1">
+                    <button className="px-3 py-2 min-h-[44px] bg-purple-500/20 text-purple-400 text-sm rounded-lg hover:bg-purple-500/30 transition-colors flex items-center justify-center gap-1 touch-manipulation">
                       <Flag className="w-4 h-4" />
                       Mark Reported
                     </button>

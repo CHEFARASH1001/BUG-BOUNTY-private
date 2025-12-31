@@ -106,9 +106,21 @@ RUN go install github.com/tomnomnom/waybackurls@latest
 # Install assetfinder via go
 RUN go install github.com/tomnomnom/assetfinder@latest
 
+# Install dalfox (XSS scanner) via go
+RUN go install github.com/hahwul/dalfox/v2@v2.9.3
+
+# Install kxss (XSS parameter finder) via go
+RUN go install github.com/Emoe/kxss@latest
+
 # Install dnsgen (Python tool)
 RUN apk add --no-cache python3 py3-pip && \
     pip3 install dnsgen --break-system-packages
+
+# Install XSStrike (Python XSS scanner)
+RUN git clone https://github.com/s0md3v/XSStrike.git /opt/xsstrike && \
+    pip3 install fuzzywuzzy --break-system-packages && \
+    chmod +x /opt/xsstrike/xsstrike.py && \
+    ln -s /opt/xsstrike/xsstrike.py /usr/local/bin/xsstrike
 
 # Install massdns
 RUN apk add --no-cache --virtual .build-deps build-base && \

@@ -7,10 +7,13 @@ import { VulnerabilityCheckerService } from './services/vulnerability-checker.se
 import { EndpointDiscoveryService } from './services/endpoint-discovery.service';
 import { ScreenshotService } from './services/screenshot.service';
 import { FuzzService } from './services/fuzz.service';
+import { XssService } from './services/xss.service';
 import { FuzzController } from './fuzz.controller';
+import { XssController } from './xss.controller';
 import { Vulnerability, VulnerabilitySchema } from '../../schemas/vulnerability.schema';
 import { Endpoint, EndpointSchema } from '../../schemas/endpoint.schema';
 import { FuzzJob, FuzzJobSchema } from '../../schemas/fuzz-job.schema';
+import { XssScan, XssScanSchema } from '../../schemas/xss-scan.schema';
 
 @Module({
   imports: [
@@ -19,9 +22,10 @@ import { FuzzJob, FuzzJobSchema } from '../../schemas/fuzz-job.schema';
       { name: Vulnerability.name, schema: VulnerabilitySchema },
       { name: Endpoint.name, schema: EndpointSchema },
       { name: FuzzJob.name, schema: FuzzJobSchema },
+      { name: XssScan.name, schema: XssScanSchema },
     ]),
   ],
-  controllers: [FuzzController],
+  controllers: [FuzzController, XssController],
   providers: [
     ScannerService,
     NucleiService,
@@ -29,8 +33,9 @@ import { FuzzJob, FuzzJobSchema } from '../../schemas/fuzz-job.schema';
     EndpointDiscoveryService,
     ScreenshotService,
     FuzzService,
+    XssService,
   ],
-  exports: [ScannerService, NucleiService, VulnerabilityCheckerService, EndpointDiscoveryService, ScreenshotService, FuzzService],
+  exports: [ScannerService, NucleiService, VulnerabilityCheckerService, EndpointDiscoveryService, ScreenshotService, FuzzService, XssService],
 })
 export class ScannerModule {}
 

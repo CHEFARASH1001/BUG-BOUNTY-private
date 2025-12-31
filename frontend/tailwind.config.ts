@@ -7,6 +7,14 @@ const config: Config = {
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
+    screens: {
+      'xs': '480px',
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
         // Theme-aware primary colors using CSS variables
@@ -55,6 +63,10 @@ const config: Config = {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'glow': 'glow 2s ease-in-out infinite alternate',
         'scan': 'scan 2s ease-in-out infinite',
+        // Mobile-optimized animations with shorter durations
+        'pulse-slow-mobile': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+        'fade-in-fast': 'fadeIn 0.15s ease-out forwards',
+        'slide-in-fast': 'slideIn 0.2s ease-out forwards',
       },
       keyframes: {
         glow: {
@@ -65,6 +77,19 @@ const config: Config = {
           '0%, 100%': { opacity: '0.3' },
           '50%': { opacity: '1' },
         },
+        fadeIn: {
+          from: { opacity: '0' },
+          to: { opacity: '1' },
+        },
+        slideIn: {
+          from: { opacity: '0', transform: 'translateY(20px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+      },
+      // Transition duration utilities for mobile optimization
+      transitionDuration: {
+        'fast': '150ms',
+        'mobile': '150ms',
       },
     },
   },

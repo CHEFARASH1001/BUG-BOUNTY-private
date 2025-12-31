@@ -295,17 +295,7 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
       { method: 'git', command: 'git clone https://github.com/m4ll0k/SecretFinder.git /opt/secretfinder && cd /opt/secretfinder && pip install --break-system-packages -r requirements.txt && ln -sf /opt/secretfinder/SecretFinder.py /usr/local/bin/secretfinder' },
     ],
   },
-  {
-    name: 'jsparser',
-    displayName: 'JSParser',
-    description: 'Python script to parse relative URLs from JavaScript files',
-    githubUrl: 'https://github.com/nahamsec/JSParser',
-    categories: [ToolCategory.JAVASCRIPT_ANALYSIS],
-    binaryName: 'jsparser',
-    installCommands: [
-      { method: 'git', command: 'git clone https://github.com/nahamsec/JSParser.git /opt/jsparser && cd /opt/jsparser && pip install --break-system-packages -r requirements.txt' },
-    ],
-  },
+
 
 
   {
@@ -345,15 +335,120 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
       { method: 'apt', command: 'sudo apt install -y wafw00f' },
     ],
   },
+
+  // ============================================
+  // PARAMETER DISCOVERY TOOLS
+  // ============================================
   {
-    name: 'spyhunt',
-    displayName: 'SpyHunt',
-    description: 'OSINT tool for gathering information about targets',
-    githubUrl: 'https://github.com/spyhunt/spyhunt',
-    categories: [ToolCategory.OSINT],
-    binaryName: 'spyhunt',
+    name: 'paramspider',
+    displayName: 'ParamSpider',
+    description: 'Mining parameters from dark corners of Web Archives for bug hunting',
+    githubUrl: 'https://github.com/devanshbatham/ParamSpider',
+    categories: [ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY],
+    binaryName: 'paramspider',
     installCommands: [
-      { method: 'pip', command: 'pip install --break-system-packages spyhunt' },
+      { method: 'pip', command: 'pip install --break-system-packages paramspider' },
+      { method: 'git', command: 'git clone https://github.com/devanshbatham/ParamSpider.git /opt/paramspider && cd /opt/paramspider && pip install --break-system-packages .' },
+    ],
+  },
+  {
+    name: 'x8',
+    displayName: 'x8',
+    description: 'Hidden parameters discovery suite - finds hidden GET/POST parameters',
+    githubUrl: 'https://github.com/Sh1Yo/x8',
+    categories: [ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'x8',
+    installCommands: [
+      { method: 'cargo', command: 'cargo install x8' },
+      { method: 'git', command: 'git clone https://github.com/Sh1Yo/x8.git /opt/x8 && cd /opt/x8 && cargo build --release && cp target/release/x8 /usr/local/bin/' },
+    ],
+  },
+  {
+    name: 'unfurl',
+    displayName: 'Unfurl',
+    description: 'Pull out bits of URLs provided on stdin - extract params, paths, etc',
+    githubUrl: 'https://github.com/tomnomnom/unfurl',
+    categories: [ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY],
+    binaryName: 'unfurl',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/tomnomnom/unfurl@latest' },
+    ],
+  },
+  {
+    name: 'qsreplace',
+    displayName: 'qsreplace',
+    description: 'Accept URLs on stdin, replace all query string values with a user-supplied value',
+    githubUrl: 'https://github.com/tomnomnom/qsreplace',
+    categories: [ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'qsreplace',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/tomnomnom/qsreplace@latest' },
+    ],
+  },
+  {
+    name: 'gf',
+    displayName: 'gf',
+    description: 'A wrapper around grep to avoid typing common patterns - great for finding params',
+    githubUrl: 'https://github.com/tomnomnom/gf',
+    categories: [ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY],
+    binaryName: 'gf',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/tomnomnom/gf@latest' },
+    ],
+  },
+  {
+    name: 'uro',
+    displayName: 'uro',
+    description: 'Declutters URL lists for crawling/pentesting - removes duplicates with different params',
+    githubUrl: 'https://github.com/s0md3v/uro',
+    categories: [ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY],
+    binaryName: 'uro',
+    installCommands: [
+      { method: 'pip', command: 'pip install --break-system-packages uro' },
+    ],
+  },
+  {
+    name: 'gospider',
+    displayName: 'GoSpider',
+    description: 'Fast web spider written in Go - extracts URLs, params, and endpoints',
+    githubUrl: 'https://github.com/jaeles-project/gospider',
+    categories: [ToolCategory.WEB_CRAWLING, ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY],
+    binaryName: 'gospider',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/jaeles-project/gospider@latest' },
+    ],
+  },
+  {
+    name: 'cariddi',
+    displayName: 'Cariddi',
+    description: 'Take a list of domains, crawl URLs and scan for endpoints, secrets, api keys, etc',
+    githubUrl: 'https://github.com/edoardottt/cariddi',
+    categories: [ToolCategory.WEB_CRAWLING, ToolCategory.PARAMETER_DISCOVERY, ToolCategory.SECRET_DETECTION],
+    binaryName: 'cariddi',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/edoardottt/cariddi/cmd/cariddi@latest' },
+    ],
+  },
+  {
+    name: 'xnlinkfinder',
+    displayName: 'xnLinkFinder',
+    description: 'Discover endpoints, parameters, and potential vulnerabilities from URLs',
+    githubUrl: 'https://github.com/xnl-h4ck3r/xnLinkFinder',
+    categories: [ToolCategory.PARAMETER_DISCOVERY, ToolCategory.URL_DISCOVERY, ToolCategory.JAVASCRIPT_ANALYSIS],
+    binaryName: 'xnLinkFinder',
+    installCommands: [
+      { method: 'pip', command: 'pip install --break-system-packages xnLinkFinder' },
+    ],
+  },
+  {
+    name: 'waymore',
+    displayName: 'Waymore',
+    description: 'Find way more from the Wayback Machine - extracts URLs with params from archives',
+    githubUrl: 'https://github.com/xnl-h4ck3r/waymore',
+    categories: [ToolCategory.URL_DISCOVERY, ToolCategory.PARAMETER_DISCOVERY],
+    binaryName: 'waymore',
+    installCommands: [
+      { method: 'pip', command: 'pip install --break-system-packages waymore' },
     ],
   },
 

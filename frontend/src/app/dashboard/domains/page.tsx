@@ -21,10 +21,14 @@ import {
   ChevronsLeft,
   ChevronsRight,
   AlertCircle,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn, formatDateTime } from '@/lib/utils';
 import { domainsApi } from '@/lib/api';
+import { useIsMobile } from '@/hooks';
+import { ResponsivePagination } from '@/components/ResponsivePagination';
 
 interface Domain {
   _id: string;
@@ -71,6 +75,8 @@ export default function DomainsPage() {
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const isMobile = useIsMobile();
 
   // Debounce search input
   useEffect(() => {
@@ -145,15 +151,15 @@ export default function DomainsPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 md:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white flex items-center gap-3">
-            <Globe className="w-7 h-7 text-primary-400" />
+          <h1 className="text-xl md:text-2xl font-bold text-white flex items-center gap-2 md:gap-3">
+            <Globe className="w-6 h-6 md:w-7 md:h-7 text-primary-400" />
             Domains
           </h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-sm md:text-base text-slate-400 mt-1">
             Manage your target domains
             {pagination.total > 0 && (
               <span className="ml-2 text-slate-500">
@@ -166,61 +172,155 @@ export default function DomainsPage() {
           <button
             onClick={handleRefresh}
             disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors disabled:opacity-50"
+            className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] px-3 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors disabled:opacity-50 touch-manipulation"
+            aria-label="Refresh domains"
           >
             <RefreshCw className={cn("w-4 h-4", loading && "animate-spin")} />
           </button>
           <Link
             href="/dashboard/domains/new"
-            className="flex items-center gap-2 px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors"
+            className="flex items-center justify-center gap-2 min-h-[44px] px-4 py-2 bg-primary-600 hover:bg-primary-500 rounded-lg text-sm text-white font-medium transition-colors touch-manipulation"
           >
             <Plus className="w-4 h-4" />
-            Add Domain
+            <span className="hidden xs:inline">Add Domain</span>
+            <span className="xs:hidden">Add</span>
           </Link>
         </div>
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 flex-wrap">
-        <div className="relative flex-1 min-w-[200px] max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-          <input
-            type="text"
-            placeholder="Search domains..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
-          />
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Filter className="w-4 h-4 text-slate-400" />
-          <select
-            value={selectedStatus || ''}
-            onChange={(e) => setSelectedStatus(e.target.value || null)}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+      {/* Filters - Mobile Collapsible */}
+      {isMobile ? (
+        <div className="space-y-3">
+          {/* Search - always visible on mobile */}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search domains..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors touch-manipulation"
+            />
+          </div>
+          
+          {/* Collapsible filter button */}
+          <button
+            onClick={() => setFiltersExpanded(!filtersExpanded)}
+            className={cn(
+              'flex items-center justify-between w-full px-4 py-3 min-h-[44px]',
+              'bg-dark-800 border border-dark-700 rounded-lg',
+              'text-sm text-slate-300 font-medium',
+              'transition-colors hover:bg-dark-700 touch-manipulation',
+              filtersExpanded && 'border-primary-500/30 bg-dark-700'
+            )}
+            aria-expanded={filtersExpanded}
           >
-            <option value="">All Status</option>
-            <option value="completed">Completed</option>
-            <option value="scanning">Scanning</option>
-            <option value="pending">Pending</option>
-            <option value="failed">Failed</option>
-          </select>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="text-sm text-slate-400">Show:</span>
-          <select
-            value={pagination.limit}
-            onChange={(e) => handleLimitChange(Number(e.target.value))}
-            className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            <div className="flex items-center gap-2">
+              <Filter className="w-4 h-4 text-slate-400" />
+              <span>Filters</span>
+              {selectedStatus && (
+                <span className="px-2 py-0.5 bg-primary-500/20 text-primary-400 text-xs rounded-full">
+                  1
+                </span>
+              )}
+            </div>
+            {filtersExpanded ? (
+              <ChevronUp className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            )}
+          </button>
+          
+          {/* Expandable filter panel */}
+          <div
+            className={cn(
+              'overflow-hidden transition-all duration-200 ease-in-out',
+              filtersExpanded ? 'max-h-[300px] opacity-100' : 'max-h-0 opacity-0'
+            )}
           >
-            {ITEMS_PER_PAGE_OPTIONS.map(opt => (
-              <option key={opt} value={opt}>{opt}</option>
-            ))}
-          </select>
+            <div className="p-4 bg-dark-800/50 border border-dark-700 rounded-lg space-y-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Status</label>
+                <select
+                  value={selectedStatus || ''}
+                  onChange={(e) => setSelectedStatus(e.target.value || null)}
+                  className="w-full px-3 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
+                >
+                  <option value="">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="scanning">Scanning</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-slate-500">Items per page</label>
+                <select
+                  value={pagination.limit}
+                  onChange={(e) => handleLimitChange(Number(e.target.value))}
+                  className="w-full px-3 py-3 min-h-[44px] bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50 touch-manipulation"
+                >
+                  {ITEMS_PER_PAGE_OPTIONS.map(opt => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </div>
+              
+              {selectedStatus && (
+                <button
+                  onClick={() => setSelectedStatus(null)}
+                  className="w-full px-4 py-3 min-h-[44px] bg-dark-700 border border-dark-600 rounded-lg text-sm text-slate-400 hover:text-white transition-colors touch-manipulation"
+                >
+                  Clear Filters
+                </button>
+              )}
+            </div>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* Desktop Filters - Inline */
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[200px] max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+            <input
+              type="text"
+              placeholder="Search domains..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary-500/50 transition-colors"
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Filter className="w-4 h-4 text-slate-400" />
+            <select
+              value={selectedStatus || ''}
+              onChange={(e) => setSelectedStatus(e.target.value || null)}
+              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            >
+              <option value="">All Status</option>
+              <option value="completed">Completed</option>
+              <option value="scanning">Scanning</option>
+              <option value="pending">Pending</option>
+              <option value="failed">Failed</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-slate-400">Show:</span>
+            <select
+              value={pagination.limit}
+              onChange={(e) => handleLimitChange(Number(e.target.value))}
+              className="px-3 py-2 bg-dark-800 border border-dark-700 rounded-lg text-sm text-slate-300 focus:outline-none focus:border-primary-500/50"
+            >
+              {ITEMS_PER_PAGE_OPTIONS.map(opt => (
+                <option key={opt} value={opt}>{opt}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {/* Error State */}
       {error && (
@@ -340,19 +440,21 @@ export default function DomainsPage() {
                       <div className="flex items-center gap-1">
                         <button
                           onClick={(e) => handleStartScan(domain._id, e)}
-                          className="p-1 text-slate-400 hover:text-primary-400 transition-colors"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-primary-400 active:bg-dark-700 rounded-lg transition-colors touch-manipulation"
                           title="Start Scan"
+                          aria-label="Start scan"
                         >
-                          <Play className="w-3.5 h-3.5" />
+                          <Play className="w-4 h-4" />
                         </button>
                         <a
                           href={`https://${domain.domain}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-1 text-slate-400 hover:text-white transition-colors"
+                          className="p-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-slate-400 hover:text-white active:bg-dark-700 rounded-lg transition-colors touch-manipulation"
                           title="Open Website"
+                          aria-label="Open website"
                         >
-                          <ExternalLink className="w-3.5 h-3.5" />
+                          <ExternalLink className="w-4 h-4" />
                         </a>
                       </div>
                     </div>
@@ -364,79 +466,14 @@ export default function DomainsPage() {
 
           {/* Pagination */}
           {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between pt-4 border-t border-dark-800">
-              <div className="text-sm text-slate-400">
-                Showing {((pagination.page - 1) * pagination.limit) + 1} to{' '}
-                {Math.min(pagination.page * pagination.limit, pagination.total)} of{' '}
-                {pagination.total.toLocaleString()} domains
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handlePageChange(1)}
-                  disabled={!pagination.hasPrev}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="First page"
-                >
-                  <ChevronsLeft className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.page - 1)}
-                  disabled={!pagination.hasPrev}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Previous page"
-                >
-                  <ChevronLeft className="w-4 h-4" />
-                </button>
-                
-                {/* Page numbers */}
-                <div className="flex items-center gap-1 mx-2">
-                  {Array.from({ length: Math.min(5, pagination.totalPages) }, (_, i) => {
-                    let pageNum: number;
-                    if (pagination.totalPages <= 5) {
-                      pageNum = i + 1;
-                    } else if (pagination.page <= 3) {
-                      pageNum = i + 1;
-                    } else if (pagination.page >= pagination.totalPages - 2) {
-                      pageNum = pagination.totalPages - 4 + i;
-                    } else {
-                      pageNum = pagination.page - 2 + i;
-                    }
-                    
-                    return (
-                      <button
-                        key={pageNum}
-                        onClick={() => handlePageChange(pageNum)}
-                        className={cn(
-                          'w-8 h-8 text-sm rounded-lg transition-colors',
-                          pageNum === pagination.page
-                            ? 'bg-primary-600 text-white'
-                            : 'text-slate-400 hover:text-white hover:bg-dark-800'
-                        )}
-                      >
-                        {pageNum}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <button
-                  onClick={() => handlePageChange(pagination.page + 1)}
-                  disabled={!pagination.hasNext}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Next page"
-                >
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={() => handlePageChange(pagination.totalPages)}
-                  disabled={!pagination.hasNext}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                  title="Last page"
-                >
-                  <ChevronsRight className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
+            <ResponsivePagination
+              currentPage={pagination.page}
+              totalPages={pagination.totalPages}
+              onPageChange={handlePageChange}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              className="mt-4"
+            />
           )}
         </>
       )}

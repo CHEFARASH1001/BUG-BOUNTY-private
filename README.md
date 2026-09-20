@@ -37,9 +37,26 @@ RabbitMQ-backed workers, and optional integrations with common security tools.
 
 ## Screenshots
 
-The dashboard preview above reflects the current BB.AUTO interface. It uses local
-sample data for demonstration; review or replace it before sharing data that is
-not intended to be public.
+The gallery below is captured from the current BB.AUTO interface, including the
+main workspace and the pages used during reconnaissance. It uses local sample
+data for demonstration; review or replace it before sharing data that is not
+intended to be public.
+
+| Dashboard | Programs |
+| --- | --- |
+| ![Current dashboard](scripts/screenshots/dashboard.png) | ![Programs page](scripts/screenshots/dashboard-programs.png) |
+
+| Tools | Domains |
+| --- | --- |
+| ![Tools registry](scripts/screenshots/dashboard-tools.png) | ![Domains page](scripts/screenshots/dashboard-domains.png) |
+
+| Scans | Vulnerabilities |
+| --- | --- |
+| ![Scans page](scripts/screenshots/dashboard-scans.png) | ![Vulnerabilities page](scripts/screenshots/dashboard-vulnerabilities.png) |
+
+| HexStrike AI |
+| --- |
+| ![HexStrike AI page](scripts/screenshots/dashboard-hexstrike.png) |
 
 ## Architecture
 

@@ -24,6 +24,27 @@ Next.js، API با NestJS، ذخیره‌سازی با MongoDB و workerها ب�
 - اعلان از طریق Telegram، Slack، Discord و SMTP
 - داشبورد responsive با checklist و scratchpad
 
+## تصاویر نسخه‌ی فعلی
+
+این تصاویر از همین نسخه‌ی فعلی پنل گرفته شده‌اند و نماهای اصلی پروژه را نشان
+می‌دهند؛ از تصاویر نسخه‌ی قدیمی استفاده نشده است.
+
+| داشبورد | برنامه‌ها |
+| --- | --- |
+| ![داشبورد فعلی](scripts/screenshots/dashboard.png) | ![صفحه‌ی برنامه‌ها](scripts/screenshots/dashboard-programs.png) |
+
+| ابزارها | دامنه‌ها |
+| --- | --- |
+| ![رجیستری ابزارها](scripts/screenshots/dashboard-tools.png) | ![صفحه‌ی دامنه‌ها](scripts/screenshots/dashboard-domains.png) |
+
+| اسکن‌ها | آسیب‌پذیری‌ها |
+| --- | --- |
+| ![صفحه‌ی اسکن‌ها](scripts/screenshots/dashboard-scans.png) | ![صفحه‌ی آسیب‌پذیری‌ها](scripts/screenshots/dashboard-vulnerabilities.png) |
+
+| HexStrike AI |
+| --- |
+| ![صفحه‌ی HexStrike AI](scripts/screenshots/dashboard-hexstrike.png) |
+
 ## راه‌اندازی با Docker
 
 پیش‌نیازها: Docker Engine و Docker Compose v2.

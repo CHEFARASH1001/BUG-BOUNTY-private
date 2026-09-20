@@ -17,7 +17,7 @@ const PAGES = [
   { path: '/', name: 'home', requiresAuth: false },
   { path: '/login', name: 'login', requiresAuth: false },
   { path: '/register', name: 'register', requiresAuth: false },
-  
+
   // Dashboard pages (require auth)
   { path: '/dashboard', name: 'dashboard', requiresAuth: true },
   { path: '/dashboard/alerts', name: 'dashboard-alerts', requiresAuth: true },
@@ -34,7 +34,6 @@ const PAGES = [
   { path: '/dashboard/subdomains', name: 'dashboard-subdomains', requiresAuth: true },
   { path: '/dashboard/tools', name: 'dashboard-tools', requiresAuth: true },
   { path: '/dashboard/vulnerabilities', name: 'dashboard-vulnerabilities', requiresAuth: true },
-  { path: '/dashboard/xss-narutow-live-4', name: 'dashboard-xss-narutow-live-4', requiresAuth: true },
 ];
 
 async function login(page) {
@@ -47,20 +46,20 @@ async function login(page) {
   console.log('🔐 Logging in...');
   try {
     await page.goto(`${BASE_URL}/login`, { waitUntil: 'networkidle2', timeout: 30000 });
-    
+
     // Wait for login form
     await page.waitForSelector('input[type="email"], input[name="email"]', { timeout: 5000 });
-    
+
     // Fill in credentials
     await page.type('input[type="email"], input[name="email"]', LOGIN_EMAIL);
     await page.type('input[type="password"], input[name="password"]', LOGIN_PASSWORD);
-    
+
     // Submit form
     await Promise.all([
       page.click('button[type="submit"]'),
       page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }),
     ]);
-    
+
     // Check if login was successful (should redirect away from login page)
     const currentUrl = page.url();
     if (!currentUrl.includes('/login')) {
@@ -83,12 +82,12 @@ async function screenshotPage(page, pageInfo) {
 
   try {
     console.log(`📸 ${pageInfo.name}: ${url}`);
-    
+
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
-    
+
     // Wait for page to stabilize
     await new Promise(r => setTimeout(r, 2000));
-    
+
     await page.screenshot({ path: filepath, fullPage: false });
     console.log(`   ✅ Saved: ${filename}`);
     return true;

@@ -15,7 +15,7 @@ import { ValidationService, RepoMetrics } from './validation.service';
 
 // Valid GitHub username: 1-39 alphanumeric characters or hyphens, cannot start/end with hyphen
 const githubUsernameArb = fc.string({ minLength: 1, maxLength: 39 })
-  .filter((s) => /^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?$/.test(s) || /^[a-zA-Z0-9]$/.test(s));
+  .filter((s) => /^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(s));
 
 // Valid GitHub repo name: alphanumeric, dots, hyphens, underscores
 const githubRepoNameArb = fc.string({ minLength: 1, maxLength: 100 })
@@ -125,8 +125,8 @@ describe('ValidationService Property-Based Tests', () => {
           async (owner, repo) => {
             const url = `https://github.com/${owner}/${repo}`;
             const result = service.validateGitHubUrl(url);
-            return result.valid === true && 
-                   result.owner === owner && 
+            return result.valid === true &&
+                   result.owner === owner &&
                    result.repo === repo;
           },
         ),
@@ -155,8 +155,8 @@ describe('ValidationService Property-Based Tests', () => {
           async (owner, repo) => {
             const url = `https://github.com/${owner}/${repo}/`;
             const result = service.validateGitHubUrl(url);
-            return result.valid === true && 
-                   result.owner === owner && 
+            return result.valid === true &&
+                   result.owner === owner &&
                    result.repo === repo;
           },
         ),
@@ -172,8 +172,8 @@ describe('ValidationService Property-Based Tests', () => {
           async (owner, repo) => {
             const url = `https://github.com/${owner}/${repo}.git`;
             const result = service.validateGitHubUrl(url);
-            return result.valid === true && 
-                   result.owner === owner && 
+            return result.valid === true &&
+                   result.owner === owner &&
                    result.repo === repo;
           },
         ),
@@ -198,8 +198,8 @@ describe('ValidationService Property-Based Tests', () => {
           lowStarsMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
-                   result.reason !== undefined && 
+            return result.valid === false &&
+                   result.reason !== undefined &&
                    result.reason.toLowerCase().includes('stars');
           },
         ),
@@ -227,8 +227,8 @@ describe('ValidationService Property-Based Tests', () => {
           lowStarsMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
-                   result.reason !== undefined && 
+            return result.valid === false &&
+                   result.reason !== undefined &&
                    result.reason.includes(String(metrics.stars));
           },
         ),
@@ -253,9 +253,9 @@ describe('ValidationService Property-Based Tests', () => {
           inactiveMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
-                   result.reason !== undefined && 
-                   (result.reason.toLowerCase().includes('inactive') || 
+            return result.valid === false &&
+                   result.reason !== undefined &&
+                   (result.reason.toLowerCase().includes('inactive') ||
                     result.reason.toLowerCase().includes('activity'));
           },
         ),
@@ -293,8 +293,8 @@ describe('ValidationService Property-Based Tests', () => {
           lowStarsMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
-                   result.reason !== undefined && 
+            return result.valid === false &&
+                   result.reason !== undefined &&
                    result.reason.trim().length > 0;
           },
         ),
@@ -308,8 +308,8 @@ describe('ValidationService Property-Based Tests', () => {
           inactiveMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
-                   result.reason !== undefined && 
+            return result.valid === false &&
+                   result.reason !== undefined &&
                    result.reason.trim().length > 0;
           },
         ),
@@ -323,8 +323,8 @@ describe('ValidationService Property-Based Tests', () => {
           invalidUrlArb,
           async (url) => {
             const result = service.validateGitHubUrl(url);
-            return result.valid === false && 
-                   result.reason !== undefined && 
+            return result.valid === false &&
+                   result.reason !== undefined &&
                    result.reason.trim().length > 0;
           },
         ),
@@ -338,7 +338,7 @@ describe('ValidationService Property-Based Tests', () => {
           lowStarsMetricsArb,
           async (metrics) => {
             const result = service.isLegitimate(metrics as RepoMetrics);
-            return result.valid === false && 
+            return result.valid === false &&
                    result.metrics !== undefined &&
                    result.metrics.stars === metrics.stars;
           },

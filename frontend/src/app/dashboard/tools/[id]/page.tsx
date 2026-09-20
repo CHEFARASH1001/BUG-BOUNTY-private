@@ -123,16 +123,16 @@ export default function ToolDetailPage({ params }: { params: { id: string } }) {
   const [refreshingStatus, setRefreshingStatus] = useState(false);
   const [revalidating, setRevalidating] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'config' | 'history'>('overview');
-  
+
   // Configuration form state
   const [configValues, setConfigValues] = useState<Record<string, any>>({});
   const [savingConfig, setSavingConfig] = useState(false);
-  
+
   // Execution history filters
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
-  
+
   // Execution detail modal
   const [selectedExecution, setSelectedExecution] = useState<ToolExecution | null>(null);
 
@@ -166,7 +166,7 @@ export default function ToolDetailPage({ params }: { params: { id: string } }) {
       if (statusFilter) filters.status = statusFilter;
       if (startDate) filters.startDate = startDate;
       if (endDate) filters.endDate = endDate;
-      
+
       const response = await toolsApi.getExecutions(params.id, filters);
       setExecutions(Array.isArray(response.data) ? response.data : []);
     } catch (err: any) {
@@ -268,7 +268,7 @@ export default function ToolDetailPage({ params }: { params: { id: string } }) {
     }
   };
 
-  const getInstallationStatus = (tool: Tool) => {
+  const getInstallationStatus = (tool: Tool): keyof typeof installationStatusConfig => {
     if (!tool.installation) return 'not_installed';
     if (!tool.installation.isInstalled) return 'not_installed';
     return 'installed';
@@ -679,7 +679,7 @@ export default function ToolDetailPage({ params }: { params: { id: string } }) {
                       <p className="text-xs text-slate-600 font-mono mt-1">Flag: {option.flag}</p>
                     </div>
                   </div>
-                  
+
                   {option.type === 'boolean' ? (
                     <label className="flex items-center gap-2 mt-2">
                       <input
@@ -1024,7 +1024,7 @@ export default function ToolDetailPage({ params }: { params: { id: string } }) {
                       )}
                     </div>
                   )}
-                  
+
                   {installResult.output && (
                     <div>
                       <h4 className="text-sm font-medium text-slate-300 mb-2">Output</h4>

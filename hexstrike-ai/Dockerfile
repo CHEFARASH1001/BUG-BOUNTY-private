@@ -95,9 +95,10 @@ COPY requirements-minimal.txt requirements.txt ./
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements-minimal.txt
 
-# Install Python-based security tools
-RUN pip install --no-cache-dir arjun paramspider && \
-    echo "✅ Python security tools installed"
+# Install Python-based security tools (continue if some tools are unavailable)
+RUN (pip install --no-cache-dir arjun paramspider && \
+    echo "✅ Python security tools installed") || \
+    (echo "⚠️  Some Python security tools could not be installed (e.g., paramspider not found)" && true)
 
 # Copy HexStrike AI source code
 COPY hexstrike_server.py hexstrike_mcp.py ./

@@ -80,9 +80,9 @@ export class ToolsService {
   /**
    * Creates a new tool with GitHub validation.
    * Validates the GitHub URL and repository metrics before saving.
-   * 
+   *
    * Requirements: 2.1, 2.4, 2.5
-   * 
+   *
    * @param dto - Tool creation data
    * @returns Created tool document
    * @throws BadRequestException if validation fails
@@ -97,7 +97,7 @@ export class ToolsService {
 
     // Validate GitHub URL and repository metrics
     const validationResult = await this.validationService.validateGitHubRepo(dto.githubUrl);
-    
+
     if (!validationResult.valid) {
       throw new BadRequestException(validationResult.reason);
     }
@@ -130,9 +130,9 @@ export class ToolsService {
 
   /**
    * Retrieves all tools with optional filtering.
-   * 
+   *
    * Requirements: 1.1, 1.2, 1.3
-   * 
+   *
    * @param query - Optional filters for category, search, and installation status
    * @returns Array of matching tools
    */
@@ -159,9 +159,9 @@ export class ToolsService {
 
   /**
    * Retrieves a single tool by ID.
-   * 
+   *
    * Requirements: 1.1
-   * 
+   *
    * @param id - Tool document ID
    * @returns Tool document
    * @throws NotFoundException if tool not found
@@ -176,7 +176,7 @@ export class ToolsService {
 
   /**
    * Retrieves a tool by name.
-   * 
+   *
    * @param name - Tool name (case-insensitive)
    * @returns Tool document or null
    */
@@ -186,9 +186,9 @@ export class ToolsService {
 
   /**
    * Updates a tool's metadata and configuration.
-   * 
+   *
    * Requirements: 6.1, 6.2
-   * 
+   *
    * @param id - Tool document ID
    * @param dto - Update data
    * @returns Updated tool document
@@ -225,9 +225,9 @@ export class ToolsService {
 
   /**
    * Deletes a tool from the registry.
-   * 
+   *
    * Requirements: 6.1, 6.2
-   * 
+   *
    * @param id - Tool document ID
    * @throws NotFoundException if tool not found
    */
@@ -241,9 +241,9 @@ export class ToolsService {
   /**
    * Bulk imports predefined security tools into the registry.
    * Processes each tool sequentially, validating before adding.
-   * 
+   *
    * Requirements: 7.1, 7.2, 7.3
-   * 
+   *
    * @returns BulkImportResult with success/failure counts and details
    */
   async bulkImport(): Promise<BulkImportResult> {
@@ -277,7 +277,7 @@ export class ToolsService {
   /**
    * Imports a single predefined tool with validation.
    * Skips tools that already exist in the registry.
-   * 
+   *
    * @param tool - Predefined tool data
    * @returns Created tool document
    * @throws Error if validation fails
@@ -291,7 +291,7 @@ export class ToolsService {
 
     // Validate GitHub URL and repository metrics
     const validationResult = await this.validationService.validateGitHubRepo(tool.githubUrl);
-    
+
     if (!validationResult.valid) {
       throw new Error(validationResult.reason || 'Validation failed');
     }
@@ -326,7 +326,7 @@ export class ToolsService {
 
   /**
    * Gets the predefined tools list for testing purposes.
-   * 
+   *
    * @returns Array of predefined tools
    */
   getPredefinedTools(): PredefinedTool[] {
@@ -336,9 +336,9 @@ export class ToolsService {
   /**
    * Re-validates a tool's GitHub repository metrics.
    * Updates the tool's validation data with fresh metrics from GitHub.
-   * 
+   *
    * Requirements: 3.2
-   * 
+   *
    * @param id - Tool document ID
    * @returns Updated tool document with fresh validation data
    * @throws NotFoundException if tool not found
@@ -352,7 +352,7 @@ export class ToolsService {
 
     // Re-validate GitHub URL and repository metrics
     const validationResult = await this.validationService.validateGitHubRepo(tool.githubUrl);
-    
+
     // Update validation data regardless of result
     tool.validation = {
       isValid: validationResult.valid,
@@ -368,7 +368,7 @@ export class ToolsService {
   /**
    * Syncs existing tools with the latest predefined tool data.
    * Updates install commands and other metadata for tools that already exist.
-   * 
+   *
    * @returns Object with counts of updated and skipped tools
    */
   async syncPredefinedTools(): Promise<{ updated: number; skipped: number; errors: string[] }> {
@@ -377,7 +377,7 @@ export class ToolsService {
     for (const predefinedTool of PREDEFINED_TOOLS) {
       try {
         const existingTool = await this.toolModel.findOne({ name: predefinedTool.name.toLowerCase() });
-        
+
         if (existingTool) {
           // Update the tool with latest predefined data (especially installCommands and containerName)
           existingTool.installation = {
@@ -388,7 +388,7 @@ export class ToolsService {
             lastChecked: existingTool.installation?.lastChecked || new Date(),
             isInstalled: existingTool.installation?.isInstalled || false,
           };
-          
+
           await existingTool.save();
           result.updated++;
           this.logger.log(`Synced tool: ${predefinedTool.name}`);
@@ -408,7 +408,7 @@ export class ToolsService {
 
   /**
    * Refreshes the installation status of all tools by checking which binaries are available.
-   * 
+   *
    * @returns Object with counts of installed and not installed tools
    */
   async refreshInstallationStatus(): Promise<{ installed: number; notInstalled: number; tools: Array<{ name: string; isInstalled: boolean; version?: string }> }> {
@@ -449,6 +449,52 @@ export class ToolsService {
     }
 
     this.logger.log(`Refresh completed: ${result.installed} installed, ${result.notInstalled} not installed`);
+    return result;
+  }
+
+  /**
+   * Self-heal: checks all tools and automatically reinstalls any that are missing.
+   * This ensures tools stay available even after container restarts.
+   *
+   * @returns Object with counts of checked, healthy, repaired tools and any failures
+   */
+  async selfHeal(): Promise<{ checked: number; healthy: number; repaired: number; failed: string[] }> {
+    this.logger.log('Starting tools self-heal...');
+    const tools = await this.toolModel.find().exec();
+    const result = { checked: 0, healthy: 0, repaired: 0, failed: [] as string[] };
+
+    for (const tool of tools) {
+      result.checked++;
+      const binaryName = tool.installation?.binaryName || tool.name;
+      const containerName = tool.installation?.containerName;
+
+      try {
+        const isInstalled = await this.executorService.isInstalled(tool.name, binaryName, containerName);
+
+        if (isInstalled) {
+          result.healthy++;
+          continue;
+        }
+
+        // Tool is missing — try to reinstall
+        this.logger.warn(`Tool ${tool.name} is missing, attempting reinstall...`);
+        const installResult = await this.executorService.installTool(tool);
+
+        if (installResult.success) {
+          result.repaired++;
+          this.logger.log(`✅ Repaired tool: ${tool.name} (method: ${installResult.method})`);
+        } else {
+          result.failed.push(`${tool.name}: ${installResult.error || 'install failed'}`);
+          this.logger.error(`❌ Failed to repair tool: ${tool.name} - ${installResult.error}`);
+        }
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'Unknown error';
+        result.failed.push(`${tool.name}: ${reason}`);
+        this.logger.error(`❌ Error healing tool ${tool.name}: ${reason}`);
+      }
+    }
+
+    this.logger.log(`Self-heal complete: ${result.healthy} healthy, ${result.repaired} repaired, ${result.failed.length} failed out of ${result.checked}`);
     return result;
   }
 }

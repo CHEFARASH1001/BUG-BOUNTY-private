@@ -21,6 +21,7 @@ import { WaybackService } from '../recon/services/wayback.service';
 import { EndpointsService } from '../endpoints/endpoints.service';
 import { NucleiService } from '../scanner/services/nuclei.service';
 import { DNSBruteService } from '../recon/services/dns-brute.service';
+import { ToolsService } from '../tools/tools.service';
 
 export interface JobDefinition {
   name: string;
@@ -95,6 +96,11 @@ export class CronService implements OnModuleInit {
       schedule: '0 0 * * *',
       description: 'DNS brute forcing for watched domains',
     },
+    {
+      name: 'tools_self_heal',
+      schedule: '0 */1 * * *',
+      description: 'Auto-check and reinstall missing tools every hour',
+    },
   ];
 
   constructor(
@@ -117,6 +123,7 @@ export class CronService implements OnModuleInit {
     @Inject(forwardRef(() => EndpointsService)) private endpointsService: EndpointsService,
     @Inject(forwardRef(() => NucleiService)) private nucleiService: NucleiService,
     @Inject(forwardRef(() => DNSBruteService)) private dnsBruteService: DNSBruteService,
+    @Inject(forwardRef(() => ToolsService)) private toolsService: ToolsService,
   ) {}
 
   async onModuleInit() {
@@ -205,6 +212,11 @@ export class CronService implements OnModuleInit {
     await this.runJobIfEnabled('watch_dns_brute', (log) => this.runDNSBruteWatch(log));
   }
 
+  @Cron(CronExpression.EVERY_HOUR)
+  async scheduledToolsSelfHeal() {
+    await this.runJobIfEnabled('tools_self_heal', (log) => this.runToolsSelfHeal(log));
+  }
+
   private async runJobIfEnabled(
     jobName: string,
     handler: (log: LogFn) => Promise<any>,
@@ -245,7 +257,7 @@ export class CronService implements OnModuleInit {
 
     try {
       const result = await handler(addLog);
-      
+
       const completedAt = new Date();
       const duration = completedAt.getTime() - execution.startedAt.getTime();
 
@@ -278,7 +290,7 @@ export class CronService implements OnModuleInit {
       return updatedExecution || execution;
     } catch (error: any) {
       await addLog(`ERROR: ${error.message}`);
-      
+
       // Use updateOne to avoid overwriting logs
       await this.jobExecutionModel.updateOne(
         { _id: execution._id },
@@ -302,7 +314,7 @@ export class CronService implements OnModuleInit {
       );
 
       this.logger.error(`Failed job: ${jobName}: ${error.message}`);
-      
+
       // Refresh execution for return value
       const updatedExecution = await this.jobExecutionModel.findById(execution._id);
       return updatedExecution || execution;
@@ -344,6 +356,7 @@ export class CronService implements OnModuleInit {
       watch_ct_logs: (log) => this.runCTMonitor(log),
       watch_wayback: (log) => this.runWaybackWatch(log),
       watch_dns_brute: (log) => this.runDNSBruteWatch(log),
+      tools_self_heal: (log) => this.runToolsSelfHeal(log),
     };
 
     const handler = handlers[jobName];
@@ -361,7 +374,7 @@ export class CronService implements OnModuleInit {
   ): Promise<{ data: JobExecutionDocument[]; pagination: { page: number; limit: number; total: number; totalPages: number } }> {
     const query = jobName ? { jobName } : {};
     const skip = (page - 1) * limit;
-    
+
     const [data, total] = await Promise.all([
       this.jobExecutionModel
         .find(query)
@@ -371,7 +384,7 @@ export class CronService implements OnModuleInit {
         .exec(),
       this.jobExecutionModel.countDocuments(query).exec(),
     ]);
-    
+
     return {
       data,
       pagination: {
@@ -393,7 +406,7 @@ export class CronService implements OnModuleInit {
    */
   async markStaleJobsAsFailed(maxAgeMs: number): Promise<number> {
     const cutoffTime = new Date(Date.now() - maxAgeMs);
-    
+
     const result = await this.jobExecutionModel.updateMany(
       {
         status: JobStatus.RUNNING,
@@ -420,7 +433,7 @@ export class CronService implements OnModuleInit {
    */
   async cancelJob(executionId: string): Promise<JobExecutionDocument | null> {
     const execution = await this.jobExecutionModel.findById(executionId);
-    
+
     if (!execution || execution.status !== JobStatus.RUNNING) {
       return null;
     }
@@ -429,11 +442,11 @@ export class CronService implements OnModuleInit {
     execution.completedAt = new Date();
     execution.duration = execution.completedAt.getTime() - execution.startedAt.getTime();
     execution.error = 'Job cancelled by user';
-    
+
     await execution.save();
-    
+
     this.logger.log(`Cancelled job: ${execution.jobName} (${executionId})`);
-    
+
     return execution;
   }
 
@@ -455,11 +468,11 @@ export class CronService implements OnModuleInit {
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`RabbitMQ API error: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return {
         messages: data.messages || 0,
@@ -497,13 +510,13 @@ export class CronService implements OnModuleInit {
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error(`RabbitMQ API error: ${response.status}`);
       }
-      
+
       this.logger.log(`Cleared subfinder queue: ${messageCount} messages purged`);
-      
+
       return {
         success: true,
         messagesCleared: messageCount,
@@ -523,7 +536,7 @@ export class CronService implements OnModuleInit {
   private async runProgramSync(log: LogFn): Promise<any> {
     await log('Starting platform synchronization...');
     await log('Fetching programs from HackerOne...');
-    
+
     try {
       const result = await this.platformSyncService.syncAllPlatforms(log);
       await log(`Sync completed: ${JSON.stringify(result)}`);
@@ -536,12 +549,12 @@ export class CronService implements OnModuleInit {
 
   private async runSubfinderAll(log: LogFn): Promise<any> {
     await log('Starting subfinder for all domains (parallel via RabbitMQ)...');
-    
+
     // Get all domains from database
     const domainsResult = await this.domainsService.findAll({ limit: 10000 });
     const allDomains = domainsResult.data;
     await log(`Found ${allDomains.length} total domain entries`);
-    
+
     if (allDomains.length === 0) {
       await log('No domains found. Add domains first.');
       return { message: 'No domains to scan', scanned: 0 };
@@ -550,17 +563,17 @@ export class CronService implements OnModuleInit {
     // Filter to only scan root domains and wildcards (not subdomains)
     // Root domain pattern: domain.tld or *.domain.tld
     const rootDomainPattern = /^(\*\.)?[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z]{2,})+$/;
-    
+
     const domainsToScan = allDomains.filter(d => {
       const domain = d.domain;
       // Skip if it's clearly a subdomain (has more than 2 dots and doesn't start with *)
       const dotCount = (domain.match(/\./g) || []).length;
-      
+
       // Handle wildcards - extract the base domain
       if (domain.startsWith('*.')) {
         return true; // Wildcards are good to scan
       }
-      
+
       // Skip subdomains like mail.notion.so, staging.hosted.mender.io
       // Keep root domains like stripchat.com, notion.so
       if (dotCount > 1) {
@@ -572,7 +585,7 @@ export class CronService implements OnModuleInit {
         }
         return false; // Skip subdomains
       }
-      
+
       return true; // Root domains with 1 dot
     });
 
@@ -586,16 +599,16 @@ export class CronService implements OnModuleInit {
     // Generate batch ID for tracking
     const batchId = `subfinder-${Date.now()}`;
     await log(`Batch ID: ${batchId}`);
-    
+
     // Publish domains to the queue for parallel processing
     // For wildcards, remove the *. prefix
     const domainJobs = domainsToScan.map(d => ({
       domain: d.domain.startsWith('*.') ? d.domain.substring(2) : d.domain,
       domainId: d._id.toString(),
     }));
-    
+
     const published = await this.queueService.publishSubfinderBatch(domainJobs, batchId);
-    
+
     await log(`✓ Published ${published} domains to subfinder queue`);
     await log(`Workers will process domains in parallel`);
     await log(`Monitor progress in RabbitMQ: http://localhost:15672`);
@@ -612,11 +625,11 @@ export class CronService implements OnModuleInit {
 
   private async runDnsAll(log: LogFn): Promise<any> {
     await log('Starting DNS resolution for all subdomains...');
-    
+
     const subdomainsResult = await this.subdomainsService.findAll({ limit: 10000 });
     const subdomains = subdomainsResult.data;
     await log(`Found ${subdomains.length} subdomains to resolve`);
-    
+
     if (subdomains.length === 0) {
       await log('No subdomains found. Run enumeration first.');
       return { message: 'No subdomains to resolve', resolved: 0 };
@@ -630,13 +643,13 @@ export class CronService implements OnModuleInit {
     // Process in batches to avoid overwhelming DNS
     const batchSize = 50;
     const totalBatches = Math.ceil(subdomains.length / batchSize);
-    
+
     for (let i = 0; i < subdomains.length; i += batchSize) {
       const batch = subdomains.slice(i, i + batchSize);
       const batchNum = Math.floor(i / batchSize) + 1;
-      
+
       await log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} subdomains)`);
-      
+
       // Process batch in parallel
       const results = await Promise.allSettled(
         batch.map(async (sub) => {
@@ -658,7 +671,7 @@ export class CronService implements OnModuleInit {
           }
         })
       );
-      
+
       // Count results
       for (const result of results) {
         if (result.status === 'fulfilled') {
@@ -677,7 +690,7 @@ export class CronService implements OnModuleInit {
     }
 
     await log(`DNS resolution complete: ${alive} alive, ${dead} dead`);
-    
+
     // Send notification for newly alive subdomains
     if (newlyAlive.length > 0) {
       await log(`🆕 ${newlyAlive.length} subdomains became alive!`);
@@ -698,10 +711,10 @@ export class CronService implements OnModuleInit {
       }
     }
 
-    return { 
-      message: 'DNS resolution completed', 
-      alive, 
-      dead, 
+    return {
+      message: 'DNS resolution completed',
+      alive,
+      dead,
       total: subdomains.length,
       newlyAlive: newlyAlive.length,
     };
@@ -711,8 +724,8 @@ export class CronService implements OnModuleInit {
     await log('Starting live subdomain detection for all domains...');
 
     // Get domains that have subdomains (subdomainCount > 0)
-    const domainsResult = await this.domainsService.findAll({ 
-      limit: 100, 
+    const domainsResult = await this.domainsService.findAll({
+      limit: 100,
       hasSubdomains: true,
       sortBy: 'subdomainCount',
       sortOrder: 'desc',
@@ -798,11 +811,11 @@ export class CronService implements OnModuleInit {
 
   private async runNucleiAll(log: LogFn): Promise<any> {
     await log('Starting Nuclei vulnerability scanning...');
-    
+
     const subdomainsResult = await this.subdomainsService.findAll({ isAlive: true, limit: 1000 });
     const subdomains = subdomainsResult.data;
     await log(`Found ${subdomains.length} alive subdomains for scanning`);
-    
+
     if (subdomains.length === 0) {
       await log('No alive subdomains found. Run DNS resolution first.');
       return { message: 'No targets to scan', scanned: 0 };
@@ -821,7 +834,7 @@ export class CronService implements OnModuleInit {
     try {
       // Run nuclei scan using the NucleiService
       const results = await this.nucleiService.scan(targets);
-      
+
       await log(`Nuclei scan complete: ${results.length} findings`);
 
       // Group findings by severity
@@ -870,12 +883,12 @@ export class CronService implements OnModuleInit {
       };
     } catch (error: any) {
       await log(`Nuclei scan error: ${error.message}`);
-      
+
       // Check if it's a Docker/nuclei availability issue
       if (error.message.includes('docker') || error.message.includes('nuclei')) {
         await log('Note: Ensure the nuclei container is running (bb-nuclei)');
       }
-      
+
       throw error;
     }
   }
@@ -883,7 +896,7 @@ export class CronService implements OnModuleInit {
   private async runFreshDetection(log: LogFn): Promise<any> {
     await log('Starting fresh detection...');
     await log('Marking stale live hosts (older than 24h)...');
-    
+
     const livesMarked = await this.livesService.markAsNotFresh(24);
 
     await log(`Marked ${livesMarked} live hosts as not fresh`);
@@ -917,9 +930,9 @@ export class CronService implements OnModuleInit {
 
     try {
       // Get all alive subdomains with IP addresses
-      const subdomainsResult = await this.subdomainsService.findAll({ 
-        isAlive: true, 
-        limit: 500 
+      const subdomainsResult = await this.subdomainsService.findAll({
+        isAlive: true,
+        limit: 500
       });
       const subdomains = subdomainsResult.data;
       await log(`Found ${subdomains.length} alive subdomains to check`);
@@ -932,7 +945,7 @@ export class CronService implements OnModuleInit {
       // Extract unique IPs from subdomains
       const ipSet = new Set<string>();
       const ipToSubdomain = new Map<string, any>();
-      
+
       for (const sub of subdomains) {
         const ips = sub.ip || [];
         for (const ip of ips) {
@@ -1043,10 +1056,10 @@ export class CronService implements OnModuleInit {
       for (const domain of domains.slice(0, maxDomains)) {
         try {
           await log(`Querying CT logs for: ${domain.domain}`);
-          
+
           const ctResult = await this.ctService.queryDomain(domain.domain);
           await log(`Found ${ctResult.subdomains.length} subdomains from CT logs for ${domain.domain}`);
-          
+
           totalDiscovered += ctResult.subdomains.length;
 
           // Create subdomain records with cert_trans source
@@ -1061,7 +1074,7 @@ export class CronService implements OnModuleInit {
             try {
               // Check if subdomain already exists
               const existing = await this.subdomainsService.findBySubdomain(record.subdomain);
-              
+
               if (!existing) {
                 await this.subdomainsService.create({
                   subdomain: record.subdomain,
@@ -1276,7 +1289,7 @@ export class CronService implements OnModuleInit {
           try {
             for await (const subdomain of this.dnsBruteService.runStaticBrute(config)) {
               discoveredSubdomains.push(subdomain);
-              
+
               if (!existingSet.has(subdomain.toLowerCase())) {
                 newSubdomains.push(subdomain);
                 existingSet.add(subdomain.toLowerCase());
@@ -1351,6 +1364,32 @@ export class CronService implements OnModuleInit {
       };
     } catch (error: any) {
       await log(`DNS brute watch error: ${error.message}`);
+      throw error;
+    }
+  }
+
+  private async runToolsSelfHeal(log: LogFn): Promise<any> {
+    await log('Starting tools self-heal check...');
+
+    try {
+      const result = await this.toolsService.selfHeal();
+
+      await log(`Checked ${result.checked} tools: ${result.healthy} healthy, ${result.repaired} repaired`);
+
+      if (result.failed.length > 0) {
+        await log(`Failed to repair ${result.failed.length} tools:`);
+        for (const failure of result.failed) {
+          await log(`  ❌ ${failure}`);
+        }
+      }
+
+      if (result.repaired > 0) {
+        await log(`✅ Successfully repaired ${result.repaired} tools`);
+      }
+
+      return result;
+    } catch (error: any) {
+      await log(`Self-heal error: ${error.message}`);
       throw error;
     }
   }

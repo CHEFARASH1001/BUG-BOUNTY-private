@@ -6,8 +6,8 @@ WORKDIR /app
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_SKIP_DOWNLOAD=true
 
-# Install tools and Go
-RUN apk add --no-cache curl bind-tools unzip git go nmap
+# Install tools and Go + gcompat for glibc binary compatibility
+RUN apk add --no-cache curl bind-tools unzip git go gcompat nmap
 
 # Set Go environment
 ENV GOPATH=/root/go
@@ -69,12 +69,9 @@ RUN curl -sL https://github.com/owasp-amass/amass/releases/download/v4.2.0/amass
     chmod +x /usr/local/bin/amass && \
     rm -rf /tmp/*
 
-# Install gau binary
-RUN curl -sL https://github.com/lc/gau/releases/download/v2.2.4/gau_2.2.4_linux_amd64.tar.gz -o /tmp/gau.tar.gz && \
-    tar -xzf /tmp/gau.tar.gz -C /tmp && \
-    mv /tmp/gau /usr/local/bin/ && \
-    chmod +x /usr/local/bin/gau && \
-    rm -rf /tmp/*
+# Install gau via go (binary download has glibc issues on Alpine)
+RUN go install github.com/lc/gau/v2/cmd/gau@latest && \
+    ln -sf /root/go/bin/gau /usr/local/bin/gau
 
 # Install feroxbuster binary
 RUN curl -sL https://github.com/epi052/feroxbuster/releases/download/v2.11.0/x86_64-linux-feroxbuster.tar.gz -o /tmp/feroxbuster.tar.gz && \
@@ -112,9 +109,13 @@ RUN go install github.com/hahwul/dalfox/v2@v2.9.3
 # Install kxss (XSS parameter finder) via go
 RUN go install github.com/Emoe/kxss@latest
 
-# Install dnsgen (Python tool)
+# Install Python tools (dnsgen, sqlmap, dirsearch, arjun, wafw00f, trufflehog)
 RUN apk add --no-cache python3 py3-pip && \
-    pip3 install dnsgen --break-system-packages
+    pip3 install 'setuptools>=70,<81' --break-system-packages && \
+    pip3 install dnsgen sqlmap dirsearch arjun wafw00f trufflehog --break-system-packages
+
+# Suppress Python deprecation warnings globally
+ENV PYTHONWARNINGS=ignore
 
 # Install XSStrike (Python XSS scanner)
 RUN git clone https://github.com/s0md3v/XSStrike.git /opt/xsstrike && \

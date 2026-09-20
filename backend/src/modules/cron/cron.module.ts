@@ -16,6 +16,7 @@ import { ExternalApisModule } from '../external-apis/external-apis.module';
 import { AlertModule } from '../alerts/alert.module';
 import { EndpointsModule } from '../endpoints/endpoints.module';
 import { ScannerModule } from '../scanner/scanner.module';
+import { ToolsModule } from '../tools/tools.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { ScannerModule } from '../scanner/scanner.module';
     forwardRef(() => AlertModule),
     forwardRef(() => EndpointsModule),
     forwardRef(() => ScannerModule),
+    forwardRef(() => ToolsModule),
   ],
   controllers: [CronController],
   providers: [CronService],

@@ -49,7 +49,7 @@ function DefaultMobileCard<T>({
   const getValue = (col: Column<T>) => {
     const key = col.key as keyof T;
     const value = row[key];
-    return col.render ? col.render(value, row) : value;
+    return col.render ? col.render(value, row) : String(value ?? '');
   };
 
   return (

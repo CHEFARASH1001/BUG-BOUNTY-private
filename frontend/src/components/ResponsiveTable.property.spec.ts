@@ -2,7 +2,7 @@ import * as fc from 'fast-check';
 
 /**
  * Property-based tests for ResponsiveTable component
- * 
+ *
  * Feature: mobile-responsive
  * Property 11: Table to Card Transformation
  * Validates: Requirements 4.1, 4.2
@@ -91,7 +91,10 @@ const testRowArb = fc.record({
   id: fc.uuid(),
   name: fc.string({ minLength: 1, maxLength: 100 }),
   status: fc.constantFrom('active', 'inactive', 'pending', 'completed'),
-  date: fc.date({ min: new Date('2000-01-01'), max: new Date('2100-01-01') }).map(d => d.toISOString()),
+  date: fc.integer({
+    min: new Date('2000-01-01').getTime(),
+    max: new Date('2100-01-01').getTime(),
+  }).map(timestamp => new Date(timestamp).toISOString()),
   description: fc.string({ minLength: 0, maxLength: 500 }),
   category: fc.string({ minLength: 1, maxLength: 50 }),
 });
@@ -152,7 +155,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (width) => {
             const isMobile = isMobileViewport(width);
             const mode = getDisplayMode(width);
-            
+
             // Invariant: mobile viewport should show cards, desktop should show table
             return (isMobile && mode === 'cards') || (!isMobile && mode === 'table');
           }
@@ -178,7 +181,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           mobileViewportWidthArb,
           (columns, width) => {
             const visibleColumns = getVisibleColumnsForMobile(columns);
-            
+
             // All visible columns should be high priority
             return visibleColumns.every(col => col.priority === 'high');
           }
@@ -194,10 +197,10 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (columns) => {
             const highPriorityColumns = columns.filter(col => col.priority === 'high');
             const visibleColumns = getVisibleColumnsForMobile(columns);
-            
+
             // All high-priority columns should be visible
             return highPriorityColumns.length === visibleColumns.length &&
-              highPriorityColumns.every(hp => 
+              highPriorityColumns.every(hp =>
                 visibleColumns.some(vc => vc.key === hp.key)
               );
           }
@@ -212,7 +215,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           fc.array(testColumnArb, { minLength: 1, maxLength: 10 }),
           (columns) => {
             const visibleColumns = getVisibleColumnsForMobile(columns);
-            
+
             // No low-priority columns should be visible
             return !visibleColumns.some(col => col.priority === 'low');
           }
@@ -228,7 +231,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (columns) => {
             const visibleColumns = getVisibleColumnsForMobile(columns);
             const originalHighPriority = columns.filter(col => col.priority === 'high');
-            
+
             // Order should be preserved
             for (let i = 0; i < visibleColumns.length; i++) {
               if (visibleColumns[i].key !== originalHighPriority[i].key) {
@@ -250,7 +253,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           fc.array(testColumnArb, { minLength: 1, maxLength: 10 }),
           (columns) => {
             const mediumColumns = getMediumPriorityColumns(columns);
-            
+
             // All returned columns should be medium priority
             return mediumColumns.every(col => col.priority === 'medium');
           }
@@ -266,7 +269,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (columns) => {
             const expectedMedium = columns.filter(col => col.priority === 'medium');
             const actualMedium = getMediumPriorityColumns(columns);
-            
+
             return expectedMedium.length === actualMedium.length;
           }
         ),
@@ -285,7 +288,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
             // Data should be preserved regardless of viewport
             // This tests that the transformation doesn't lose data
             const mode = getDisplayMode(width);
-            
+
             // In both modes, all rows should be represented
             // (The actual rendering would show all rows)
             return rows.length >= 0; // Data integrity maintained
@@ -302,7 +305,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (width) => {
             const emptyRows: TestRow[] = [];
             const mode = getDisplayMode(width);
-            
+
             // Empty data should work in both modes
             return emptyRows.length === 0;
           }
@@ -319,7 +322,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           (row, width) => {
             const rows = [row];
             const mode = getDisplayMode(width);
-            
+
             // Single row should work in both modes
             return rows.length === 1;
           }
@@ -341,9 +344,9 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
               header: `Column ${i}`,
               priority,
             }));
-            
+
             const visible = getVisibleColumnsForMobile(columns);
-            
+
             if (priority === 'high') {
               return visible.length === count;
             } else {
@@ -379,10 +382,10 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
                 priority: 'low' as ColumnPriority,
               })),
             ];
-            
+
             const visible = getVisibleColumnsForMobile(columns);
             const medium = getMediumPriorityColumns(columns);
-            
+
             return visible.length === highCount && medium.length === mediumCount;
           }
         ),
@@ -409,7 +412,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           mobileViewportWidthArb,
           (width) => {
             const visible = getVisibleColumnsForMobile(typicalColumns);
-            
+
             // Should show exactly name, status, date
             const expectedKeys = ['name', 'status', 'date'];
             return visible.length === 3 &&
@@ -436,7 +439,7 @@ describe('Feature: mobile-responsive, Property 11: Table to Card Transformation'
           desktopViewportWidthArb,
           (width) => {
             const mode = getDisplayMode(width);
-            
+
             // Desktop mode shows table with all columns
             return mode === 'table';
           }

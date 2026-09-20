@@ -2,8 +2,11 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# Install dependencies for Puppeteer and other tools
-RUN apk add --no-cache \
+# Install dependencies for Puppeteer and other tools with retry logic
+RUN for i in 1 2 3; do \
+    apk update && break || sleep 5; \
+    done && \
+    (apk add --no-cache \
     chromium \
     nss \
     freetype \
@@ -13,19 +16,25 @@ RUN apk add --no-cache \
     bind-tools \
     curl \
     git \
-    go
+    go || \
+    (echo "⚠️  Some packages failed, installing essential ones..." && \
+     apk add --no-cache curl git ca-certificates || true))
 
-# Install Go-based security tools
+# Install Go-based security tools (continue on failure)
 ENV GOPATH=/root/go
 ENV PATH=$PATH:/root/go/bin
+ENV GOPROXY=direct,https://proxy.golang.org
+ENV GOSUMDB=off
 
-# Install shuffledns and massdns
-RUN go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest && \
-    apk add --no-cache --virtual .build-deps build-base && \
+# Install shuffledns and massdns (continue on failure for network resilience)
+RUN (go install -v github.com/projectdiscovery/shuffledns/cmd/shuffledns@latest && \
+    echo "✅ shuffledns installed") || echo "❌ shuffledns failed" || true
+RUN (apk add --no-cache --virtual .build-deps build-base && \
     git clone https://github.com/blechschmidt/massdns.git /tmp/massdns && \
     cd /tmp/massdns && make && cp bin/massdns /usr/local/bin/ && \
     rm -rf /tmp/massdns && \
-    apk del .build-deps
+    apk del .build-deps && \
+    echo "✅ massdns installed") || echo "❌ massdns failed" || true
 
 # Create resolvers file with public DNS servers
 RUN mkdir -p /app && \
@@ -44,8 +53,10 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 # Copy package files
 COPY package*.json ./
 
-# Install ALL dependencies (including devDependencies for build)
-RUN npm install
+# Install ALL dependencies (including devDependencies for build) with retry
+RUN for i in 1 2 3; do \
+    npm install && break || (echo "⚠️  npm install attempt $i failed, retrying..." && sleep 5); \
+    done || echo "⚠️  npm install failed after retries"
 
 # Copy source code
 COPY . .

@@ -12,7 +12,7 @@
 dev: dev-up
 
 dev-up:
-	docker compose -f docker-compose.dev.yml up -d
+	docker compose -f docker-compose.dev.yml up -d --remove-orphans
 	@echo ""
 	@echo "🚀 Development environment started!"
 	@echo "   Frontend: http://localhost:3000"
@@ -22,7 +22,7 @@ dev-up:
 	@echo "📝 Run 'make dev-logs' to see logs"
 
 dev-down:
-	docker compose -f docker-compose.dev.yml down
+	docker compose -f docker-compose.dev.yml down --remove-orphans
 
 dev-build:
 	docker compose -f docker-compose.dev.yml build --no-cache
@@ -34,7 +34,7 @@ dev-restart:
 	docker compose -f docker-compose.dev.yml restart
 
 dev-clean:
-	docker compose -f docker-compose.dev.yml down -v --rmi local
+	docker compose -f docker-compose.dev.yml down -v --rmi local --remove-orphans
 	@echo "✅ Cleaned up development environment (volumes and images removed)"
 
 # ===========================================
@@ -114,6 +114,13 @@ status:
 
 # Full reset - removes everything and rebuilds
 reset: dev-clean dev-build dev-up
+
+# Self-heal tools - check and reinstall any missing tools
+tools-heal:
+	@echo "🔧 Running tools self-heal..."
+	@curl -s -X POST http://localhost:4000/api/v1/tools/self-heal | python3 -m json.tool
+	@echo ""
+	@echo "✅ Self-heal complete"
 
 # Update MongoDB validator for programs collection
 update-mongo-validator:

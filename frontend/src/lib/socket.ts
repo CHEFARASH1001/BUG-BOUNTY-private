@@ -1,5 +1,7 @@
 import { io, Socket } from 'socket.io-client';
+import { useEffect } from 'react';
 
+// Socket connections are always client-side, so use the public URL
 const SOCKET_URL = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:4000';
 
 class SocketClient {
@@ -117,8 +119,6 @@ export const socketClient = new SocketClient();
 
 // React hook for socket events
 export function useSocket(event: string, callback: (data: any) => void) {
-  const { useEffect } = require('react');
-
   useEffect(() => {
     socketClient.connect();
     const unsubscribe = socketClient.on(event, callback);

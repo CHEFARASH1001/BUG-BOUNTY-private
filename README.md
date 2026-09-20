@@ -1,360 +1,180 @@
-# 🔒 Bug Bounty Automation Platform
+<div align="center">
+  <img src="docs/bbauto-banner.svg" alt="BB.AUTO — Bug Bounty Automation Platform" width="100%" />
 
-A comprehensive, scalable bug bounty automation platform built with **Next.js**, **NestJS**, and **MongoDB**. Automate your reconnaissance and vulnerability scanning workflows with ease.
+  <p>
+    <a href="https://nextjs.org/"><img src="https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white" alt="Next.js 14" /></a>
+    <a href="https://nestjs.com/"><img src="https://img.shields.io/badge/NestJS-10-E0234E?logo=nestjs&logoColor=white" alt="NestJS 10" /></a>
+    <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ED?logo=docker&logoColor=white" alt="Docker ready" /></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-21F38A" alt="MIT license" /></a>
+  </p>
 
-![Dashboard Preview](https://via.placeholder.com/1200x600/0a0a0f/22c55e?text=Bug+Bounty+Automation+Platform)
+  <p><strong>Map the surface. Run the work. Keep the signal.</strong></p>
+</div>
 
-## 🚀 Features
+## BB.AUTO
 
-### Reconnaissance
-- **Subdomain Enumeration** - Multiple sources including:
-  - Subfinder integration
-  - SecurityTrails API
-  - crt.sh Certificate Transparency
-  - VirusTotal
-  - AlienVault OTX
-  - HackerTarget
-  - DNS bruteforce
+BB.AUTO is a self-hosted workspace for organizing bug bounty programs, mapping
+their attack surface, running reconnaissance jobs, and keeping scan results in
+one place. It combines a Next.js dashboard with a NestJS API, MongoDB,
+RabbitMQ-backed workers, and optional integrations with common security tools.
 
-- **Port Scanning** - Fast port scanning with:
-  - Naabu integration
-  - Service detection
-  - Banner grabbing
+![BB.AUTO dashboard](scripts/screenshots/dashboard.png)
 
-- **HTTP Probing** - Alive host detection with:
-  - HTTPx integration
-  - Technology detection
-  - Title extraction
-  - Content-length analysis
+> Use this project only against assets that you own or are explicitly
+> authorized to test. The platform can launch active discovery and scanning
+> tools; authorization and rate limits are your responsibility.
 
-### Vulnerability Scanning
-- **Nuclei Integration** - Automated vulnerability scanning with:
-  - CVE detection
-  - Misconfigurations
-  - Exposures
-  - Default credentials
-  - Subdomain takeover
+## What is included
 
-- **Custom Vulnerability Checks**:
-  - XSS detection
-  - SQL Injection testing
-  - SSRF detection
-  - Open redirect checking
-  - LFI/RFI testing
-  - CORS misconfiguration
-  - Security header analysis
+- Program, scope, domain, subdomain, and vulnerability management
+- DNS resolution, subdomain discovery, HTTP probing, port scanning, and Nuclei workflows
+- Scheduled jobs with progress updates over WebSocket
+- Reports and exports for reconnaissance and vulnerability data
+- Tool registry with installation checks and execution history
+- Optional HexStrike AI integration for guided workflows
+- Notifications through Telegram, Slack, Discord, or SMTP
+- A responsive dashboard with a hunting checklist and scratchpad
 
-### External API Integrations
-- **Shodan** - Host information, search, exploits
-- **SecurityTrails** - Subdomains, DNS history, WHOIS
-- **VirusTotal** - Domain/IP reputation, file analysis
-- **Censys** - Certificate search, host lookup
-- **Hunter.io** - Email discovery
-- **URLScan.io** - URL analysis, screenshots
+## Screenshots
 
-### Automation & Scaling
-- **Bull/Redis Queue** - Async job processing with:
-  - Priority queuing
-  - Retry logic
-  - Progress tracking
-  - Real-time updates via WebSocket
+The repository includes a few UI previews under `scripts/screenshots/`.
 
-- **Scheduled Scans** - Automatic recurring scans
+| Dashboard | Programs | Tools |
+| --- | --- | --- |
+| ![Dashboard](scripts/screenshots/dashboard.png) | ![Programs](scripts/screenshots/dashboard-programs.png) | ![Tools](scripts/screenshots/dashboard-tools.png) |
 
-### Notifications
-- **Slack** - Webhook integration
-- **Discord** - Webhook integration
-- **Email** - SMTP support
-- **Telegram** - Bot integration
+The screenshots use local sample data. Review or replace them before making a
+public repository if the data is not intended to be shared.
 
-### Reporting
-- **PDF Reports** - Professional vulnerability reports
-- **CSV Export** - Vulnerabilities, subdomains
-- **JSON Export** - Full data export
+### Short walkthrough
 
-## 🏗️ Architecture
+![BB.AUTO dashboard walkthrough](docs/demo.gif)
 
-```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│   Next.js       │────▶│   NestJS        │────▶│   MongoDB       │
-│   Frontend      │◀────│   Backend API   │◀────│   Database      │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │                     │
-              ┌─────▼─────┐         ┌─────▼─────┐
-              │   Redis   │         │  Docker   │
-              │   Queue   │         │  Scanners │
-              └───────────┘         └───────────┘
-                                         │
-                          ┌──────────────┼──────────────┐
-                          │              │              │
-                    ┌─────▼────┐  ┌─────▼────┐  ┌─────▼────┐
-                    │  Nuclei  │  │  HTTPx   │  │ Subfinder│
-                    └──────────┘  └──────────┘  └──────────┘
+## Architecture
+
+```mermaid
+flowchart LR
+    UI[Next.js dashboard<br/>localhost:3000] --> API[NestJS API<br/>localhost:4000]
+    API --> DB[(MongoDB)]
+    API --> MQ[(RabbitMQ)]
+    MQ --> W[Workers]
+    W --> S[Recon and scanner tools]
+    API --> H[Optional HexStrike AI]
 ```
 
-## 📋 Prerequisites
+The longer version of the system diagram is available in
+[`architecture.mermaid`](architecture.mermaid).
 
-- Docker & Docker Compose
-- Node.js 18+ (for local development)
-- API keys for external services (optional but recommended)
+## Quick start with Docker
 
-## 🚀 Quick Start
+### Requirements
 
-### 1. Clone and Setup
+- Docker Engine and Docker Compose v2
+- Node.js 18+ only when running services or scripts outside Docker
+- API keys for external providers are optional
+
+### Development environment
 
 ```bash
-# Clone the repository
-cd /path/to/project
-
-# Copy environment file
 cp env.sample .env
-
-# Edit .env with your API keys and configuration
-nano .env
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
-### 2. Configure API Keys
+Open the following URLs after the containers finish starting:
 
-Edit `.env` and add your API keys:
+- Dashboard: <http://localhost:3000>
+- API: <http://localhost:4000>
+- Swagger documentation: <http://localhost:4000/api/docs>
+- RabbitMQ management: <http://localhost:15672>
 
-```env
-# Required for full functionality
-SHODAN_API_KEY=your_shodan_key
-SECURITYTRAILS_API_KEY=your_securitytrails_key
-VIRUSTOTAL_API_KEY=your_virustotal_key
-
-# Optional but recommended
-CENSYS_API_ID=your_censys_id
-CENSYS_API_SECRET=your_censys_secret
-HUNTER_API_KEY=your_hunter_key
-
-# Notifications (optional)
-SLACK_WEBHOOK_URL=your_slack_webhook
-DISCORD_WEBHOOK_URL=your_discord_webhook
-```
-
-### 3. Start Services
+Create an administrator with credentials that are kept outside the repository:
 
 ```bash
-# Start all services
-docker-compose up -d
-
-# Check status
-docker-compose ps
-
-# View logs
-docker-compose logs -f backend
+docker compose -f docker-compose.dev.yml exec \
+  -e ADMIN_EMAIL=you@example.com \
+  -e ADMIN_PASSWORD='choose-a-long-password' \
+  backend npm run create-admin
 ```
 
-### 4. Access the Application
-
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:4000
-- **API Documentation**: http://localhost:4000/api/docs
-
-## 📖 Usage
-
-### Adding a Domain
-
-1. Navigate to **Dashboard** → **Domains**
-2. Click **Add Domain**
-3. Enter the target domain (e.g., `example.com`)
-4. Select a program or create one
-5. Enable **Auto Scan** for immediate scanning
-6. Click **Add Domain**
-
-### Starting a Scan
-
-1. Go to the domain's page
-2. Click **Start Scan**
-3. Select scan type:
-   - **Full Scan** - Complete reconnaissance
-   - **Subdomain Only** - Just subdomain enumeration
-   - **Port Scan** - Port scanning only
-   - **Nuclei Scan** - Vulnerability scanning
-4. Monitor progress in real-time
-
-### Viewing Results
-
-- **Subdomains**: View all discovered subdomains with status
-- **Vulnerabilities**: Filter by severity, status, type
-- **Endpoints**: Discovered URLs and API endpoints
-- **Reports**: Generate PDF/CSV reports
-
-## 🔧 Configuration
-
-### Scan Settings
-
-```typescript
-// Default scan configuration
-{
-  includeSubdomains: true,
-  includePorts: true,
-  includeNuclei: true,
-  includeScreenshots: true,
-  includeTechnologies: true,
-  threads: 25,
-  rateLimit: 100,
-  timeout: 10,
-}
-```
-
-### Nuclei Templates
-
-By default, scans use these template categories:
-- `cves/` - CVE exploits
-- `exposures/` - Information disclosure
-- `misconfiguration/` - Misconfigurations
-- `vulnerabilities/` - Common vulnerabilities
-- `default-logins/` - Default credentials
-- `takeovers/` - Subdomain takeover
-
-## 📡 API Reference
-
-### Authentication
+Useful commands:
 
 ```bash
-# Login
-POST /api/v1/auth/login
-{
-  "email": "user@example.com",
-  "password": "password"
-}
-
-# Register
-POST /api/v1/auth/register
-{
-  "email": "user@example.com",
-  "password": "password",
-  "name": "User Name"
-}
+make status
+make dev-logs
+make backend-logs
+make frontend-logs
+make dev-down
 ```
 
-### Domains
+The production compose file is `docker-compose.yml`. Set real MongoDB,
+RabbitMQ, JWT, and integration secrets in `.env` before using it.
+
+## Environment variables
+
+Copy [`env.sample`](env.sample) to `.env` and fill only the services you use.
+`.env` is ignored by Git. Never put bot tokens, API keys, passwords, or JWT
+secrets in source files, screenshots, shell history, or documentation.
+
+For the Telegram bot:
 
 ```bash
-# List domains
-GET /api/v1/domains
-
-# Add domain
-POST /api/v1/domains
-{
-  "domain": "example.com",
-  "programId": "program_id",
-  "autoScan": true
-}
-
-# Start scan
-POST /api/v1/domains/:id/scan
+export TELEGRAM_BOT_TOKEN='token-from-botfather'
+export TELEGRAM_CHAT_ID='your-chat-id'
+export PROXY_PORT=10808   # optional
+./start-telegram-bot.sh
 ```
 
-### Vulnerabilities
+## Main areas of the dashboard
+
+- `/dashboard` — current totals, system status, quick actions, and recent jobs
+- `/dashboard/programs` — programs, platform metadata, scopes, and rewards
+- `/dashboard/domains` — monitored domains and their scan history
+- `/dashboard/subdomains` — discovered assets and live-host filters
+- `/dashboard/scans` — scan execution and results
+- `/dashboard/vulnerabilities` — findings, severity, and status tracking
+- `/dashboard/cron` — scheduled reconnaissance jobs
+- `/dashboard/tools` — tool health, installation, configuration, and output
+- `/dashboard/hexstrike` — optional AI-assisted workflows
+- `/dashboard/reports` — report generation and exports
+- `/dashboard/checklist` — a practical hunting checklist stored locally in the browser
+
+## Repository layout
+
+```text
+backend/       NestJS API, workers, queues, and integrations
+frontend/      Next.js dashboard
+cli/           Command-line client
+hexstrike-ai/  Optional HexStrike AI service
+scripts/       Screenshot and Telegram bot utilities
+docker/        MongoDB initialization and validation scripts
+```
+
+## Local development without Docker
+
+Install dependencies in the service you are changing, then start the API and
+dashboard separately. MongoDB and RabbitMQ still need to be reachable.
 
 ```bash
-# List vulnerabilities
-GET /api/v1/vulnerabilities?severity=high&status=new
-
-# Update status
-PUT /api/v1/vulnerabilities/:id/status
-{
-  "status": "confirmed"
-}
+cd backend && npm install && npm run start:dev
+cd frontend && npm install && npm run dev
 ```
 
-Full API documentation available at `/api/docs` when running the backend.
-
-## 🔔 WebSocket Events
-
-Connect to `/ws` namespace for real-time updates:
-
-```javascript
-// Subscribe to scan updates
-socket.emit('subscribe:scan', { scanId: 'scan_id' });
-
-// Receive updates
-socket.on('scan:update', (data) => {
-  console.log(data.progress, data.currentStep);
-});
-
-// New vulnerability found
-socket.on('vulnerability:new', (data) => {
-  console.log('New vulnerability:', data.vulnerability);
-});
-```
-
-## 🐳 Docker Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| frontend | 3000 | Next.js web application |
-| backend | 4000 | NestJS API server |
-| mongodb | 27017 | MongoDB database |
-| redis | 6379 | Redis for job queue |
-| nuclei | - | Nuclei scanner |
-| httpx | - | HTTP prober |
-| subfinder | - | Subdomain finder |
-| naabu | - | Port scanner |
-
-## 🛠️ Development
-
-### Local Development
+## Verification
 
 ```bash
-# Backend
 cd backend
-npm install
-npm run start:dev
+npm test -- --runInBand
+npm run build
 
-# Frontend
-cd frontend
-npm install
-npm run dev
+cd ../frontend
+npm test -- --runInBand
+npx tsc --noEmit
+npm run build
 ```
 
-### Running Tests
+## Further reading
 
-```bash
-# Backend tests
-cd backend
-npm run test
-
-# Frontend tests
-cd frontend
-npm run test
-```
-
-## 📊 Dashboard Features
-
-- **Real-time Statistics** - Live vulnerability and scan metrics
-- **Activity Timeline** - Recent scans and findings
-- **Severity Distribution** - Visual breakdown of vulnerabilities
-- **Quick Actions** - One-click scan initiation
-- **Search** - Global search across all assets
-
-## 🔐 Security Considerations
-
-- All API endpoints require authentication
-- Passwords are hashed with bcrypt
-- JWT tokens with refresh token rotation
-- Rate limiting on all endpoints
-- Input validation on all requests
-- CORS properly configured
-
-## 📝 License
-
-MIT License - Feel free to use for your bug bounty activities!
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines.
-
-## 📧 Support
-
-For issues and feature requests, please open a GitHub issue.
-
----
-
-**Happy Bug Hunting! 🐛🔍**
-
+- [راهنمای فارسی](README-FA.md)
+- [راهنمای سریع](QUICK-START.md)
+- [نقشه‌ی معماری](architecture.mermaid)
+- [مجوز MIT](LICENSE)

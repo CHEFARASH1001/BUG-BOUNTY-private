@@ -41,16 +41,16 @@ export function ResponsiveActionButton({
   const isMobile = useIsMobile();
 
   const variantStyles = {
-    default: 'text-slate-400 hover:text-white hover:bg-dark-700',
+    default: 'text-[#8e8e93] hover:text-white hover:bg-[#2c2c2e]',
     primary: 'text-primary-400 hover:text-primary-300 hover:bg-primary-500/20',
-    danger: 'text-red-400 hover:text-red-300 hover:bg-red-500/20',
-    success: 'text-green-400 hover:text-green-300 hover:bg-green-500/20',
-    ghost: 'text-slate-400 hover:text-white',
+    danger: 'text-[#ff453a] hover:text-[#ff6961] hover:bg-[#ff453a]/20',
+    success: 'text-[#30d158] hover:text-[#4ade80] hover:bg-[#30d158]/20',
+    ghost: 'text-[#8e8e93] hover:text-white',
   };
 
   const sizeStyles = {
-    sm: 'p-1.5',
-    md: 'p-2',
+    sm: 'p-2',
+    md: 'p-2.5',
     lg: 'p-3',
   };
 
@@ -61,12 +61,14 @@ export function ResponsiveActionButton({
       aria-label={label}
       title={tooltip || label}
       className={cn(
-        // Base styles
-        'inline-flex items-center justify-center gap-2 rounded-lg transition-colors',
+        // Base styles - iOS style
+        'inline-flex items-center justify-center gap-2 rounded-xl transition-all',
         // Touch target: minimum 44x44px
         'min-h-[44px] min-w-[44px]',
         // Touch manipulation to prevent double-tap zoom
         'touch-manipulation',
+        // iOS-style active state
+        'active:scale-[0.97] active:opacity-90',
         // Variant styles
         variantStyles[variant],
         // Size styles

@@ -1,0 +1,50 @@
+<svg width="1600" height="720" viewBox="0 0 1600 720" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="720" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#05070D"/>
+      <stop offset="0.55" stop-color="#08151A"/>
+      <stop offset="1" stop-color="#020307"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="390" y1="160" x2="1310" y2="570" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21F38A" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#19C7FF" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="42"/>
+    </filter>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
+      <path d="M48 0H0V48" stroke="#21F38A" stroke-opacity="0.08"/>
+    </pattern>
+  </defs>
+
+  <rect width="1600" height="720" rx="34" fill="url(#bg)"/>
+  <rect x="28" y="28" width="1544" height="664" rx="24" stroke="#21F38A" stroke-opacity="0.22"/>
+  <rect width="1600" height="720" rx="34" fill="url(#grid)"/>
+  <ellipse cx="1130" cy="320" rx="420" ry="270" fill="url(#glow)" filter="url(#blur)"/>
+
+  <g opacity="0.7" font-family="monospace" font-size="18" fill="#21F38A">
+    <text x="1120" y="116">[ reconnaissance / automation / signal ]</text>
+    <text x="1120" y="148" fill="#6E8290">scope mapped</text>
+    <text x="1120" y="180" fill="#6E8290">workers online</text>
+    <text x="1120" y="212" fill="#6E8290">findings queued</text>
+    <circle cx="1092" cy="110" r="5" fill="#21F38A"/>
+    <circle cx="1092" cy="142" r="5" fill="#19C7FF"/>
+    <circle cx="1092" cy="174" r="5" fill="#FFB84D"/>
+  </g>
+
+  <g font-family="monospace">
+    <text x="120" y="210" font-size="30" letter-spacing="8" fill="#21F38A">BB.AUTO</text>
+    <text x="120" y="330" font-size="92" font-weight="700" letter-spacing="-3" fill="#F4F7F8">Bug Bounty</text>
+    <text x="120" y="432" font-size="92" font-weight="700" letter-spacing="-3" fill="#21F38A">Automation</text>
+    <text x="126" y="500" font-size="24" letter-spacing="2" fill="#93A6B1">MAP THE SURFACE. RUN THE WORK. KEEP THE SIGNAL.</text>
+  </g>
+
+  <g transform="translate(120 574)" font-family="monospace" font-size="18">
+    <rect width="310" height="54" rx="12" fill="#0E2524" stroke="#21F38A" stroke-opacity="0.45"/>
+    <circle cx="26" cy="27" r="6" fill="#21F38A"/>
+    <text x="48" y="34" fill="#D8FFF0">self-hosted security workspace</text>
+  </g>
+
+  <path d="M970 586H1460" stroke="#21F38A" stroke-opacity="0.35" stroke-dasharray="8 12"/>
+  <path d="M1372 586L1460 586L1416 542" stroke="#21F38A" stroke-opacity="0.55" stroke-width="2"/>
+</svg>

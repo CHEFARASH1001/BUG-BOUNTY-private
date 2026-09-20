@@ -33,7 +33,7 @@ export interface PredefinedTool {
 /**
  * Predefined list of security tools for bulk import
  * Requirements: 7.1
- * 
+ *
  * This list contains 26 well-known security reconnaissance and scanning tools
  * that are commonly used in bug bounty and security research workflows.
  */
@@ -333,6 +333,18 @@ export const PREDEFINED_TOOLS: PredefinedTool[] = [
     installCommands: [
       { method: 'pip', command: 'pip install --break-system-packages wafw00f' },
       { method: 'apt', command: 'sudo apt install -y wafw00f' },
+    ],
+  },
+  {
+    name: 'dalfox',
+    displayName: 'Dalfox',
+    description: 'Parameter Analysis and XSS Scanning tool - fast and powerful XSS scanner',
+    githubUrl: 'https://github.com/hahwul/dalfox',
+    categories: [ToolCategory.VULNERABILITY_SCANNING, ToolCategory.EXPLOITATION],
+    binaryName: 'dalfox',
+    installCommands: [
+      { method: 'go', command: 'go install github.com/hahwul/dalfox/v2@latest' },
+      { method: 'brew', command: 'brew install dalfox' },
     ],
   },
 

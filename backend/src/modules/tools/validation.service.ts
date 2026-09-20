@@ -33,9 +33,8 @@ export interface RepoMetrics {
 
 // Minimum star threshold for tool legitimacy
 const MIN_STARS_THRESHOLD = 100;
-// Maximum months since last commit for tool to be considered active
-// Set to 120 months (10 years) to allow stable, mature tools that don't need frequent updates
-const MAX_INACTIVE_MONTHS = 120;
+// Maximum months since last commit for a tool to be considered active.
+const MAX_INACTIVE_MONTHS = 12;
 
 @Injectable()
 export class ValidationService {
@@ -44,7 +43,7 @@ export class ValidationService {
   /**
    * Validates a GitHub URL and extracts owner/repo components.
    * Valid format: https://github.com/{owner}/{repo}
-   * 
+   *
    * @param url - The GitHub URL to validate
    * @returns GitHubUrlParseResult with parsed components or error reason
    */
@@ -57,12 +56,12 @@ export class ValidationService {
     }
 
     const trimmedUrl = url.trim();
-    
+
     // Pattern: https://github.com/{owner}/{repo} with optional trailing slash or .git
     const githubPattern = /^https:\/\/github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38})\/([a-zA-Z0-9._-]+?)(?:\.git)?(?:\/)?$/;
-    
+
     const match = trimmedUrl.match(githubPattern);
-    
+
     if (!match) {
       return {
         valid: false,
@@ -84,7 +83,7 @@ export class ValidationService {
 
   /**
    * Fetches repository metrics from GitHub API.
-   * 
+   *
    * @param owner - Repository owner
    * @param repo - Repository name
    * @returns RepoMetrics or throws error on failure
@@ -140,7 +139,7 @@ export class ValidationService {
    * Criteria:
    * - At least 100 stars
    * - Active within the last 12 months
-   * 
+   *
    * @param metrics - Repository metrics to evaluate
    * @returns ValidationResult with validity and reason if invalid
    */
@@ -176,7 +175,7 @@ export class ValidationService {
   /**
    * Validates a GitHub repository URL and checks legitimacy.
    * This is the main validation entry point.
-   * 
+   *
    * @param url - GitHub repository URL
    * @returns ValidationResult with full validation status
    */

@@ -48,7 +48,7 @@ const maxWidthClasses: Record<string, string> = {
 /**
  * Responsive modal component that displays full-screen on mobile
  * and centered with configurable max-width on desktop.
- * 
+ *
  * Features:
  * - Full-screen on mobile (< 768px)
  * - Centered modal on desktop with configurable max-width
@@ -145,7 +145,7 @@ export function ResponsiveModal({
         exit: { opacity: 0 },
       };
     }
-    
+
     if (isMobile) {
       return {
         initial: { y: '100%' },
@@ -153,7 +153,7 @@ export function ResponsiveModal({
         exit: { y: '100%' },
       };
     }
-    
+
     return {
       initial: { opacity: 0, scale: 0.95 },
       animate: { opacity: 1, scale: 1 },
@@ -165,15 +165,15 @@ export function ResponsiveModal({
     if (prefersReducedMotion) {
       return { duration: 0.01 };
     }
-    
+
     if (isMobile) {
-      return { 
-        type: 'spring', 
-        damping: animationConfig.springConfig.damping, 
-        stiffness: animationConfig.springConfig.stiffness 
+      return {
+        type: 'spring',
+        damping: animationConfig.springConfig.damping,
+        stiffness: animationConfig.springConfig.stiffness
       };
     }
-    
+
     return { duration: animationConfig.fadeConfig.duration };
   };
 
@@ -184,13 +184,13 @@ export function ResponsiveModal({
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
+          {/* Backdrop - iOS style */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: prefersReducedMotion ? 0.01 : animationConfig.fadeConfig.duration }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50"
+            transition={{ duration: prefersReducedMotion ? 0.01 : 0.25 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
             onClick={handleBackdropClick}
             aria-hidden="true"
             data-testid={`${testId}-backdrop`}
@@ -200,15 +200,13 @@ export function ResponsiveModal({
           <div
             className={clsx(
               'fixed inset-0 z-50 flex',
-              // Mobile: full screen with small padding
               'p-0 md:p-4',
-              // Desktop: center the modal
               'md:items-center md:justify-center'
             )}
             onClick={handleBackdropClick}
             data-testid={`${testId}-container`}
           >
-            {/* Modal */}
+            {/* Modal - iOS style */}
             <motion.div
               ref={modalRef}
               initial={modalVariants.initial}
@@ -216,11 +214,9 @@ export function ResponsiveModal({
               exit={modalVariants.exit}
               transition={modalTransition}
               className={clsx(
-                'bg-dark-900 border border-dark-700 overflow-hidden flex flex-col',
-                // Mobile: full screen
+                'bg-[#2c2c2e] overflow-hidden flex flex-col',
                 'w-full h-full',
-                // Desktop: centered with max dimensions
-                'md:w-full md:h-auto md:max-h-[90vh] md:rounded-xl',
+                'md:w-full md:h-auto md:max-h-[90vh] md:rounded-2xl md:shadow-ios-xl',
                 maxWidthClasses[maxWidth],
                 className
               )}
@@ -231,12 +227,12 @@ export function ResponsiveModal({
               tabIndex={-1}
               data-testid={testId}
             >
-              {/* Header */}
+              {/* Header - iOS style */}
               {(title || showCloseButton) && (
-                <div className="flex items-center justify-between p-4 border-b border-dark-800 shrink-0">
+                <div className="flex items-center justify-between p-4 border-b border-[rgba(84,84,88,0.65)] shrink-0">
                   <div className="flex items-center gap-3">
                     {icon && (
-                      <div className="p-2 bg-primary-500/20 rounded-lg shrink-0">
+                      <div className="p-2.5 bg-primary-500/20 rounded-xl shrink-0">
                         {icon}
                       </div>
                     )}
@@ -244,12 +240,12 @@ export function ResponsiveModal({
                       <div>
                         <h2
                           id={`${testId}-title`}
-                          className="text-lg font-semibold text-white"
+                          className="text-[17px] font-semibold text-white"
                         >
                           {title}
                         </h2>
                         {subtitle && (
-                          <p className="text-sm text-slate-400">{subtitle}</p>
+                          <p className="text-[13px] text-[#8e8e93]">{subtitle}</p>
                         )}
                       </div>
                     )}
@@ -258,8 +254,7 @@ export function ResponsiveModal({
                     <button
                       onClick={onClose}
                       className={clsx(
-                        'p-2 text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors',
-                        // Ensure 44x44px minimum touch target
+                        'p-2 text-[#8e8e93] hover:text-white hover:bg-[#3c3c3e] rounded-xl transition-colors',
                         'min-w-[44px] min-h-[44px] flex items-center justify-center',
                         'touch-manipulation'
                       )}
@@ -281,10 +276,10 @@ export function ResponsiveModal({
                 {children}
               </div>
 
-              {/* Footer */}
+              {/* Footer - iOS style */}
               {footer && (
                 <div
-                  className="p-4 border-t border-dark-800 shrink-0"
+                  className="p-4 border-t border-[rgba(84,84,88,0.65)] shrink-0"
                   data-testid={`${testId}-footer`}
                 >
                   {footer}

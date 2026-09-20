@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # MongoDB Database
   mongodb:
@@ -149,15 +147,15 @@ services:
       - bb-network
 
   # Katana - Web Crawling/Spidering Tool
-  katana:
-    image: projectdiscovery/katana:latest
-    container_name: bb-katana
-    restart: unless-stopped
-    entrypoint: ["tail", "-f", "/dev/null"]
-    volumes:
-      - scan_results:/results
-    networks:
-      - bb-network
+  # katana:
+  #   image: projectdiscovery/katana:latest
+  #   container_name: bb-katana
+  #   restart: unless-stopped
+  #   entrypoint: ["tail", "-f", "/dev/null"]
+  #   volumes:
+  #     - scan_results:/results
+  #   networks:
+  #     - bb-network
 
   # HexStrike AI - AI-Powered Penetration Testing Framework
   #hexstrike-ai:
@@ -195,7 +193,10 @@ services:
     restart: unless-stopped
     environment:
       NODE_ENV: development
+      # Client-side API URL (browser -> host -> backend container)
       NEXT_PUBLIC_API_URL: http://localhost:4000/api/v1
+      # Server-side API URL (frontend container -> backend container via Docker network)
+      API_URL: http://backend:4000/api/v1
       NEXTAUTH_URL: http://localhost:3000
       NEXTAUTH_SECRET: dev-nextauth-secret
     ports:
@@ -221,4 +222,5 @@ volumes:
 
 networks:
   bb-network:
+    name: bb-network
     driver: bridge

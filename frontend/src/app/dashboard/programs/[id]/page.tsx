@@ -152,7 +152,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
       try {
         setLoading(true);
         setError(null);
-        
+
         // Fetch all data in parallel
         const [programRes, statsRes, domainsRes, vulnsRes, scopesRes] = await Promise.all([
           programsApi.getById(params.id),
@@ -207,10 +207,10 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
   // Separate in-scope and out-of-scope (after null check)
   const inScopeItems = scopes.filter(s => s.status === 'in_scope');
   const outOfScopeItems = scopes.filter(s => s.status === 'out_of_scope');
-  
+
   // Also include program.scope array (string array) if scopes collection is empty
-  const allInScope = inScopeItems.length > 0 
-    ? inScopeItems 
+  const allInScope: Scope[] = inScopeItems.length > 0
+    ? inScopeItems
     : (program?.scope || []).map((item, index) => ({
         _id: `in-scope-${index}`,
         target: item,
@@ -218,10 +218,10 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
         status: 'in_scope' as const,
         description: undefined,
       }));
-  
+
   // Also include program.outOfScope array (string array) if scopes collection is empty
-  const allOutOfScope = outOfScopeItems.length > 0 
-    ? outOfScopeItems 
+  const allOutOfScope = outOfScopeItems.length > 0
+    ? outOfScopeItems
     : (program?.outOfScope || []).map((item, index) => ({
         _id: `out-of-scope-${index}`,
         target: item,
@@ -251,9 +251,9 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
               <h1 className="text-2xl font-bold text-white">{program.name}</h1>
               <span className={cn(
                 'px-2 py-1 rounded text-xs',
-                program.status === 'active' || program.status === 'open' 
-                  ? 'bg-green-500/20 text-green-400' 
-                  : program.status === 'paused' 
+                program.status === 'active' || program.status === 'open'
+                  ? 'bg-green-500/20 text-green-400'
+                  : program.status === 'paused'
                   ? 'bg-yellow-500/20 text-yellow-400'
                   : 'bg-slate-500/20 text-slate-400'
               )}>
@@ -536,7 +536,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
                   </div>
                 )}
               </div>
-              
+
               <div className="pt-4 border-t border-dark-700">
                 <h4 className="text-sm font-medium text-slate-300 mb-3">Recent Vulnerabilities</h4>
                 {vulnerabilities.length === 0 ? (
@@ -720,7 +720,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
               <CheckCircle className="w-5 h-5 text-green-400" />
               In Scope ({allInScope.length > 0 ? allInScope.length : domains.length})
             </h3>
-            
+
             {/* Show scopes if available, otherwise show domains */}
             {allInScope.length > 0 ? (
               <div className="space-y-2 max-h-[500px] overflow-y-auto">
@@ -775,7 +775,7 @@ export default function ProgramDetailPage({ params }: { params: { id: string } }
               <XCircle className="w-5 h-5 text-red-400" />
               Out of Scope ({allOutOfScope.length})
             </h3>
-            
+
             {allOutOfScope.length > 0 ? (
               <div className="space-y-2 max-h-[500px] overflow-y-auto">
                 {allOutOfScope.map((scope) => (

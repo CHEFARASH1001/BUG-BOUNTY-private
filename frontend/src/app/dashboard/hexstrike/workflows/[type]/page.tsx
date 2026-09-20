@@ -107,10 +107,10 @@ interface Finding {
 
 
 // Workflow type configuration
-const workflowConfig: Record<WorkflowType, { 
-  label: string; 
-  icon: typeof Zap; 
-  color: string; 
+const workflowConfig: Record<WorkflowType, {
+  label: string;
+  icon: typeof Zap;
+  color: string;
   bg: string;
 }> = {
   reconnaissance: { label: 'Reconnaissance', icon: Search, color: 'text-blue-400', bg: 'bg-blue-500/20' },
@@ -174,7 +174,7 @@ export default function WorkflowExecutionPage() {
   // Execute a specific tool
   const handleRunTool = async (toolName: string) => {
     if (!target.trim()) return;
-    
+
     setRunningTools((prev) => new Set(prev).add(toolName));
     setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] 🔧 Running ${toolName} on ${target}...`]);
     setActiveTab('logs');
@@ -187,19 +187,19 @@ export default function WorkflowExecutionPage() {
 
       const result = response.data;
       setToolResults((prev) => ({ ...prev, [toolName]: result }));
-      
+
       // HexStrike AI returns stdout/stderr, not output
       const output = result.stdout || result.output || '';
       const errorOutput = result.stderr || '';
-      
+
       if (output) {
         const outputLines = output.split('\n').slice(0, 20); // First 20 lines
         setLogs((prev) => [
           ...prev,
           `[${new Date().toLocaleTimeString()}] ✅ ${toolName} completed`,
           ...outputLines.map((line: string) => `   ${line}`),
-          outputLines.length < output.split('\n').length 
-            ? `   ... (${output.split('\n').length - 20} more lines)` 
+          outputLines.length < output.split('\n').length
+            ? `   ... (${output.split('\n').length - 20} more lines)`
             : '',
         ].filter(Boolean));
       } else if (result.error || errorOutput) {
@@ -310,17 +310,17 @@ export default function WorkflowExecutionPage() {
 
         setExecution((prev) => {
           if (!prev) return prev;
-          
-          const newStatus: WorkflowStatus = 
+
+          const newStatus: WorkflowStatus =
             process.process?.status === 'terminated' ? 'cancelled' :
             process.process?.status === 'completed' ? 'completed' :
-            process.process?.status === 'failed' ? 'failed' : 
+            process.process?.status === 'failed' ? 'failed' :
             process.process?.status === 'running' ? 'running' : prev.status;
 
           // Generate mock steps progress for visualization
           const totalSteps = prev.totalSteps || 5;
           let currentStep = prev.currentStep;
-          
+
           if (newStatus === 'running' && currentStep < totalSteps) {
             currentStep = Math.min(currentStep + 1, totalSteps);
           } else if (newStatus === 'completed') {
@@ -341,8 +341,8 @@ export default function WorkflowExecutionPage() {
             status: newStatus,
             currentStep,
             steps: updatedSteps,
-            endTime: ['completed', 'failed', 'cancelled'].includes(newStatus) 
-              ? new Date().toISOString() 
+            endTime: ['completed', 'failed', 'cancelled'].includes(newStatus)
+              ? new Date().toISOString()
               : prev.endTime,
           };
         });
@@ -370,7 +370,7 @@ export default function WorkflowExecutionPage() {
   const executeToolsFromAssessment = async (assessment: any, targetDomain: string) => {
     // Collect all unique tools from the assessment
     const toolsToRun: { tool: string; priority: number }[] = [];
-    
+
     // Get tools from vulnerability tests (highest priority)
     if (assessment.vulnerability_hunting?.vulnerability_tests) {
       assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
@@ -429,8 +429,8 @@ export default function WorkflowExecutionPage() {
           const stepIdx = prev.steps.findIndex(s => s.tool === tool);
           if (stepIdx >= 0) {
             const updatedSteps = [...prev.steps];
-            updatedSteps[stepIdx] = { 
-              ...updatedSteps[stepIdx], 
+            updatedSteps[stepIdx] = {
+              ...updatedSteps[stepIdx],
               status: 'completed' as StepStatus,
               output: result.stdout || result.output || result.error || 'Completed',
               results: result
@@ -443,7 +443,7 @@ export default function WorkflowExecutionPage() {
         // HexStrike AI returns stdout/stderr, not output
         const output = result.stdout || result.output || '';
         const errorOutput = result.stderr || '';
-        
+
         if (output) {
           const outputLines = output.split('\n').filter((l: string) => l.trim()).slice(0, 10);
           setLogs((prev) => [
@@ -462,15 +462,15 @@ export default function WorkflowExecutionPage() {
       } catch (err: any) {
         const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message;
         setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ❌ ${tool} failed: ${errorMsg}`]);
-        
+
         // Update step as failed
         setExecution((prev) => {
           if (!prev) return prev;
           const stepIdx = prev.steps.findIndex(s => s.tool === tool);
           if (stepIdx >= 0) {
             const updatedSteps = [...prev.steps];
-            updatedSteps[stepIdx] = { 
-              ...updatedSteps[stepIdx], 
+            updatedSteps[stepIdx] = {
+              ...updatedSteps[stepIdx],
               status: 'failed' as StepStatus,
               error: errorMsg
             };
@@ -521,7 +521,7 @@ export default function WorkflowExecutionPage() {
       // Log the assessment results
       const assessment = response.data.assessment || response.data;
       setAssessmentData(assessment);
-      
+
       // Collect tools from assessment for steps
       const toolsFromAssessment: string[] = [];
       if (assessment.vulnerability_hunting?.vulnerability_tests) {
@@ -535,10 +535,10 @@ export default function WorkflowExecutionPage() {
           }
         });
       }
-      
+
       // Use assessment tools or fallback to workflow required tools
-      const toolsToUse = toolsFromAssessment.length > 0 
-        ? toolsFromAssessment.slice(0, 5) 
+      const toolsToUse = toolsFromAssessment.length > 0
+        ? toolsFromAssessment.slice(0, 5)
         : (workflow?.requiredTools || ['nmap', 'nuclei', 'ffuf']);
 
       // Initialize execution state with real steps
@@ -563,7 +563,7 @@ export default function WorkflowExecutionPage() {
       };
 
       setExecution(newExecution);
-      
+
       setLogs((prev) => [
         ...prev,
         `[${new Date().toLocaleTimeString()}] ✅ Assessment completed for ${target.trim()}`,
@@ -577,7 +577,7 @@ export default function WorkflowExecutionPage() {
         `[${new Date().toLocaleTimeString()}] 🕵️ OSINT phases: ${assessment.osint?.osint_phases?.length || 0}`,
         `[${new Date().toLocaleTimeString()}] 💼 Business logic tests: ${assessment.business_logic?.business_logic_tests?.length || 0}`,
       ]);
-      
+
       // Log detailed vulnerability tests
       if (assessment.vulnerability_hunting?.vulnerability_tests) {
         assessment.vulnerability_hunting.vulnerability_tests.forEach((test: any) => {
@@ -672,7 +672,7 @@ export default function WorkflowExecutionPage() {
       if (result.output && result.output.trim()) {
         // Parse output for potential findings
         const output = result.output;
-        
+
         // Check for vulnerability indicators in output
         const vulnPatterns = [
           { pattern: /critical|CRITICAL/gi, severity: 'critical' as const },
@@ -727,7 +727,7 @@ export default function WorkflowExecutionPage() {
     // Generate recommendations based on results
     if (Object.keys(toolResults).length > 0) {
       recommendations.push('Review the tool outputs for potential vulnerabilities');
-      
+
       const failedTools = execution.steps.filter(s => s.status === 'failed');
       if (failedTools.length > 0) {
         recommendations.push(`Retry failed tools: ${failedTools.map(s => s.tool).join(', ')}`);
@@ -757,7 +757,7 @@ export default function WorkflowExecutionPage() {
       totalSteps: execution.totalSteps,
       findings,
       recommendations,
-      summary: toolsExecuted > 0 
+      summary: toolsExecuted > 0
         ? `Executed ${toolsExecuted} tools on ${execution.target}. ${toolsWithOutput} tools returned output. ${findings.length} findings identified.`
         : `Assessment completed for ${execution.target}. Identified ${findings.length} vulnerability categories to test with ${assessmentData?.summary?.total_tools || 0} tools.`,
     };
@@ -768,7 +768,7 @@ export default function WorkflowExecutionPage() {
     const colors = severityColors[finding.severity] || severityColors.info;
     const tools = finding.tool.split(', ').filter(t => t && t !== 'N/A');
     const hasEvidence = finding.evidence && finding.evidence.trim();
-    
+
     return (
       <div key={index} className={cn('p-4 rounded-lg border', colors.bg, colors.border)}>
         <div className="flex items-start justify-between mb-2">
@@ -778,7 +778,7 @@ export default function WorkflowExecutionPage() {
           </span>
         </div>
         <p className="text-sm text-slate-400 mb-2">{finding.description}</p>
-        
+
         {/* Show evidence/output if available */}
         {hasEvidence && (
           <div className="mt-3 p-2 bg-dark-900/50 rounded text-xs">
@@ -789,7 +789,7 @@ export default function WorkflowExecutionPage() {
             </pre>
           </div>
         )}
-        
+
         <div className="flex items-center justify-between mt-2">
           <div className="flex items-center gap-2 text-xs text-slate-500">
             <Wrench className="w-3.5 h-3.5" />
@@ -951,7 +951,7 @@ export default function WorkflowExecutionPage() {
                   }
                 }}
                 placeholder="e.g., example.com, 192.168.1.0/24"
-                disabled={execution && ['running', 'paused'].includes(execution.status)}
+                disabled={Boolean(execution && ['running', 'paused'].includes(execution.status))}
                 className={cn(
                   'w-full px-4 py-2.5 bg-dark-800 border rounded-lg text-white placeholder-slate-500 focus:outline-none transition-colors disabled:opacity-50',
                   validationErrors.target ? 'border-red-500/50 focus:border-red-500' : 'border-dark-700 focus:border-primary-500/50'
@@ -969,7 +969,7 @@ export default function WorkflowExecutionPage() {
               <select
                 value={options.depth}
                 onChange={(e) => setOptions((prev) => ({ ...prev, depth: e.target.value }))}
-                disabled={execution && ['running', 'paused'].includes(execution.status)}
+                disabled={Boolean(execution && ['running', 'paused'].includes(execution.status))}
                 className="w-full px-4 py-2.5 bg-dark-800 border border-dark-700 rounded-lg text-white focus:outline-none focus:border-primary-500/50 transition-colors disabled:opacity-50"
               >
                 <option value="quick">Quick - Fast surface scan</option>
@@ -987,7 +987,7 @@ export default function WorkflowExecutionPage() {
                 onChange={(e) => setOptions((prev) => ({ ...prev, threads: parseInt(e.target.value) || 10 }))}
                 min={1}
                 max={100}
-                disabled={execution && ['running', 'paused'].includes(execution.status)}
+                disabled={Boolean(execution && ['running', 'paused'].includes(execution.status))}
                 className="w-full px-4 py-2.5 bg-dark-800 border border-dark-700 rounded-lg text-white focus:outline-none focus:border-primary-500/50 transition-colors disabled:opacity-50"
               />
             </div>
@@ -1008,10 +1008,10 @@ export default function WorkflowExecutionPage() {
             <div className="pt-4">
               <button
                 onClick={handleStart}
-                disabled={executing || (execution && ['running', 'paused'].includes(execution.status))}
+                disabled={executing || Boolean(execution && ['running', 'paused'].includes(execution.status))}
                 className={cn(
                   'w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-sm font-medium transition-colors',
-                  executing || (execution && ['running', 'paused'].includes(execution.status))
+                  executing || Boolean(execution && ['running', 'paused'].includes(execution.status))
                     ? 'bg-dark-700 text-slate-500 cursor-not-allowed'
                     : 'bg-primary-500 hover:bg-primary-600 text-white'
                 )}
@@ -1169,7 +1169,7 @@ export default function WorkflowExecutionPage() {
                       {idx < execution.steps.length - 1 && (
                         <div className="absolute left-5 top-10 w-0.5 h-6 bg-dark-700" />
                       )}
-                      
+
                       <button
                         onClick={() => toggleStep(step.id)}
                         className={cn(

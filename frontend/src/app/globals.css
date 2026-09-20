@@ -1,228 +1,391 @@
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+/* iOS-style System Font Stack */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /**
- * Theme System CSS Variables
- * These variables are dynamically updated by the ThemeProvider
- * Default values match the cyberpunk theme
- * 
- * Requirements: 3.1, 3.3
+ * iOS Theme System CSS Variables
+ * Clean, minimal design with the existing color scheme
  */
 :root {
-  /* Primary accent colors */
+  /* Primary accent colors - keeping the green theme */
   --accent-primary: #22c55e;
   --accent-primary-hover: #16a34a;
-  
+
   /* Secondary accent colors */
   --accent-secondary: #00f5ff;
   --accent-tertiary: #a855f7;
   --accent-quaternary: #ec4899;
-  
-  /* Background colors */
-  --bg-primary: #0a0a0f;
-  --bg-card: #111118;
-  --bg-hover: #1a1a24;
-  
-  /* Border and effect colors */
-  --border-primary: #1e293b;
+
+  /* iOS-style dark backgrounds */
+  --bg-primary: #000000;
+  --bg-card: #1c1c1e;
+  --bg-hover: #2c2c2e;
+  --bg-elevated: #2c2c2e;
+  --bg-grouped: #1c1c1e;
+
+  /* iOS-style borders */
+  --border-primary: #38383a;
+  --border-secondary: #48484a;
   --glow-color: #22c55e;
-  
-  /* Scrollbar colors - Requirements: 5.5, 6.3 */
-  --scrollbar-thumb: #22c55e;
-  --scrollbar-thumb-hover: #16a34a;
-  
-  /* Grid pattern color - Requirements: 6.4 */
+
+  /* Scrollbar colors */
+  --scrollbar-thumb: rgba(255, 255, 255, 0.3);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.5);
+
+  /* Grid pattern color */
   --grid-pattern-color: #22c55e;
-  
-  /* Legacy variable aliases for backward compatibility */
-  --accent-cyan: var(--accent-secondary);
-  --accent-green: var(--accent-primary);
-  --accent-purple: var(--accent-tertiary);
-  --accent-pink: var(--accent-quaternary);
-  --dark-bg: var(--bg-primary);
-  --dark-card: var(--bg-card);
-  --dark-border: var(--border-primary);
+
+  /* iOS-style text colors */
+  --text-primary: #ffffff;
+  --text-secondary: #8e8e93;
+  --text-tertiary: #636366;
+
+  /* iOS-style separator */
+  --separator-color: rgba(84, 84, 88, 0.65);
 }
 
 /**
- * Scrollbar Styling - Requirements: 5.5, 6.3
- * Uses CSS variables for theme-aware scrollbar colors
+ * iOS-style Scrollbar
  */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--bg-primary);
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 *::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 *::-webkit-scrollbar-track {
-  background: var(--bg-primary);
+  background: transparent;
 }
 
 *::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 4px;
+  border-radius: 10px;
 }
 
 *::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
 
+/**
+ * Base Styles - iOS Typography
+ */
 body {
   background-color: var(--bg-primary);
-  color: #e2e8f0;
-  font-family: 'JetBrains Mono', monospace;
-  /* Mobile-first typography: ensure minimum 14px body text */
-  font-size: 14px;
-  line-height: 1.5;
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Helvetica Neue', sans-serif;
+  font-size: 15px;
+  line-height: 1.47;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: -0.01em;
 }
 
-/* Responsive Typography - Mobile First */
+/* iOS-style Typography */
 @layer base {
-  /* Headings with minimum sizes for mobile */
   h1 {
-    font-size: 1.5rem; /* 24px minimum on mobile */
-    line-height: 1.3;
+    font-size: 28px;
     font-weight: 700;
+    line-height: 1.14;
+    letter-spacing: 0.007em;
   }
-  
+
   h2 {
-    font-size: 1.25rem; /* 20px minimum on mobile */
-    line-height: 1.35;
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 700;
+    line-height: 1.18;
+    letter-spacing: 0.016em;
   }
-  
+
   h3 {
-    font-size: 1.125rem; /* 18px minimum on mobile */
-    line-height: 1.4;
+    font-size: 20px;
     font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: 0.012em;
   }
-  
-  /* Scale up headings on larger screens */
+
   @media (min-width: 640px) {
-    h1 {
-      font-size: 1.875rem; /* 30px */
-    }
-    
-    h2 {
-      font-size: 1.5rem; /* 24px */
-    }
-    
-    h3 {
-      font-size: 1.25rem; /* 20px */
-    }
+    h1 { font-size: 34px; }
+    h2 { font-size: 28px; }
+    h3 { font-size: 22px; }
   }
-  
-  @media (min-width: 1024px) {
-    h1 {
-      font-size: 2.25rem; /* 36px */
-    }
-    
-    h2 {
-      font-size: 1.875rem; /* 30px */
-    }
-    
-    h3 {
-      font-size: 1.5rem; /* 24px */
-    }
-  }
-  
-  /* Body text with proper line height for readability */
+
   p, li, span, div {
-    line-height: 1.5;
+    line-height: 1.47;
   }
-  
-  /* Ensure minimum font sizes for small text */
+
   small, .text-xs {
-    font-size: max(12px, 0.75rem);
+    font-size: 12px;
+    letter-spacing: 0;
   }
-  
+
   .text-sm {
-    font-size: max(14px, 0.875rem);
+    font-size: 13px;
+    letter-spacing: -0.008em;
   }
 }
 
 /**
- * Custom utility classes with theme-aware CSS variables
- * Requirements: 6.1, 6.2, 6.3, 6.4
+ * iOS-style Utility Classes
  */
 @layer utilities {
-  /* Responsive spacing utilities for mobile-first design */
+  /* Responsive spacing */
   .responsive-spacing {
     @apply space-y-4 sm:space-y-5 md:space-y-6;
   }
-  
+
   .responsive-gap {
     @apply gap-3 sm:gap-4 md:gap-6;
   }
-  
+
   .responsive-padding {
-    @apply p-3 sm:p-4 md:p-5;
-  }
-  
-  .responsive-padding-lg {
     @apply p-4 sm:p-5 md:p-6;
   }
 
-  .text-glow {
-    text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+  /* iOS Card Styles */
+  .ios-card {
+    background: var(--bg-card);
+    border-radius: 12px;
+    border: none;
+    box-shadow: 0 0 0 0.5px rgba(255, 255, 255, 0.1);
   }
 
-  /* Glow effects using CSS variables - Requirements: 5.4, 6.2 */
-  .border-glow {
-    box-shadow: 0 0 5px var(--glow-color), inset 0 0 5px color-mix(in srgb, var(--glow-color) 10%, transparent);
+  .ios-card-elevated {
+    background: var(--bg-elevated);
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.32), 0 0 0 0.5px rgba(255, 255, 255, 0.08);
   }
 
-  .card-glow {
-    box-shadow: 0 0 20px color-mix(in srgb, var(--glow-color) 10%, transparent);
+  .ios-card-grouped {
+    background: var(--bg-grouped);
+    border-radius: 10px;
+    margin: 0 16px;
   }
 
-  /* Grid pattern using CSS variable - Requirements: 6.4 */
-  .bg-grid {
-    background-image: linear-gradient(color-mix(in srgb, var(--grid-pattern-color) 3%, transparent) 1px, transparent 1px),
-                      linear-gradient(90deg, color-mix(in srgb, var(--grid-pattern-color) 3%, transparent) 1px, transparent 1px);
-    background-size: 40px 40px;
+  /* iOS Button Styles */
+  .ios-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 12px 20px;
+    font-size: 17px;
+    font-weight: 600;
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
   }
 
-  /* Glass effect using theme variables */
+  .ios-button-primary {
+    background: var(--accent-primary);
+    color: white;
+  }
+
+  .ios-button-primary:hover {
+    background: var(--accent-primary-hover);
+    transform: scale(0.98);
+  }
+
+  .ios-button-primary:active {
+    transform: scale(0.95);
+  }
+
+  .ios-button-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--accent-primary);
+  }
+
+  .ios-button-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+  }
+
+  /* iOS List Styles */
+  .ios-list {
+    background: var(--bg-card);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .ios-list-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    min-height: 44px;
+    border-bottom: 0.5px solid var(--separator-color);
+    transition: background 0.15s ease;
+  }
+
+  .ios-list-item:last-child {
+    border-bottom: none;
+  }
+
+  .ios-list-item:active {
+    background: var(--bg-hover);
+  }
+
+  /* iOS Input Styles */
+  .ios-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 17px;
+    background: var(--bg-elevated);
+    border: none;
+    border-radius: 10px;
+    color: var(--text-primary);
+    outline: none;
+    transition: box-shadow 0.2s ease;
+  }
+
+  .ios-input:focus {
+    box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.3);
+  }
+
+  .ios-input::placeholder {
+    color: var(--text-tertiary);
+  }
+
+  /* iOS Segmented Control */
+  .ios-segmented {
+    display: inline-flex;
+    background: rgba(118, 118, 128, 0.24);
+    border-radius: 9px;
+    padding: 2px;
+  }
+
+  .ios-segmented-item {
+    padding: 6px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 7px;
+    color: var(--text-primary);
+    transition: all 0.2s ease;
+  }
+
+  .ios-segmented-item.active {
+    background: var(--bg-elevated);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  }
+
+  /* iOS Navigation Bar */
+  .ios-navbar {
+    background: rgba(28, 28, 30, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--separator-color);
+  }
+
+  /* iOS Tab Bar */
+  .ios-tabbar {
+    background: rgba(28, 28, 30, 0.88);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid var(--separator-color);
+  }
+
+  /* iOS Modal/Sheet */
+  .ios-sheet {
+    background: var(--bg-elevated);
+    border-radius: 12px 12px 0 0;
+    box-shadow: 0 -2px 20px rgba(0, 0, 0, 0.3);
+  }
+
+  .ios-modal {
+    background: var(--bg-elevated);
+    border-radius: 14px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+  }
+
+  /* iOS Badge */
+  .ios-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 10px;
+    background: #ff3b30;
+    color: white;
+  }
+
+  /* iOS Toggle/Switch */
+  .ios-toggle {
+    width: 51px;
+    height: 31px;
+    background: rgba(120, 120, 128, 0.32);
+    border-radius: 16px;
+    position: relative;
+    transition: background 0.2s ease;
+    cursor: pointer;
+  }
+
+  .ios-toggle.active {
+    background: var(--accent-primary);
+  }
+
+  .ios-toggle::after {
+    content: '';
+    position: absolute;
+    width: 27px;
+    height: 27px;
+    background: white;
+    border-radius: 50%;
+    top: 2px;
+    left: 2px;
+    transition: transform 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  }
+
+  .ios-toggle.active::after {
+    transform: translateX(20px);
+  }
+
+  /* Glass effect */
   .glass {
-    background: color-mix(in srgb, var(--bg-card) 80%, transparent);
-    backdrop-filter: blur(10px);
-    border: 1px solid color-mix(in srgb, var(--accent-primary) 20%, transparent);
+    background: rgba(28, 28, 30, 0.72);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 0.5px solid rgba(255, 255, 255, 0.1);
   }
 
-  /* Cyber border using theme variables - Requirements: 6.1 */
-  .cyber-border {
-    border: 1px solid transparent;
-    background: linear-gradient(var(--bg-card), var(--bg-card)) padding-box,
-                linear-gradient(135deg, var(--accent-primary), transparent, var(--accent-secondary)) border-box;
+  /* Subtle glow for accent elements */
+  .ios-glow {
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.2);
+  }
+
+  /* iOS-style separator */
+  .ios-separator {
+    height: 0.5px;
+    background: var(--separator-color);
+    margin-left: 16px;
   }
 }
 
-/* Severity colors */
-.severity-critical { color: #dc3545; }
-.severity-high { color: #fd7e14; }
-.severity-medium { color: #ffc107; }
-.severity-low { color: #28a745; }
-.severity-info { color: #17a2b8; }
+/* Severity colors - iOS style */
+.severity-critical { color: #ff453a; }
+.severity-high { color: #ff9f0a; }
+.severity-medium { color: #ffd60a; }
+.severity-low { color: #30d158; }
+.severity-info { color: #64d2ff; }
 
-.bg-severity-critical { background-color: rgba(220, 53, 69, 0.2); border-color: #dc3545; }
-.bg-severity-high { background-color: rgba(253, 126, 20, 0.2); border-color: #fd7e14; }
-.bg-severity-medium { background-color: rgba(255, 193, 7, 0.2); border-color: #ffc107; }
-.bg-severity-low { background-color: rgba(40, 167, 69, 0.2); border-color: #28a745; }
-.bg-severity-info { background-color: rgba(23, 162, 184, 0.2); border-color: #17a2b8; }
+.bg-severity-critical { background-color: rgba(255, 69, 58, 0.15); }
+.bg-severity-high { background-color: rgba(255, 159, 10, 0.15); }
+.bg-severity-medium { background-color: rgba(255, 214, 10, 0.15); }
+.bg-severity-low { background-color: rgba(48, 209, 88, 0.15); }
+.bg-severity-info { background-color: rgba(100, 210, 255, 0.15); }
 
-/* Animations */
-@keyframes slideIn {
+/* iOS-style Animations */
+@keyframes iosSlideIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(10px);
   }
   to {
     opacity: 1;
@@ -230,261 +393,132 @@ body {
   }
 }
 
-@keyframes fadeIn {
+@keyframes iosFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-@keyframes scanline {
-  0% { top: 0%; }
-  100% { top: 100%; }
+@keyframes iosScale {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
 }
 
-.animate-slideIn {
-  animation: slideIn 0.3s ease-out forwards;
+@keyframes iosSheetSlide {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out forwards;
+.animate-ios-slide {
+  animation: iosSlideIn 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
-/* Terminal effect */
-.terminal-cursor::after {
-  content: '█';
-  animation: blink 1s step-end infinite;
+.animate-ios-fade {
+  animation: iosFadeIn 0.25s ease-out forwards;
 }
 
-@keyframes blink {
-  50% { opacity: 0; }
+.animate-ios-scale {
+  animation: iosScale 0.3s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
-/* Code/data display */
-.code-block {
-  background: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 0.875rem;
-  overflow-x: auto;
+.animate-ios-sheet {
+  animation: iosSheetSlide 0.35s cubic-bezier(0.32, 0.72, 0, 1) forwards;
 }
 
-/* Interactive elements */
-.hover-lift {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
-}
-
-/* Status indicators - using theme-aware colors */
+/* Status indicators - iOS style */
 .status-dot {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
   display: inline-block;
 }
 
-.status-dot.online { background-color: var(--accent-primary); box-shadow: 0 0 10px var(--accent-primary); }
-.status-dot.offline { background-color: #ef4444; }
-.status-dot.pending { background-color: #f59e0b; animation: pulse 2s infinite; }
-.status-dot.scanning { background-color: #3b82f6; animation: pulse 1s infinite; }
+.status-dot.online {
+  background-color: #30d158;
+  box-shadow: 0 0 8px rgba(48, 209, 88, 0.5);
+}
+.status-dot.offline { background-color: #ff453a; }
+.status-dot.pending {
+  background-color: #ff9f0a;
+  animation: pulse 2s infinite;
+}
+.status-dot.scanning {
+  background-color: #0a84ff;
+  animation: pulse 1s infinite;
+}
 
-/* Touch Interaction Improvements */
-/* Task 14.1: Active states for touch feedback */
+/* Touch Interaction - iOS style */
 @layer utilities {
-  /* Touch-friendly active states for interactive elements */
   .touch-active {
-    @apply active:scale-[0.98] active:opacity-80;
+    @apply active:scale-[0.97] active:opacity-90;
     transition: transform 0.1s ease, opacity 0.1s ease;
   }
-  
-  /* More subtle active state for buttons */
+
   .touch-active-subtle {
-    @apply active:bg-opacity-80 active:brightness-95;
-    transition: background-color 0.1s ease, filter 0.1s ease;
+    @apply active:bg-opacity-80;
+    transition: background-color 0.1s ease;
   }
 }
 
-/* Global active states for common interactive elements */
+/* iOS-style press states */
 button:not(:disabled):active,
 a:active,
 [role="button"]:not(:disabled):active {
-  transform: scale(0.98);
+  transform: scale(0.97);
   opacity: 0.9;
 }
 
-/* Task 14.2: Prevent double-tap zoom on interactive elements */
-/* Apply touch-action: manipulation to all interactive elements */
-button,
-a,
-input,
-select,
-textarea,
-[role="button"],
-[role="link"],
+/* Prevent double-tap zoom */
+button, a, input, select, textarea,
+[role="button"], [role="link"],
 [tabindex]:not([tabindex="-1"]),
 .touch-manipulation {
   touch-action: manipulation;
 }
 
-/* Task 14.3: Enable smooth momentum scrolling */
-/* Apply smooth scrolling behavior */
+/* Smooth scrolling */
 html {
   scroll-behavior: smooth;
 }
 
-/* Momentum scrolling for scrollable containers */
-.scroll-smooth {
-  scroll-behavior: smooth;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Apply momentum scrolling to common scrollable elements */
+/* Momentum scrolling */
+.scroll-smooth,
 [data-scroll-container],
 .overflow-y-auto,
 .overflow-x-auto,
 .overflow-auto,
-nav,
-aside {
+nav, aside {
   -webkit-overflow-scrolling: touch;
 }
 
-/* Task 16.1: Reduce animations on mobile for better performance */
-/* Shorten animation durations on mobile devices */
+/* Mobile optimizations */
 @media (max-width: 767px) {
-  /* Reduce transition durations on mobile */
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.15s !important;
+  *, *::before, *::after {
+    transition-duration: 0.2s !important;
   }
-  
-  /* Shorten animation durations */
-  .animate-slideIn {
-    animation-duration: 0.2s;
-  }
-  
-  .animate-fadeIn {
-    animation-duration: 0.15s;
-  }
-  
-  /* Disable non-essential decorative animations on mobile */
-  .animate-pulse-slow,
-  .animate-glow,
-  .animate-scan {
-    animation: none !important;
-  }
-  
-  /* Reduce hover-lift effect on mobile */
-  .hover-lift {
-    transition-duration: 0.15s !important;
-  }
-  
-  .hover-lift:hover {
-    transform: translateY(-1px);
-  }
-  
-  /* Simplify status dot animations */
-  .status-dot.pending,
-  .status-dot.scanning {
-    animation-duration: 3s;
-  }
-  
-  /* Reduce terminal cursor blink frequency */
-  .terminal-cursor::after {
-    animation-duration: 1.5s;
-  }
-  
-  /* Disable text glow effects on mobile for performance */
-  .text-glow {
-    text-shadow: none;
-  }
-  
-  /* Simplify border glow on mobile */
-  .border-glow {
-    box-shadow: 0 0 3px var(--accent-green);
-  }
-  
-  /* Reduce card glow intensity */
-  .card-glow {
-    box-shadow: 0 0 10px rgba(34, 197, 94, 0.05);
-  }
+
+  .animate-ios-slide { animation-duration: 0.25s; }
+  .animate-ios-fade { animation-duration: 0.15s; }
 }
 
-/* Task 16.2: Respect prefers-reduced-motion preference */
-/* Disable all non-essential animations when user prefers reduced motion */
+/* Reduced motion preference */
 @media (prefers-reduced-motion: reduce) {
-  /* Disable smooth scrolling */
-  html {
-    scroll-behavior: auto;
-  }
-  
-  /* Disable all animations and transitions globally */
-  *,
-  *::before,
-  *::after {
+  html { scroll-behavior: auto; }
+
+  *, *::before, *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-  
-  /* Disable active state transforms */
+
   button:not(:disabled):active,
   a:active,
   [role="button"]:not(:disabled):active {
     transform: none;
   }
-  
-  .touch-active {
-    transform: none !important;
-  }
-  
-  /* Disable all custom animations */
-  .animate-slideIn,
-  .animate-fadeIn,
-  .animate-pulse-slow,
-  .animate-glow,
-  .animate-scan {
-    animation: none !important;
-  }
-  
-  /* Disable hover effects that involve motion */
-  .hover-lift:hover {
-    transform: none;
-  }
-  
-  /* Disable status dot animations */
-  .status-dot.pending,
-  .status-dot.scanning {
-    animation: none !important;
-  }
-  
-  /* Disable terminal cursor blink */
-  .terminal-cursor::after {
-    animation: none !important;
-    opacity: 1;
-  }
-  
-  /* Disable glow effects (they can be distracting) */
-  .text-glow {
-    text-shadow: none;
-  }
-  
-  .border-glow {
-    box-shadow: none;
-  }
-  
-  .card-glow {
-    box-shadow: none;
-  }
-  
-  /* Ensure backdrop-filter doesn't cause issues */
-  .glass {
-    backdrop-filter: none;
-  }
+
+  .touch-active { transform: none !important; }
+  .glass { backdrop-filter: none; }
 }
 
 /* Scrollbar hide utility */
@@ -497,3 +531,127 @@ aside {
   display: none;
 }
 
+/* Code block styling */
+.code-block {
+  background: var(--bg-elevated);
+  border: 0.5px solid var(--separator-color);
+  border-radius: 10px;
+  font-family: 'SF Mono', Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+/* iOS-style hover lift */
+.hover-lift {
+  transition: transform 0.2s cubic-bezier(0.32, 0.72, 0, 1),
+              box-shadow 0.2s cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Legacy compatibility classes */
+.text-glow { text-shadow: 0 0 10px currentColor; }
+.border-glow { box-shadow: 0 0 10px rgba(34, 197, 94, 0.3); }
+.card-glow { box-shadow: 0 0 20px rgba(34, 197, 94, 0.1); }
+.cyber-border {
+  border: 0.5px solid var(--separator-color);
+  border-radius: 12px;
+}
+.bg-grid {
+  background-image: none;
+}
+
+/* Snowy theme effects container */
+.snowy-theme-effects { display: none; }
+[data-theme="snowy"] .snowy-theme-effects,
+.theme-snowy .snowy-theme-effects { display: block; }
+
+/* Snowflakes */
+.snowflakes {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 9998;
+  overflow: hidden;
+}
+
+@keyframes snowfall {
+  0% { transform: translateY(-10vh) translateX(0); opacity: 1; }
+  100% { transform: translateY(110vh) translateX(20px); opacity: 0.3; }
+}
+
+@keyframes snowfall-drift {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(15px); }
+}
+
+.snowflake {
+  position: absolute;
+  top: -20px;
+  color: #fff;
+  font-size: 1rem;
+  text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);
+  animation: snowfall linear infinite, snowfall-drift ease-in-out infinite;
+  opacity: 0.8;
+}
+
+.snowflake:nth-child(1) { left: 5%; animation-duration: 8s, 3s; font-size: 0.8rem; animation-delay: 0s; }
+.snowflake:nth-child(2) { left: 15%; animation-duration: 12s, 4s; font-size: 1.2rem; animation-delay: 1s; }
+.snowflake:nth-child(3) { left: 25%; animation-duration: 10s, 3.5s; font-size: 0.9rem; animation-delay: 2s; }
+.snowflake:nth-child(4) { left: 35%; animation-duration: 14s, 4.5s; font-size: 1.1rem; animation-delay: 0.5s; }
+.snowflake:nth-child(5) { left: 45%; animation-duration: 9s, 3s; font-size: 0.7rem; animation-delay: 3s; }
+.snowflake:nth-child(6) { left: 55%; animation-duration: 11s, 3.8s; font-size: 1rem; animation-delay: 1.5s; }
+.snowflake:nth-child(7) { left: 65%; animation-duration: 13s, 4.2s; font-size: 1.3rem; animation-delay: 2.5s; }
+.snowflake:nth-child(8) { left: 75%; animation-duration: 8.5s, 3.2s; font-size: 0.85rem; animation-delay: 4s; }
+.snowflake:nth-child(9) { left: 85%; animation-duration: 10.5s, 3.6s; font-size: 1.15rem; animation-delay: 0.8s; }
+.snowflake:nth-child(10) { left: 95%; animation-duration: 12.5s, 4s; font-size: 0.95rem; animation-delay: 3.5s; }
+
+/* Santa animation */
+.santa-container {
+  position: fixed;
+  top: 60px;
+  left: 0;
+  width: 100%;
+  height: 80px;
+  pointer-events: none;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+@keyframes santa-fly {
+  0% { transform: translateX(-200px) translateY(0); }
+  25% { transform: translateX(25vw) translateY(-15px); }
+  50% { transform: translateX(50vw) translateY(5px); }
+  75% { transform: translateX(75vw) translateY(-10px); }
+  100% { transform: translateX(calc(100vw + 200px)) translateY(0); }
+}
+
+.santa-sleigh {
+  position: absolute;
+  left: -200px;
+  top: 20px;
+  animation: santa-fly 20s linear infinite;
+  font-size: 2rem;
+  filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.5));
+  white-space: nowrap;
+}
+
+.santa-sleigh::before { content: "🦌🦌"; margin-right: 5px; font-size: 1.8rem; }
+.santa-sleigh::after { content: "🎅🛷"; font-size: 2rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .snowflake, .santa-sleigh { animation: none !important; display: none; }
+}
+
+@media (max-width: 767px) {
+  .snowflake:nth-child(n+6) { display: none; }
+  .santa-sleigh { animation-duration: 15s; font-size: 1.5rem; }
+  .santa-sleigh::before { font-size: 1.3rem; }
+  .santa-sleigh::after { font-size: 1.5rem; }
+}

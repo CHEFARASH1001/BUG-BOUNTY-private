@@ -177,10 +177,10 @@ export class ToolsController {
   ): Promise<ToolExecutionDocument[]> {
     // Verify tool exists
     await this.toolsService.findById(id);
-    
+
     const startDate = query.startDate ? new Date(query.startDate) : undefined;
     const endDate = query.endDate ? new Date(query.endDate) : undefined;
-    
+
     return this.executorService.getExecutionHistory(
       id,
       query.limit || 10,
@@ -297,5 +297,16 @@ export class ToolsController {
   @ApiResponse({ status: 200, description: 'Installation status refreshed' })
   async refreshStatus(): Promise<{ installed: number; notInstalled: number; tools: Array<{ name: string; isInstalled: boolean; version?: string }> }> {
     return this.toolsService.refreshInstallationStatus();
+  }
+
+  /**
+   * POST /api/tools/self-heal - Check and auto-fix all tools (reinstall missing ones)
+   */
+  @Post('self-heal')
+  @Public()
+  @ApiOperation({ summary: 'Self-heal: check all tools and automatically reinstall any that are missing' })
+  @ApiResponse({ status: 200, description: 'Self-heal completed' })
+  async selfHeal(): Promise<{ checked: number; healthy: number; repaired: number; failed: string[] }> {
+    return this.toolsService.selfHeal();
   }
 }

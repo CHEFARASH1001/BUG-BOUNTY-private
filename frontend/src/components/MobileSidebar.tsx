@@ -104,36 +104,36 @@ export function MobileSidebar({
             data-testid="mobile-sidebar-backdrop"
           />
 
-          {/* Sidebar */}
+          {/* Sidebar - iOS style */}
           <motion.aside
             ref={sidebarRef}
             initial={sidebarVariants.initial}
             animate={sidebarVariants.animate}
             exit={sidebarVariants.exit}
             transition={sidebarTransition}
-            className="fixed left-0 top-0 h-full w-[280px] max-w-[85vw] bg-dark-900 border-r border-dark-800 z-50 flex flex-col md:hidden"
+            className="fixed left-0 top-0 h-full w-[280px] max-w-[85vw] bg-[#1c1c1e]/95 backdrop-blur-[20px] border-r border-[rgba(84,84,88,0.65)] z-50 flex flex-col md:hidden"
             role="dialog"
             aria-modal="true"
             aria-label="Mobile navigation"
             data-testid="mobile-sidebar"
           >
-            {/* Header with logo and close button */}
-            <div className="p-4 border-b border-dark-800 flex items-center justify-between">
-              <Link 
-                href="/dashboard" 
+            {/* Header with logo and close button - iOS style */}
+            <div className="p-4 border-b border-[rgba(84,84,88,0.65)] flex items-center justify-between">
+              <Link
+                href="/dashboard"
                 className="flex items-center gap-3"
                 onClick={handleNavClick}
               >
-                <div className="p-2 bg-primary-500/20 rounded-lg border border-primary-500/30 shrink-0">
+                <div className="p-2.5 bg-primary-500/20 rounded-xl shrink-0">
                   <Terminal className="w-5 h-5 text-primary-400" />
                 </div>
-                <span className="font-display text-lg font-bold text-primary-400 tracking-wide">
-                  BB<span className="text-accent-cyan">.</span>AUTO
+                <span className="text-lg font-semibold text-white tracking-tight">
+                  BB<span className="text-primary-400">.</span>AUTO
                 </span>
               </Link>
               <button
                 onClick={onClose}
-                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-slate-400 hover:text-white hover:bg-dark-800 rounded-lg transition-colors touch-manipulation"
+                className="p-2 min-w-[44px] min-h-[44px] flex items-center justify-center text-[#8e8e93] hover:text-white hover:bg-[#2c2c2e] rounded-xl transition-colors touch-manipulation"
                 aria-label="Close navigation menu"
                 data-testid="mobile-sidebar-close"
               >
@@ -141,95 +141,97 @@ export function MobileSidebar({
               </button>
             </div>
 
-            {/* Navigation */}
+            {/* Navigation - iOS style */}
             <div className="flex-1 flex flex-col overflow-hidden">
               <nav className="flex-1 p-3 space-y-1 overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
                 {navigation.map((item) => {
-                  const isActive = pathname === item.href || 
+                  const isActive = pathname === item.href ||
                     (item.href !== '/dashboard' && pathname.startsWith(item.href));
-                  
+
                   return (
                     <Link
                       key={item.name}
                       href={item.href}
                       onClick={handleNavClick}
                       className={clsx(
-                        'flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg transition-all group touch-manipulation',
+                        'flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-xl transition-all group touch-manipulation',
                         isActive
-                          ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                          : 'text-slate-400 hover:bg-dark-800 hover:text-white active:bg-dark-700'
+                          ? 'bg-primary-500/20 text-primary-400'
+                          : 'text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-white active:bg-[#3c3c3e]'
                       )}
                     >
                       <item.icon className={clsx(
                         'w-5 h-5 shrink-0',
-                        isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                        isActive ? 'text-primary-400' : 'text-[#8e8e93] group-hover:text-white'
                       )} />
-                      <span className="text-sm font-medium">{item.name}</span>
+                      <span className="text-[15px] font-medium">{item.name}</span>
                     </Link>
                   );
                 })}
               </nav>
-              
-              {/* Documents Section */}
-              <div className="p-3 border-t border-dark-800 shrink-0">
+
+              {/* Documents Section - iOS style */}
+              {documentsSection.items.length > 0 && (
+              <div className="p-3 border-t border-[rgba(84,84,88,0.65)] shrink-0">
                 <button
                   onClick={() => setDocumentsExpanded(!documentsExpanded)}
                   className={clsx(
-                    'w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg transition-all group touch-manipulation',
+                    'w-full flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-xl transition-all group touch-manipulation',
                     isDocumentsActive
-                      ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                      : 'text-slate-400 hover:bg-dark-800 hover:text-white active:bg-dark-700'
+                      ? 'bg-primary-500/20 text-primary-400'
+                      : 'text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-white active:bg-[#3c3c3e]'
                   )}
                 >
                   <documentsSection.icon className={clsx(
                     'w-5 h-5 shrink-0',
-                    isDocumentsActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                    isDocumentsActive ? 'text-primary-400' : 'text-[#8e8e93] group-hover:text-white'
                   )} />
-                  <span className="text-sm font-medium flex-1 text-left">{documentsSection.name}</span>
+                  <span className="text-[15px] font-medium flex-1 text-left">{documentsSection.name}</span>
                   <motion.div
                     animate={{ rotate: documentsExpanded ? 180 : 0 }}
-                    transition={{ duration: prefersReducedMotion ? 0.01 : animationConfig.fadeConfig.duration }}
+                    transition={{ duration: prefersReducedMotion ? 0.01 : 0.25, ease: [0.32, 0.72, 0, 1] }}
                   >
                     <ChevronDown className="w-4 h-4 shrink-0" />
                   </motion.div>
                 </button>
-                
+
                 <motion.div
                   initial={false}
-                  animate={{ 
+                  animate={{
                     height: documentsExpanded ? 'auto' : 0,
                     opacity: documentsExpanded ? 1 : 0
                   }}
-                  transition={{ duration: prefersReducedMotion ? 0.01 : animationConfig.fadeConfig.duration }}
+                  transition={{ duration: prefersReducedMotion ? 0.01 : 0.25, ease: [0.32, 0.72, 0, 1] }}
                   className="overflow-hidden"
                 >
-                  <div className="mt-1 ml-4 space-y-1 pl-4 border-l border-dark-700">
+                  <div className="mt-1 ml-4 space-y-1 pl-4 border-l border-[rgba(84,84,88,0.65)]">
                     {documentsSection.items.map((item) => {
                       const isActive = pathname === item.href || pathname.startsWith(item.href);
-                      
+
                       return (
                         <Link
                           key={item.name}
                           href={item.href}
                           onClick={handleNavClick}
                           className={clsx(
-                            'flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-lg transition-all group touch-manipulation',
+                            'flex items-center gap-3 px-3 py-3 min-h-[44px] rounded-xl transition-all group touch-manipulation',
                             isActive
-                              ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                              : 'text-slate-400 hover:bg-dark-800 hover:text-white active:bg-dark-700'
+                              ? 'bg-primary-500/20 text-primary-400'
+                              : 'text-[#8e8e93] hover:bg-[#2c2c2e] hover:text-white active:bg-[#3c3c3e]'
                           )}
                         >
                           <item.icon className={clsx(
                             'w-4 h-4 shrink-0',
-                            isActive ? 'text-primary-400' : 'text-slate-500 group-hover:text-white'
+                            isActive ? 'text-primary-400' : 'text-[#8e8e93] group-hover:text-white'
                           )} />
-                          <span className="text-sm font-medium">{item.name}</span>
+                          <span className="text-[15px] font-medium">{item.name}</span>
                         </Link>
                       );
                     })}
                   </div>
                 </motion.div>
               </div>
+              )}
             </div>
           </motion.aside>
         </>

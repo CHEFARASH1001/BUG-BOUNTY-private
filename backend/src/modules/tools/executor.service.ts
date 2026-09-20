@@ -63,9 +63,9 @@ export class ExecutorService {
 
   /**
    * Checks if a tool binary exists in PATH or in its Docker container.
-   * 
+   *
    * Requirements: 3.1, 3.2
-   * 
+   *
    * @param toolName - The name of the tool
    * @param binaryName - Optional binary name (defaults to toolName)
    * @param containerName - Optional Docker container name for containerized tools
@@ -73,7 +73,7 @@ export class ExecutorService {
    */
   async isInstalled(toolName: string, binaryName?: string, containerName?: string): Promise<boolean> {
     const binary = binaryName || toolName;
-    
+
     // If containerized, check if the container exists and tool is available
     if (containerName) {
       try {
@@ -83,7 +83,7 @@ export class ExecutorService {
         return false;
       }
     }
-    
+
     try {
       // Use 'which' on Unix-like systems, 'where' on Windows
       // Include common tool installation paths in PATH
@@ -105,9 +105,9 @@ export class ExecutorService {
 
   /**
    * Gets the installed version of a tool.
-   * 
+   *
    * Requirements: 3.1, 3.2
-   * 
+   *
    * @param toolName - The name of the tool
    * @param binaryName - Optional binary name (defaults to toolName)
    * @param containerName - Optional Docker container name for containerized tools
@@ -115,7 +115,7 @@ export class ExecutorService {
    */
   async getVersion(toolName: string, binaryName?: string, containerName?: string): Promise<string | null> {
     const binary = binaryName || toolName;
-    
+
     // Check if installed first
     const installed = await this.isInstalled(toolName, binaryName, containerName);
     if (!installed) {
@@ -124,17 +124,17 @@ export class ExecutorService {
 
     // Try common version flags
     const versionFlags = ['--version', '-version', '-v', 'version'];
-    
+
     for (const flag of versionFlags) {
       try {
-        const command = containerName 
+        const command = containerName
           ? `docker exec ${containerName} ${binary} ${flag}`
           : `${binary} ${flag}`;
-        const output = execSync(command, { 
+        const output = execSync(command, {
           stdio: 'pipe',
           timeout: 5000, // 5 second timeout
         }).toString().trim();
-        
+
         // Extract version number from output
         const version = this.extractVersion(output);
         if (version) {
@@ -153,7 +153,7 @@ export class ExecutorService {
   /**
    * Extracts version number from command output.
    * Handles various version formats like "v1.2.3", "1.2.3", "version 1.2.3", etc.
-   * 
+   *
    * @param output - Command output string
    * @returns Extracted version string or null
    */
@@ -178,9 +178,9 @@ export class ExecutorService {
 
   /**
    * Gets the full installation status of a tool.
-   * 
+   *
    * Requirements: 3.1, 3.2, 3.3
-   * 
+   *
    * @param tool - The tool document
    * @param latestVersion - Optional latest version for comparison
    * @returns Promise<ToolStatus> - Complete installation status
@@ -189,7 +189,7 @@ export class ExecutorService {
     const binaryName = tool.installation?.binaryName || tool.name;
     const containerName = tool.installation?.containerName;
     const isInstalled = await this.isInstalled(tool.name, binaryName, containerName);
-    
+
     if (!isInstalled) {
       return {
         isInstalled: false,
@@ -199,7 +199,7 @@ export class ExecutorService {
     }
 
     const version = await this.getVersion(tool.name, binaryName, containerName);
-    
+
     // Check for updates if we have both versions
     let hasUpdate = false;
     if (version && latestVersion && version !== 'unknown') {
@@ -216,9 +216,9 @@ export class ExecutorService {
 
   /**
    * Compares two semantic version strings.
-   * 
+   *
    * Requirements: 3.3
-   * 
+   *
    * @param installed - Installed version string
    * @param latest - Latest version string
    * @returns -1 if installed < latest, 0 if equal, 1 if installed > latest
@@ -226,13 +226,13 @@ export class ExecutorService {
   compareVersions(installed: string, latest: string): number {
     // Normalize versions by removing 'v' prefix
     const normalizeVersion = (v: string) => v.replace(/^v/, '');
-    
+
     const installedParts = normalizeVersion(installed).split('.').map(p => {
       // Handle versions like "1.2.3-beta" by taking only the numeric part
       const num = parseInt(p.split('-')[0], 10);
       return isNaN(num) ? 0 : num;
     });
-    
+
     const latestParts = normalizeVersion(latest).split('.').map(p => {
       const num = parseInt(p.split('-')[0], 10);
       return isNaN(num) ? 0 : num;
@@ -253,10 +253,48 @@ export class ExecutorService {
   }
 
   /**
+   * Tools that read input from stdin instead of command-line arguments.
+   * For these tools, the first argument (usually a URL/domain) is piped via stdin.
+   */
+  private readonly stdinTools = new Set([
+    'hakrawler',
+    'gau',
+    'waybackurls',
+    'kxss',
+    'qsreplace',
+    'unfurl',
+    'gf',
+    'uro',
+    'httpx',
+    'dnsx',
+    'nuclei',
+  ]);
+
+  /**
+   * Tools that require a specific flag before the target argument.
+   * Maps tool name to the flag that should precede the target.
+   */
+  private readonly targetFlagTools: Record<string, string> = {
+    'findomain': '-t',
+    'subfinder': '-d',
+    'katana': '-u',
+    'dirsearch': '-u',
+    'arjun': '-u',
+    'ffuf': '-u',
+    'feroxbuster': '-u',
+    'sqlmap': '-u',
+    'amass': '-d',
+    'shuffledns': '-d',
+  };
+
+  /** Default timeout for tool execution (5 minutes) */
+  private readonly DEFAULT_EXECUTION_TIMEOUT = 300000;
+
+  /**
    * Executes a tool with the given arguments.
-   * 
+   *
    * Requirements: 4.1, 4.2, 4.3
-   * 
+   *
    * @param tool - The tool to execute
    * @param args - Command line arguments
    * @param options - Execution options
@@ -270,7 +308,7 @@ export class ExecutorService {
   ): Promise<ToolExecutionDocument> {
     const binaryName = tool.installation?.binaryName || tool.name;
     const containerName = tool.installation?.containerName;
-    
+
     // Requirement 4.1: Validate tool is installed before proceeding
     const isInstalled = await this.isInstalled(tool.name, binaryName, containerName);
     if (!isInstalled) {
@@ -297,12 +335,60 @@ export class ExecutorService {
 
     const startTime = Date.now();
 
-    // Determine if we should run via docker exec or directly
-    if (containerName) {
-      return this.executeInContainer(execution, containerName, binaryName, args, options, startTime);
+    // For stdin-based tools, extract the target from args and pipe it via stdin
+    let stdinInput: string | undefined;
+    let effectiveArgs = args;
+    if (this.stdinTools.has(tool.name)) {
+      // If it's a help request, don't treat as stdin tool — just run with no args
+      // Most stdin tools print usage when run without stdin input
+      const isHelpRequest = args.length === 1 && (args[0] === '-h' || args[0] === '--help' || args[0] === '-help');
+      if (isHelpRequest) {
+        // Run with no args — stdin tools typically print usage when no input is provided
+        effectiveArgs = [];
+      } else {
+        // First arg is typically the target URL/domain to pipe via stdin
+        // Other args (flags) remain as command args
+        const targetArgs: string[] = [];
+        const flagArgs: string[] = [];
+        for (const arg of args) {
+          if (arg.startsWith('-')) {
+            flagArgs.push(arg);
+          } else {
+            targetArgs.push(arg);
+          }
+        }
+        if (targetArgs.length > 0) {
+          stdinInput = targetArgs.join('\n');
+          effectiveArgs = flagArgs;
+        }
+      }
     }
 
-    return this.executeDirectly(execution, binaryName, args, options, startTime);
+    // For tools that require a specific flag before the target (e.g. findomain -t, subfinder -d)
+    // If the first arg looks like a target (not a flag), prepend the required flag
+    const targetFlag = this.targetFlagTools[tool.name];
+    if (targetFlag && !this.stdinTools.has(tool.name) && effectiveArgs.length > 0) {
+      const firstArg = effectiveArgs[0];
+      if (firstArg && !firstArg.startsWith('-')) {
+        // Check if the flag is already present
+        if (!effectiveArgs.includes(targetFlag)) {
+          effectiveArgs = [targetFlag, ...effectiveArgs];
+        }
+      }
+    }
+
+    // Determine if we should run via docker exec or directly
+    // Apply default timeout if none specified
+    const effectiveOptions = {
+      ...options,
+      timeout: options?.timeout || this.DEFAULT_EXECUTION_TIMEOUT,
+    };
+
+    if (containerName) {
+      return this.executeInContainer(execution, containerName, binaryName, effectiveArgs, effectiveOptions, startTime, stdinInput);
+    }
+
+    return this.executeDirectly(execution, binaryName, effectiveArgs, effectiveOptions, startTime, stdinInput);
   }
 
   /**
@@ -314,24 +400,33 @@ export class ExecutorService {
     args: string[],
     options: ExecuteOptions | undefined,
     startTime: number,
+    stdinInput?: string,
   ): Promise<ToolExecutionDocument> {
     return new Promise((resolve) => {
       const childProcess = spawn(binaryName, args, {
         cwd: options?.workingDir,
-        env: { ...process.env, ...options?.env },
+        env: { ...process.env, ...options?.env, PYTHONWARNINGS: 'ignore' },
         shell: '/bin/sh',
       });
 
+      // Write stdin input for stdin-based tools
+      if (stdinInput && childProcess.stdin) {
+        childProcess.stdin.write(stdinInput + '\n');
+        childProcess.stdin.end();
+      }
+
       let stdout = '';
       let stderr = '';
+      let timedOut = false;
       let timeoutId: NodeJS.Timeout | undefined;
 
       // Set up timeout if specified
       if (options?.timeout) {
         timeoutId = setTimeout(() => {
+          timedOut = true;
           childProcess.kill('SIGTERM');
-          execution.status = ExecutionStatus.FAILED;
-          execution.errorMessage = `Tool execution timed out after ${options.timeout}ms`;
+          // Force kill after 5s if SIGTERM doesn't work
+          setTimeout(() => { if (!childProcess.killed) childProcess.kill('SIGKILL'); }, 5000);
         }, options.timeout);
       }
 
@@ -360,11 +455,13 @@ export class ExecutorService {
         execution.completedAt = new Date();
         execution.duration = duration;
 
-        if (code === 0) {
+        if (timedOut) {
+          execution.status = ExecutionStatus.FAILED;
+          execution.errorMessage = `Tool execution timed out after ${Math.round((options?.timeout || 0) / 1000)}s. Partial output may be available above.`;
+        } else if (code === 0) {
           execution.status = ExecutionStatus.COMPLETED;
         } else {
           execution.status = ExecutionStatus.FAILED;
-          // Requirement 4.4: Provide error message on failure
           execution.errorMessage = stderr || `Tool exited with code ${code}`;
         }
 
@@ -404,25 +501,35 @@ export class ExecutorService {
     args: string[],
     options: ExecuteOptions | undefined,
     startTime: number,
+    stdinInput?: string,
   ): Promise<ToolExecutionDocument> {
     return new Promise((resolve) => {
       // Build docker exec command
-      const dockerArgs = ['exec', containerName, binaryName, ...args];
+      const dockerArgs = stdinInput
+        ? ['exec', '-i', containerName, binaryName, ...args]
+        : ['exec', containerName, binaryName, ...args];
       const childProcess = spawn('docker', dockerArgs, {
         env: { ...process.env, ...options?.env },
         shell: false,
       });
 
+      // Write stdin input for stdin-based tools
+      if (stdinInput && childProcess.stdin) {
+        childProcess.stdin.write(stdinInput + '\n');
+        childProcess.stdin.end();
+      }
+
       let stdout = '';
       let stderr = '';
+      let timedOut = false;
       let timeoutId: NodeJS.Timeout | undefined;
 
       // Set up timeout if specified
       if (options?.timeout) {
         timeoutId = setTimeout(() => {
+          timedOut = true;
           childProcess.kill('SIGTERM');
-          execution.status = ExecutionStatus.FAILED;
-          execution.errorMessage = `Tool execution timed out after ${options.timeout}ms`;
+          setTimeout(() => { if (!childProcess.killed) childProcess.kill('SIGKILL'); }, 5000);
         }, options.timeout);
       }
 
@@ -450,7 +557,10 @@ export class ExecutorService {
         execution.completedAt = new Date();
         execution.duration = duration;
 
-        if (code === 0) {
+        if (timedOut) {
+          execution.status = ExecutionStatus.FAILED;
+          execution.errorMessage = `Tool execution timed out after ${Math.round((options?.timeout || 0) / 1000)}s. Partial output may be available above.`;
+        } else if (code === 0) {
           execution.status = ExecutionStatus.COMPLETED;
         } else {
           execution.status = ExecutionStatus.FAILED;
@@ -485,9 +595,9 @@ export class ExecutorService {
 
   /**
    * Gets execution history for a tool.
-   * 
+   *
    * Requirements: 8.1, 8.3
-   * 
+   *
    * @param toolId - The tool ID
    * @param limit - Maximum number of executions to return (default 10)
    * @param startDate - Optional start date filter
@@ -532,9 +642,9 @@ export class ExecutorService {
 
   /**
    * Gets a single execution by ID.
-   * 
+   *
    * Requirements: 8.2
-   * 
+   *
    * @param executionId - The execution ID
    * @returns Promise<ToolExecutionDocument | null> - The execution record
    */
@@ -544,7 +654,7 @@ export class ExecutorService {
 
   /**
    * Detects available package managers on the system.
-   * 
+   *
    * @returns Array of available install methods
    */
   async detectAvailablePackageManagers(): Promise<InstallMethod[]> {
@@ -573,14 +683,14 @@ export class ExecutorService {
 
   /**
    * Installs a tool using the specified method or auto-detects the best method.
-   * 
+   *
    * @param tool - The tool to install
    * @param preferredMethod - Optional preferred installation method
    * @returns Promise<InstallResult> - Installation result
    */
   async installTool(tool: ToolDocument, preferredMethod?: InstallMethod): Promise<InstallResult> {
     const installCommands = tool.installation?.installCommands || [];
-    
+
     if (installCommands.length === 0) {
       return {
         success: false,
@@ -596,7 +706,7 @@ export class ExecutorService {
 
     // Find the best installation command
     let selectedCommand = installCommands.find(cmd => cmd.method === preferredMethod && availableManagers.includes(cmd.method));
-    
+
     if (!selectedCommand) {
       // Auto-select based on priority and availability
       const priority: InstallMethod[] = ['apt', 'brew', 'pip', 'go', 'cargo', 'npm', 'git'];
@@ -619,7 +729,7 @@ export class ExecutorService {
     this.logger.log(`Installing ${tool.displayName} using ${selectedCommand.method}: ${selectedCommand.command}`);
 
     return new Promise((resolve) => {
-      exec(selectedCommand!.command, { 
+      exec(selectedCommand!.command, {
         timeout: 300000, // 5 minute timeout
         shell: '/bin/sh', // Use sh which is available in Alpine containers
         env: { ...process.env, PATH: `${process.env.HOME}/go/bin:${process.env.PATH}` },
@@ -638,8 +748,8 @@ export class ExecutorService {
         // Run post-install if specified
         if (selectedCommand!.postInstall) {
           try {
-            execSync(selectedCommand!.postInstall, { 
-              stdio: 'pipe', 
+            execSync(selectedCommand!.postInstall, {
+              stdio: 'pipe',
               timeout: 60000,
               shell: '/bin/sh',
             });
@@ -650,7 +760,7 @@ export class ExecutorService {
 
         // Verify installation
         const isNowInstalled = await this.isInstalled(tool.name, tool.installation?.binaryName);
-        
+
         if (isNowInstalled) {
           // Update tool installation status
           tool.installation = {
@@ -681,7 +791,7 @@ export class ExecutorService {
 
   /**
    * Gets available installation methods for a tool.
-   * 
+   *
    * @param tool - The tool document
    * @returns Available installation methods with their commands
    */

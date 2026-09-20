@@ -53,11 +53,34 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['JetBrains Mono', 'Fira Code', 'monospace'],
-        display: ['Orbitron', 'sans-serif'],
+        // iOS-style system font stack
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'Helvetica', 'Arial', 'sans-serif'],
+        display: ['-apple-system', 'BlinkMacSystemFont', 'SF Pro Display', 'Helvetica Neue', 'sans-serif'],
+        mono: ['SF Mono', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
       },
       backgroundImage: {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
+        // iOS-style subtle gradients
+        'ios-card': 'linear-gradient(180deg, var(--bg-card) 0%, color-mix(in srgb, var(--bg-card) 95%, var(--bg-primary)) 100%)',
+        'ios-button': 'linear-gradient(180deg, color-mix(in srgb, var(--accent-primary) 100%, white 10%) 0%, var(--accent-primary) 100%)',
+      },
+      borderRadius: {
+        // iOS-style rounded corners
+        'ios': '12px',
+        'ios-lg': '16px',
+        'ios-xl': '20px',
+        'ios-2xl': '24px',
+        'ios-full': '9999px',
+      },
+      boxShadow: {
+        // iOS-style shadows
+        'ios-sm': '0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08)',
+        'ios': '0 2px 8px rgba(0, 0, 0, 0.15), 0 1px 3px rgba(0, 0, 0, 0.1)',
+        'ios-md': '0 4px 12px rgba(0, 0, 0, 0.15), 0 2px 4px rgba(0, 0, 0, 0.1)',
+        'ios-lg': '0 8px 24px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.1)',
+        'ios-xl': '0 12px 40px rgba(0, 0, 0, 0.25), 0 6px 12px rgba(0, 0, 0, 0.1)',
+        'ios-inner': 'inset 0 1px 2px rgba(0, 0, 0, 0.1)',
+        'ios-glow': '0 0 20px color-mix(in srgb, var(--accent-primary) 30%, transparent)',
       },
       animation: {
         'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
@@ -67,6 +90,11 @@ const config: Config = {
         'pulse-slow-mobile': 'pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite',
         'fade-in-fast': 'fadeIn 0.15s ease-out forwards',
         'slide-in-fast': 'slideIn 0.2s ease-out forwards',
+        // iOS-style spring animations
+        'ios-bounce': 'iosBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+        'ios-scale': 'iosScale 0.2s ease-out',
+        'ios-slide-up': 'iosSlideUp 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
+        'ios-slide-down': 'iosSlideDown 0.35s cubic-bezier(0.32, 0.72, 0, 1)',
       },
       keyframes: {
         glow: {
@@ -85,11 +113,40 @@ const config: Config = {
           from: { opacity: '0', transform: 'translateY(20px)' },
           to: { opacity: '1', transform: 'translateY(0)' },
         },
+        // iOS-style keyframes
+        iosBounce: {
+          '0%': { transform: 'scale(0.9)', opacity: '0' },
+          '50%': { transform: 'scale(1.02)' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        iosScale: {
+          '0%': { transform: 'scale(0.97)' },
+          '100%': { transform: 'scale(1)' },
+        },
+        iosSlideUp: {
+          '0%': { transform: 'translateY(100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        iosSlideDown: {
+          '0%': { transform: 'translateY(0)', opacity: '1' },
+          '100%': { transform: 'translateY(100%)', opacity: '0' },
+        },
       },
       // Transition duration utilities for mobile optimization
       transitionDuration: {
         'fast': '150ms',
         'mobile': '150ms',
+        'ios': '350ms',
+      },
+      // iOS-style transition timing
+      transitionTimingFunction: {
+        'ios': 'cubic-bezier(0.32, 0.72, 0, 1)',
+        'ios-spring': 'cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+      },
+      // iOS-style backdrop blur
+      backdropBlur: {
+        'ios': '20px',
+        'ios-heavy': '40px',
       },
     },
   },

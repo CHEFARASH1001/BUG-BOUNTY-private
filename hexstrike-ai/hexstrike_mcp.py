@@ -5411,6 +5411,63 @@ def setup_mcp_server(hexstrike_client: HexStrikeClient) -> FastMCP:
 
         return result
 
+    # ============================================================================
+    # HEXSTRIKE AI QUERY TOOL
+    # ============================================================================
+
+    @mcp.tool()
+    def ask_hexstrike(question: str, context: str = "") -> Dict[str, Any]:
+        """
+        Ask a question to HexStrike AI.
+
+        Args:
+            question: The question to ask HexStrike AI
+            context: Optional context or system prompt to guide the AI response
+
+        Returns:
+            HexStrike AI's response
+        """
+        data_payload = {
+            "question": question,
+            "context": context if context else None
+        }
+
+        logger.info(f"{HexStrikeColors.ELECTRIC_PURPLE}🤖 Querying HexStrike AI...{HexStrikeColors.RESET}")
+        logger.info(f"  📝 Question: {question[:100]}{'...' if len(question) > 100 else ''}")
+
+        result = hexstrike_client.safe_post("api/ai/query", data_payload)
+
+        if result.get("success"):
+            response = result.get("response", "")
+            preview = response[:150] + "..." if len(response) > 150 else response
+            logger.info(f"{HexStrikeColors.SUCCESS}✅ HexStrike AI responded{HexStrikeColors.RESET}")
+            logger.info(f"  {HexStrikeColors.NEON_BLUE}🤖 Response: {preview}{HexStrikeColors.RESET}")
+        else:
+            error = result.get("error", "Unknown error")
+            logger.error(f"{HexStrikeColors.ERROR}❌ HexStrike AI query failed: {error}{HexStrikeColors.RESET}")
+
+        return result
+
+    @mcp.tool()
+    def hexstrike_ai_status() -> Dict[str, Any]:
+        """
+        Get HexStrike AI status and configuration.
+
+        Returns:
+            HexStrike AI status information
+        """
+        logger.info(f"{HexStrikeColors.ELECTRIC_PURPLE}📋 Checking HexStrike AI status...{HexStrikeColors.RESET}")
+        result = hexstrike_client.safe_get("api/ai/status")
+
+        if result.get("success"):
+            provider = result.get("provider", {})
+            logger.info(f"{HexStrikeColors.SUCCESS}✅ HexStrike AI is active{HexStrikeColors.RESET}")
+            logger.info(f"  🤖 {provider.get('name')} - {provider.get('model')} v{provider.get('version')}")
+        else:
+            logger.error(f"{HexStrikeColors.ERROR}❌ Failed to get HexStrike AI status{HexStrikeColors.RESET}")
+
+        return result
+
     return mcp
 
 def parse_args():

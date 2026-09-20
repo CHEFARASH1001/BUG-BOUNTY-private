@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Palette, Monitor, Snowflake, Check } from 'lucide-react';
+import { Palette, Monitor, Snowflake, Check, CloudSnow } from 'lucide-react';
 import { clsx } from 'clsx';
 import { useTheme } from '@/lib/theme-context';
 import { ThemeName, THEME_NAMES } from '@/lib/themes';
@@ -33,6 +33,12 @@ const THEME_OPTIONS: ThemeOption[] = [
     icon: Snowflake,
     description: 'Festive red and green theme',
   },
+  {
+    name: 'snowy',
+    label: 'Snowy',
+    icon: CloudSnow,
+    description: 'Winter wonderland with Santa',
+  },
 ];
 
 /**
@@ -45,10 +51,10 @@ export interface ThemeToggleProps {
 
 /**
  * ThemeToggle Component
- * 
+ *
  * Renders a button that opens a dropdown menu for selecting themes.
  * Shows the current theme icon and indicates the active theme in the dropdown.
- * 
+ *
  * Requirements: 2.1, 2.2, 2.3, 2.4
  */
 export function ThemeToggle({ className }: ThemeToggleProps) {

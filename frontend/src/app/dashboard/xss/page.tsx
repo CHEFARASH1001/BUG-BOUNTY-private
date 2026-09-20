@@ -820,7 +820,7 @@ export default function XssPage() {
   const [copiedPayload, setCopiedPayload] = useState<string | null>(null);
   const [payloads, setPayloads] = useState<string[]>([]);
   const [showPayloads, setShowPayloads] = useState(false);
-  
+
   // Reference section state
   const [showReference, setShowReference] = useState(false);
   const [activeRefTab, setActiveRefTab] = useState('types');
@@ -859,7 +859,7 @@ export default function XssPage() {
       try {
         const scansRes = await xssApi.getScans();
         setScans(scansRes.data || []);
-        
+
         if (selectedScan && (selectedScan.status === 'running' || selectedScan.status === 'pending')) {
           const updatedScan = await xssApi.getScan(selectedScan._id);
           setSelectedScan(updatedScan.data);
@@ -896,7 +896,7 @@ export default function XssPage() {
       setScans(prev => [response.data, ...prev]);
       setSelectedScan(response.data);
       setShowForm(false);
-      
+
       // Reset form
       setUrl('');
       setBlindXss('');
@@ -940,8 +940,8 @@ export default function XssPage() {
   };
 
   const toggleTool = (toolName: string) => {
-    setSelectedTools(prev => 
-      prev.includes(toolName) 
+    setSelectedTools(prev =>
+      prev.includes(toolName)
         ? prev.filter(t => t !== toolName)
         : [...prev, toolName]
     );
@@ -991,21 +991,14 @@ export default function XssPage() {
             onClick={() => setShowReference(!showReference)}
             className={cn(
               "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors",
-              showReference 
-                ? "bg-red-600 hover:bg-red-500 text-white" 
+              showReference
+                ? "bg-red-600 hover:bg-red-500 text-white"
                 : "bg-dark-800 hover:bg-dark-700 text-slate-300"
             )}
           >
             <FileText className="w-4 h-4" />
             XSS Reference
           </button>
-          <Link
-            href="/dashboard/xss-narutow-live-4"
-            className="flex items-center gap-2 px-4 py-2 bg-dark-800 hover:bg-dark-700 rounded-lg text-sm text-slate-300 font-medium transition-colors"
-          >
-            <BookOpen className="w-4 h-4" />
-            XSS Notes
-          </Link>
           <button
             onClick={() => { setShowForm(true); setSelectedScan(null); }}
             className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm text-white font-medium transition-colors"
@@ -1558,7 +1551,7 @@ export default function XssPage() {
                     Advanced Options
                     {showAdvanced ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </button>
-                  
+
                   {showAdvanced && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
@@ -1708,8 +1701,8 @@ export default function XssPage() {
                 <div>
                   <p className="text-xs text-slate-500">Progress</p>
                   <p className="text-sm text-white font-medium">
-                    {selectedScan.totalUrls > 0 
-                      ? `${selectedScan.urlsScanned}/${selectedScan.totalUrls}` 
+                    {selectedScan.totalUrls > 0
+                      ? `${selectedScan.urlsScanned}/${selectedScan.totalUrls}`
                       : selectedScan.urlsScanned || 0}
                   </p>
                 </div>
@@ -1749,7 +1742,7 @@ export default function XssPage() {
                           <span>{Math.round((selectedScan.urlsScanned / selectedScan.totalUrls) * 100)}%</span>
                         </div>
                         <div className="h-2 bg-dark-700 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className="h-full bg-red-500 transition-all duration-300"
                             style={{ width: `${(selectedScan.urlsScanned / selectedScan.totalUrls) * 100}%` }}
                           />
@@ -1757,7 +1750,7 @@ export default function XssPage() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Live logs */}
                   {selectedScan.logs && selectedScan.logs.length > 0 && (
                     <div className="border-t border-dark-700 pt-4">
@@ -1983,7 +1976,7 @@ export default function XssPage() {
               </span>
               {showPayloads ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </button>
-            
+
             {showPayloads && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}

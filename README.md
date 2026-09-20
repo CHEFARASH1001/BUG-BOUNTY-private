@@ -37,26 +37,17 @@ RabbitMQ-backed workers, and optional integrations with common security tools.
 
 ## Screenshots
 
-The gallery below is captured from the current BB.AUTO interface, including the
-main workspace and the pages used during reconnaissance. It uses local sample
-data for demonstration; review or replace it before sharing data that is not
-intended to be public.
+The repository includes current UI previews under `scripts/screenshots/`.
 
-| Dashboard | Programs |
-| --- | --- |
-| ![Current dashboard](scripts/screenshots/dashboard.png) | ![Programs page](scripts/screenshots/dashboard-programs.png) |
+| Dashboard | Programs | Tools |
+| --- | --- | --- |
+| ![Dashboard](scripts/screenshots/dashboard-preview.png) | ![Programs](scripts/screenshots/dashboard-programs.png) | ![Tools](scripts/screenshots/dashboard-tools.png) |
 
-| Tools | Domains |
-| --- | --- |
-| ![Tools registry](scripts/screenshots/dashboard-tools.png) | ![Domains page](scripts/screenshots/dashboard-domains.png) |
+### Short walkthrough
 
-| Scans | Vulnerabilities |
-| --- | --- |
-| ![Scans page](scripts/screenshots/dashboard-scans.png) | ![Vulnerabilities page](scripts/screenshots/dashboard-vulnerabilities.png) |
+A scrolling tour of the current dashboard, followed by Programs and Tools.
 
-| HexStrike AI |
-| --- |
-| ![HexStrike AI page](scripts/screenshots/dashboard-hexstrike.png) |
+![BB.AUTO dashboard walkthrough](docs/demo.gif)
 
 ## Architecture
 

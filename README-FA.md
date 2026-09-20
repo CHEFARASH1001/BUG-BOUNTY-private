@@ -26,24 +26,17 @@ Next.js، API با NestJS، ذخیره‌سازی با MongoDB و workerها ب�
 
 ## تصاویر نسخه‌ی فعلی
 
-این تصاویر از همین نسخه‌ی فعلی پنل گرفته شده‌اند و نماهای اصلی پروژه را نشان
-می‌دهند؛ از تصاویر نسخه‌ی قدیمی استفاده نشده است.
+این تصاویر از نسخه‌ی فعلی پنل گرفته شده‌اند.
 
-| داشبورد | برنامه‌ها |
-| --- | --- |
-| ![داشبورد فعلی](scripts/screenshots/dashboard.png) | ![صفحه‌ی برنامه‌ها](scripts/screenshots/dashboard-programs.png) |
+| داشبورد | برنامه‌ها | ابزارها |
+| --- | --- | --- |
+| ![داشبورد فعلی](scripts/screenshots/dashboard-preview.png) | ![صفحه‌ی برنامه‌ها](scripts/screenshots/dashboard-programs.png) | ![رجیستری ابزارها](scripts/screenshots/dashboard-tools.png) |
 
-| ابزارها | دامنه‌ها |
-| --- | --- |
-| ![رجیستری ابزارها](scripts/screenshots/dashboard-tools.png) | ![صفحه‌ی دامنه‌ها](scripts/screenshots/dashboard-domains.png) |
+### دموی کوتاه
 
-| اسکن‌ها | آسیب‌پذیری‌ها |
-| --- | --- |
-| ![صفحه‌ی اسکن‌ها](scripts/screenshots/dashboard-scans.png) | ![صفحه‌ی آسیب‌پذیری‌ها](scripts/screenshots/dashboard-vulnerabilities.png) |
+مرور اسکرولی داشبورد فعلی و سپس نمایش صفحه‌های برنامه‌ها و ابزارها.
 
-| HexStrike AI |
-| --- |
-| ![صفحه‌ی HexStrike AI](scripts/screenshots/dashboard-hexstrike.png) |
+![دموی داشبورد BB.AUTO](docs/demo.gif)
 
 ## راه‌اندازی با Docker
 

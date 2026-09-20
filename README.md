@@ -37,18 +37,9 @@ RabbitMQ-backed workers, and optional integrations with common security tools.
 
 ## Screenshots
 
-The repository includes a few UI previews under `scripts/screenshots/`.
-
-| Dashboard | Programs | Tools |
-| --- | --- | --- |
-| ![Dashboard](scripts/screenshots/dashboard.png) | ![Programs](scripts/screenshots/dashboard-programs.png) | ![Tools](scripts/screenshots/dashboard-tools.png) |
-
-The screenshots use local sample data. Review or replace them before making a
-public repository if the data is not intended to be shared.
-
-### Short walkthrough
-
-![BB.AUTO dashboard walkthrough](docs/demo.gif)
+The dashboard preview above reflects the current BB.AUTO interface. It uses local
+sample data for demonstration; review or replace it before sharing data that is
+not intended to be public.
 
 ## Architecture
 

@@ -8,7 +8,7 @@ Next.js، API با NestJS، ذخیره‌سازی با MongoDB و workerها ب�
 
 </div>
 
-![داشبورد BB.AUTO](scripts/screenshots/dashboard.png)
+![داشبورد فعلی BB.AUTO](scripts/screenshots/dashboard.png)
 
 > این ابزار را فقط روی دارایی‌هایی اجرا کنید که مالک آن هستید یا اجازه‌ی تستشان
 > را دارید. rate limit و محدوده‌ی اسکن باید مطابق سیاست همان برنامه تنظیم شود.
